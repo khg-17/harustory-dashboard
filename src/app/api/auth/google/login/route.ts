@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     redirect_uri: redirectUri,
     response_type: "code",
     scope: "openid email profile",
-    prompt: "select_account",
+    prompt: "select_account consent",
   });
 
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
