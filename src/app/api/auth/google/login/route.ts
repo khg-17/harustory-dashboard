@@ -10,8 +10,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Dynamically extract origin (works on localhost:3000 and Vercel automatically)
-  const origin = request.nextUrl.origin;
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || request.nextUrl.host;
+  const protocol = request.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+  const origin = process.env.APP_URL || `${protocol}://${host}`;
   const redirectUri = `${origin}/api/auth/callback/google`;
 
   const params = new URLSearchParams({

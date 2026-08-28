@@ -6,7 +6,9 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const error = searchParams.get("error");
 
-  const origin = request.nextUrl.origin;
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || request.nextUrl.host;
+  const protocol = request.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+  const origin = process.env.APP_URL || `${protocol}://${host}`;
   const redirectUri = `${origin}/api/auth/callback/google`;
   const loginUrl = new URL("/login", origin);
 
