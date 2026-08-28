@@ -15,7 +15,11 @@ export interface AuthUser {
  * Parses and returns list of allowed domains
  */
 export function getAllowedDomains(): string[] {
-  return ALLOWED_DOMAINS_ENV.split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
+  return ALLOWED_DOMAINS_ENV
+    .replace(/["']/g, "")
+    .split(",")
+    .map((d) => d.trim().toLowerCase().replace(/^@/, ""))
+    .filter(Boolean);
 }
 
 /**
