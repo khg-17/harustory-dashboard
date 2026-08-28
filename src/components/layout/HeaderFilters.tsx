@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { Smartphone, Calendar } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Smartphone, Calendar, LogOut } from "lucide-react";
 import { AppOption, DatePreset, PeriodType } from "@/types/dashboard";
 
 interface HeaderFiltersProps {
@@ -33,6 +34,17 @@ export const HeaderFilters: React.FC<HeaderFiltersProps> = ({
   handlePeriodChange,
   handleDatePreset,
 }) => {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.push("/login");
+      router.refresh();
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+  };
   return (
     <div className="bg-white rounded-2xl border border-[#e5e8eb] shadow-[0_2px_8px_rgba(0,0,0,0.04)] px-5 py-3.5 flex flex-wrap items-center justify-between gap-4">
       <div className="flex flex-wrap items-center gap-4 text-xs">

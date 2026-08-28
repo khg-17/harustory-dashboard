@@ -222,16 +222,19 @@ export interface DailyRevenueTrendItem {
 export interface DailyContentRevenueItem {
   dt: string;
   formattedDt: string;
+  totalContentRevenue: number;
   revenueWon: number;
-  revenueCoin: number;
+  paidCoinWon: number;
   chargeWon: number;
-  chargeCoin: number;
+  chargeCoin?: number;
+  adTicketWon: number;
   payerUu: number;
   arppuWon: number;
 }
 
 export interface RevenueSummary {
   contentPaySum: number;
+  paidCoinSum: number;
   adTicketSum: number;
   giftBoxSum: number;
   serviceTotalSum: number;
@@ -275,26 +278,38 @@ export interface SettlementRewardDetail {
 }
 
 export interface SettlementReceivedReward {
-  mission: SettlementRewardDetail;
-  buzzvil: SettlementRewardDetail;
-  rc: SettlementRewardDetail;
+  mission?: SettlementRewardDetail;
+  buzzvil?: SettlementRewardDetail;
+  rc?: SettlementRewardDetail;
 }
 
 export interface SettlementAdData {
   adcash: number;
   adforus: number;
-  adsense: number;
-  adpopcorn: number;
+  adsense?: number;
+  adpopcorn?: number;
+  apWebCPC?: number;
   buzzvil: number;
   rc: number;
   tossMini: number;
 }
 
-export interface SettlementDailyItem {
-  date: string; // yyyy-MM-dd
+export interface SettlementAppData {
+  appSN: number;
+  appName: string | null;
   content: SettlementContentData;
   usedReward: number;
-  receivedReward: SettlementReceivedReward;
+  receivedReward?: SettlementReceivedReward;
   ad: SettlementAdData;
 }
+
+export interface SettlementDailyItem {
+  date: string; // yyyy-MM-dd
+  apps?: SettlementAppData[];
+  content?: SettlementContentData;
+  usedReward?: number;
+  receivedReward?: SettlementReceivedReward;
+  ad?: SettlementAdData;
+}
+
 

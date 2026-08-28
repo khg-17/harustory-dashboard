@@ -205,6 +205,89 @@ function sanitizeDataset(type: string, data: any[], userSegment?: string, newUse
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type') || 'overview';
+
+  // Return filtered active app list immediately without checking responseCache
+  if (type === 'app_list') {
+    const sqlApps = `
+      SELECT appID, count() as user_count
+      FROM Log.UserFirstSeen_V
+      WHERE appID != ''
+      GROUP BY appID
+      HAVING user_count >= 5
+      ORDER BY appID ASC
+    `;
+    try {
+      const rawApps = await queryClickHouse(sqlApps);
+      const appNameMap: Record<string, string> = {
+        tc: "전체",
+        bitbunny: "비트버니",
+        yafit: "야핏무브",
+        harustory: "하루스토리",
+        kakaopay: "카카오페이",
+        toss: "토스",
+        kbpay: "KB페이",
+        digiloca: "디지로카",
+        olock: "오락",
+        pass: "PASS",
+        passbyKT: "PASS by KT",
+        okcashback: "OK캐쉬백",
+        benepia: "베네피아",
+        benecafe: "베네카페",
+        happytoon: "해피툰",
+        haruweather: "하루날씨",
+        pocketcu: "포켓CU",
+        rround: "알라운드",
+        wabank: "와뱅",
+        zaritalk: "자리톡",
+        zum: "줌",
+        "3o3": "삼쩜삼",
+        bitwalk: "비트워크",
+        bppay: "BP페이",
+        memog: "메모G",
+        treasurer: "트레저러",
+        upluspage: "유플러스페이지",
+        "ph-hw": "포인트홈-하루날씨",
+      };
+
+      const coreApps = ["tc", "bitbunny", "yafit", "harustory"];
+      const activeAppSet = new Set<string>(coreApps);
+
+      if (Array.isArray(rawApps)) {
+        rawApps.forEach((item: any) => {
+          const val = item.appID?.trim();
+          if (val) {
+            activeAppSet.add(val);
+          }
+        });
+      }
+
+      const appList: { label: string; value: string }[] = [];
+      activeAppSet.forEach((val) => {
+        if (val === "tc") {
+          appList.push({ label: "전체 (통합 서비스)", value: "tc" });
+        } else {
+          const name = appNameMap[val];
+          const labelText = name && name !== val ? `${name} (${val})` : val;
+          appList.push({ label: labelText, value: val });
+        }
+      });
+
+      return NextResponse.json({ success: true, data: appList });
+    } catch (err: any) {
+      console.error("Failed to fetch app_list:", err.message);
+      const defaultAppList = [
+        { label: "전체 (통합 서비스)", value: "tc" },
+        { label: "비트버니 (bitbunny)", value: "bitbunny" },
+        { label: "야핏무브 (yafit)", value: "yafit" },
+        { label: "하루스토리 (harustory)", value: "harustory" },
+        { label: "토스 (toss)", value: "toss" },
+        { label: "카카오페이 (kakaopay)", value: "kakaopay" },
+        { label: "포인트홈-하루날씨 (ph-hw)", value: "ph-hw" },
+      ];
+      return NextResponse.json({ success: true, data: defaultAppList });
+    }
+  }
+
   let app = searchParams.get('app') || 'tc';
   let from = searchParams.get('from') || '2026-07-03';
   let to = searchParams.get('to') || '2026-07-22';
@@ -984,78 +1067,6 @@ export async function GET(request: NextRequest) {
           label = '${label}'
         )
       `;
-    } else if (type === 'app_list') {
-      const sqlApps = `
-        SELECT DISTINCT appID
-        FROM (
-          SELECT appID FROM Log.AppNewUserWatermark_V WHERE appID != ''
-          UNION ALL
-          SELECT appID FROM Log.UserFirstSeen_V WHERE appID != ''
-        )
-        ORDER BY appID ASC
-      `;
-      try {
-        const rawApps = await queryClickHouse(sqlApps);
-        const appNameMap: Record<string, string> = {
-          tc: "전체",
-          bitbunny: "비트버니",
-          yafit: "야핏무브",
-          harustory: "하루스토리",
-          kakaopay: "카카오페이",
-          toss: "토스",
-          kbpay: "KB페이",
-          digiloca: "디지로카",
-          olock: "오락",
-          pass: "PASS",
-          passbyKT: "PASS by KT",
-          okcashback: "OK캐쉬백",
-          benepia: "베네피아",
-          benecafe: "베네카페",
-          happytoon: "해피툰",
-          haruweather: "하루날씨",
-          pocketcu: "포켓CU",
-          rround: "알라운드",
-          wabank: "와뱅",
-          zaritalk: "자리톡",
-          zum: "줌",
-          "3o3": "삼쩜삼",
-          bitwalk: "비트워크",
-          bppay: "BP페이",
-          memog: "메모G",
-          treasurer: "트레저러",
-          upluspage: "유플러스페이지",
-          "ph-hw": "ph-hw",
-        };
-
-        const appList = [{ label: "전체 (통합 서비스)", value: "tc" }];
-
-        if (Array.isArray(rawApps)) {
-          rawApps.forEach((item: any) => {
-            const val = item.appID?.trim();
-            if (val && val !== "tc") {
-              const name = appNameMap[val];
-              const labelText = name && name !== val ? `${name} (${val})` : val;
-              appList.push({
-                label: labelText,
-                value: val,
-              });
-            }
-          });
-        }
-
-        return NextResponse.json({ success: true, data: appList });
-      } catch (err: any) {
-        console.error("Failed to fetch app_list:", err.message);
-        const defaultAppList = [
-          { label: "전체 (통합 서비스)", value: "tc" },
-          { label: "비트버니 (bitbunny)", value: "bitbunny" },
-          { label: "야핏무브 (yafit)", value: "yafit" },
-          { label: "하루스토리 (harustory)", value: "harustory" },
-          { label: "카카오페이 (kakaopay)", value: "kakaopay" },
-          { label: "ph-hw", value: "ph-hw" },
-        ];
-        return NextResponse.json({ success: true, data: defaultAppList });
-      }
     } else {
       return NextResponse.json({ success: false, error: 'Invalid type parameter' }, { status: 400 });
     }
@@ -1171,7 +1182,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Dynamic Live Raw Log Fallback for 'retention' query (Pure Watermark-filtered New User Retention)
-    if (type === 'retention' && Array.isArray(data)) {
+    if (type === 'retention' && (!Array.isArray(data) || data.length < 10 || app === 'ph-hw')) {
       const addDaysStr = (dStr: string, days: number) => {
         const d = new Date(dStr);
         d.setDate(d.getDate() + days);
@@ -1228,7 +1239,7 @@ export async function GET(request: NextRequest) {
         FROM retention_raw AS r
         INNER JOIN cohort_sizes AS b ON r.cohortDateKst = b.cohortDateKst
         ORDER BY cohortDate ASC, dayN ASC
-        SETTINGS max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296, max_partitions_to_read = 1000
+        SETTINGS max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296, max_partitions_to_read = 1000, max_rows_to_read = 0
       `;
 
       try {
@@ -1238,6 +1249,85 @@ export async function GET(request: NextRequest) {
         }
       } catch (e) {
         console.warn("Failed live raw retention fallback:", e);
+      }
+    }
+
+    // Dynamic Live Raw Log Fallback for 'earning_activation' query
+    if (type === 'earning_activation' && (!Array.isArray(data) || data.length < 10 || app === 'ph-hw')) {
+      const addDaysStr = (dStr: string, days: number) => {
+        const d = new Date(dStr);
+        d.setDate(d.getDate() + days);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+      const extendedTo = addDaysStr(to, 6);
+      const appCondUfs = app === 'tc' ? "(1 = 1)" : `ufs.appID = '${app}'`;
+      const appCondUal = app === 'tc' ? "(1 = 1)" : `ual.appID = '${app}'`;
+      const rawEarningSql = `
+        WITH 
+        cohorts AS (
+          SELECT 
+            ufs.appID AS appID,
+            ufs.accountSN AS accountSN,
+            ufs.firstEventDateKst AS cohortDateKst
+          FROM Log.UserFirstSeen_V AS ufs
+          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ufs.appID = wm.appID
+          WHERE ${appCondUfs}
+            AND toInt64OrZero(ufs.accountSN) > ifNull(wm.watermark, 0)
+            AND ufs.firstEventDateKst >= '${from}'
+            AND ufs.firstEventDateKst <= '${to}'
+        ),
+        cohort_sizes AS (
+          SELECT 
+            cohortDateKst, 
+            uniqExact(accountSN) AS d0Count
+          FROM cohorts
+          GROUP BY cohortDateKst
+        ),
+        earning_raw AS (
+          SELECT 
+            c.cohortDateKst AS cohortDateKst,
+            dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) AS dayN,
+            uniqExact(c.accountSN) AS activatedUu
+          FROM cohorts AS c
+          INNER JOIN Log.UserActionLog AS ual 
+            ON ual.accountSN = c.accountSN 
+           AND ${appCondUal}
+          WHERE ual.env = 'prod'
+            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= '${from}'
+            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) <= '${extendedTo}'
+            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= c.cohortDateKst
+            AND dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) <= 30
+            AND (
+              ual.label LIKE 'reward_%' 
+              OR ual.label LIKE '%mission%' 
+              OR ual.label LIKE '%complete%' 
+              OR ual.label LIKE '%confirm%' 
+              OR ual.label LIKE '%claim%' 
+              OR ual.label LIKE '%earn%'
+            )
+          GROUP BY cohortDateKst, dayN
+        )
+        SELECT 
+          r.cohortDateKst AS cohortDate,
+          r.dayN AS dayN,
+          r.activatedUu AS activatedUu,
+          if(b.d0Count > 0, round(r.activatedUu / b.d0Count * 100, 2), 0) AS activationRate
+        FROM earning_raw AS r
+        INNER JOIN cohort_sizes AS b ON r.cohortDateKst = b.cohortDateKst
+        ORDER BY cohortDate ASC, dayN ASC
+        SETTINGS max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296, max_partitions_to_read = 1000, max_rows_to_read = 0
+      `;
+
+      try {
+        const rawEarning: any[] = await queryClickHouse(rawEarningSql);
+        if (Array.isArray(rawEarning) && rawEarning.length > 0) {
+          data = rawEarning;
+        }
+      } catch (e) {
+        console.warn("Failed live raw earning activation fallback:", e);
       }
     }
 

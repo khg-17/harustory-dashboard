@@ -16,6 +16,7 @@ const client = createClient({
     max_memory_usage: '4294967296', // 4GB memory limit per query to prevent MEMORY_LIMIT_EXCEEDED
     max_bytes_before_external_group_by: '268435456', // 256MB spill to disk before external group by
     max_partitions_to_read: '1000', // Allow reading up to 1000 partitions for wide date ranges
+    max_rows_to_read: '0', // Allow reading large tables without hitting 50M row limit
   },
 });
 

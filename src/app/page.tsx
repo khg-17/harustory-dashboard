@@ -41,6 +41,7 @@ import {
   CombinedCohortRow,
   RevenueSummary,
   DailyRevenueTrendItem,
+  DailyContentRevenueItem,
   FunnelItem,
   FunnelStepItem,
   EventCatalogItem,
@@ -57,6 +58,7 @@ import {
   UserSegment,
   MissionSubTab,
   SettlementDailyItem,
+  SettlementAdData,
 } from "@/types/dashboard";
 
 // Register Chart.js Modules
@@ -83,8 +85,9 @@ export default function Dashboard() {
     { label: "비트버니 (bitbunny)", value: "bitbunny" },
     { label: "야핏무브 (yafit)", value: "yafit" },
     { label: "하루스토리 (harustory)", value: "harustory" },
+    { label: "토스 (toss)", value: "toss" },
     { label: "카카오페이 (kakaopay)", value: "kakaopay" },
-    { label: "ph-hw", value: "ph-hw" },
+    { label: "포인트홈-하루날씨 (ph-hw)", value: "ph-hw" },
   ]);
 
   // Fetch Dynamic ClickHouse Apps List on Mount
@@ -112,6 +115,110 @@ export default function Dashboard() {
     return d;
   };
 
+  const getSettlementDataForApp = (item: SettlementDailyItem, selectedApp: string) => {
+    if (!item) return null;
+
+    if (selectedApp === "tc") {
+      if (Array.isArray(item.apps) && item.apps.length > 0) {
+        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0;
+        let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0;
+
+        item.apps.forEach((app) => {
+          paidCoin += Number(app.content?.payingCoin?.paidCoin || 0);
+          freeCoin += Number(app.content?.payingCoin?.freeCoin || 0);
+          chargeCoin += Number(app.content?.chargeCoin || 0);
+          usedReward += Number(app.usedReward || 0);
+          const ad: Partial<SettlementAdData> = app.ad || {};
+          b += Number(ad.buzzvil || 0);
+          pop += Number(ad.apWebCPC ?? ad.adpopcorn ?? 0);
+          forus += Number(ad.adforus || 0);
+          sense += Number(ad.adsense || 0);
+          cash += Number(ad.adcash || 0);
+          rc += Number(ad.rc || 0);
+          toss += Number(ad.tossMini || 0);
+        });
+
+        return {
+          paidCoin,
+          freeCoin,
+          chargeCoin,
+          usedReward,
+          ad: { b, pop, forus, sense, cash, rc, toss },
+        };
+      } else {
+        const ad: Partial<SettlementAdData> = item.ad || {};
+        return {
+          paidCoin: Number(item.content?.payingCoin?.paidCoin || 0),
+          freeCoin: Number(item.content?.payingCoin?.freeCoin || 0),
+          chargeCoin: Number(item.content?.chargeCoin || 0),
+          usedReward: Number(item.usedReward || 0),
+          ad: {
+            b: Number(ad.buzzvil || 0),
+            pop: Number(ad.apWebCPC ?? ad.adpopcorn ?? 0),
+            forus: Number(ad.adforus || 0),
+            sense: Number(ad.adsense || 0),
+            cash: Number(ad.adcash || 0),
+            rc: Number(ad.rc || 0),
+            toss: Number(ad.tossMini || 0),
+          },
+        };
+      }
+    }
+
+    if (Array.isArray(item.apps) && item.apps.length > 0) {
+      const selLower = selectedApp.toLowerCase();
+
+      const APP_ALIAS_MAP: Record<string, string[]> = {
+        bitbunny: ["bitbunny", "비트버니"],
+        yafit: ["yafit", "야핏", "야핏무브"],
+        harustory: ["harustory", "하루스토리"],
+        toss: ["toss", "토스"],
+        kakaopay: ["kakaopay", "카카오", "카카오페이"],
+        "ph-hw": ["ph-hw", "하루날씨", "포인트홈", "point home"],
+      };
+
+      const targetAliases = APP_ALIAS_MAP[selLower] || [selLower];
+
+      const matchedApps = item.apps.filter((app) => {
+        if (!app.appName) return false;
+        const appNameLower = app.appName.toLowerCase();
+        return targetAliases.some(
+          (alias) => appNameLower.includes(alias) || alias.includes(appNameLower)
+        );
+      });
+
+      if (matchedApps.length > 0) {
+        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0;
+        let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0;
+
+        matchedApps.forEach((app) => {
+          paidCoin += Number(app.content?.payingCoin?.paidCoin || 0);
+          freeCoin += Number(app.content?.payingCoin?.freeCoin || 0);
+          chargeCoin += Number(app.content?.chargeCoin || 0);
+          usedReward += Number(app.usedReward || 0);
+          const ad: Partial<SettlementAdData> = app.ad || {};
+          b += Number(ad.buzzvil || 0);
+          pop += Number(ad.apWebCPC ?? ad.adpopcorn ?? 0);
+          forus += Number(ad.adforus || 0);
+          sense += Number(ad.adsense || 0);
+          cash += Number(ad.adcash || 0);
+          rc += Number(ad.rc || 0);
+          toss += Number(ad.tossMini || 0);
+        });
+
+        return {
+          paidCoin,
+          freeCoin,
+          chargeCoin,
+          usedReward,
+          ad: { b, pop, forus, sense, cash, rc, toss },
+        };
+      }
+    }
+
+    return null;
+  };
+
   // Navigation Sidebar Active Tab ("users" = 유저 현황, "revenue" = 매출 현황)
   const [activeTab, setActiveTab] = useState<ActiveTab>("users");
 
@@ -123,10 +230,10 @@ export default function Dashboard() {
 
   const [selectedApp, setSelectedApp] = useState<string>("tc");
   const [periodType, setPeriodType] = useState<PeriodType>("day");
-  const [datePreset, setDatePreset] = useState<DatePreset>("30d");
+  const [datePreset, setDatePreset] = useState<DatePreset>("7d");
 
-  // Default date range: End date is always set to Yesterday (e.g. 07.26 if Today is 07.27)
-  const [fromDate, setFromDate] = useState<string>(() => formatDateStr(getYesterday(29)));
+  // Default date range: End date is always set to Yesterday (e.g. D-1), default: Recent 7 days (D-7 ~ D-1)
+  const [fromDate, setFromDate] = useState<string>(() => formatDateStr(getYesterday(6)));
   const [toDate, setToDate] = useState<string>(() => formatDateStr(getYesterday(0)));
 
   // View Mode Switch for DAU & Revenue Cards (차트 vs 테이블)
@@ -256,21 +363,17 @@ export default function Dashboard() {
           setMissionTotalRaw(missionTotalJson.data);
         }
 
-        // Fetch External Settlement API when selectedApp is 'tc' (전체 통합)
-        if (selectedApp === "tc") {
-          try {
-            const settlementRes = await fetch(`/api/settlement?from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts);
-            const settlementJson = await settlementRes.json();
-            if (settlementJson.success && Array.isArray(settlementJson.data)) {
-              setSettlementRaw(settlementJson.data);
-            } else {
-              setSettlementRaw([]);
-            }
-          } catch (e) {
-            console.warn("Settlement API fetch warning:", e);
+        // Fetch External Settlement API v2 (supports all apps breakdown)
+        try {
+          const settlementRes = await fetch(`/api/settlement?from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts);
+          const settlementJson = await settlementRes.json();
+          if (settlementJson.success && Array.isArray(settlementJson.data)) {
+            setSettlementRaw(settlementJson.data);
+          } else {
             setSettlementRaw([]);
           }
-        } else {
+        } catch (e) {
+          console.warn("Settlement API fetch warning:", e);
           setSettlementRaw([]);
         }
 
@@ -584,7 +687,7 @@ export default function Dashboard() {
         dateMap[rawDateStr] = { newUserCount: 0, daysMap: {} };
       }
 
-      if (dayN === 0 && !isActivation) {
+      if (dayN === 0 && (!isActivation || dateMap[rawDateStr].newUserCount === 0)) {
         dateMap[rawDateStr].newUserCount = userCount;
       }
     });
@@ -859,9 +962,18 @@ export default function Dashboard() {
     return !isNaN(num) ? num : 0;
   };
 
+  const hasActiveSettlement = useMemo(() => {
+    return (
+      Array.isArray(settlementRaw) &&
+      settlementRaw.length > 0 &&
+      settlementRaw.some((item) => getSettlementDataForApp(item, selectedApp) !== null)
+    );
+  }, [settlementRaw, selectedApp]);
+
   // 3. Process Revenue Datasets
   const revenueSummary = useMemo<RevenueSummary>(() => {
     let contentPaySum = 0;
+    let paidCoinSum = 0;
     let adTicketSum = 0;
     let giftBoxSum = 0;
     let serviceTotalSum = 0;
@@ -881,36 +993,33 @@ export default function Dashboard() {
 
     const isPhApp = selectedApp.toLowerCase().includes("ph-");
 
-    if (selectedApp === "tc" && settlementRaw && settlementRaw.length > 0) {
+    if (hasActiveSettlement) {
       settlementRaw.forEach((item) => {
-        const paidCoin = Number(item.content?.payingCoin?.paidCoin || 0);
-        const usedReward = Number(item.usedReward || 0);
+        const sData = getSettlementDataForApp(item, selectedApp);
+        if (!sData) return;
 
-        const ad = item.ad || { adcash: 0, adforus: 0, adsense: 0, adpopcorn: 0, buzzvil: 0, rc: 0, tossMini: 0 };
-        const b = Number(ad.buzzvil || 0);
-        const pop = Number(ad.adpopcorn || 0);
-        const forus = Number(ad.adforus || 0);
-        const sense = Number(ad.adsense || 0);
-        const cash = Number(ad.adcash || 0);
-        const rc = Number(ad.rc || 0);
-        const toss = Number(ad.tossMini || 0);
+        const { paidCoin, chargeCoin, usedReward, ad } = sData;
+        const { b, pop, forus, sense, cash, rc, toss } = ad;
 
         const dayTotalAd = b + pop + forus + sense + cash + rc + toss;
 
-        contentPaySum += paidCoin;
-        serviceTotalSum += paidCoin;
+        contentPaySum += chargeCoin;
+        paidCoinSum += paidCoin;
+        serviceTotalSum += chargeCoin;
+        totalAdRevenue += dayTotalAd;
         rewardAdRevenue += isPhApp ? (cash + rc) : (pop + forus + rc);
         totalExchangedPoints += usedReward;
 
         const netMap: Record<string, number> = {
           "Buzzvil": b,
-          "Adpopcorn": pop,
+          "apWebCPC": pop,
           "Adforus": forus,
-          "AdSense": sense,
           "AdCash": cash,
           "RC (비토스)": rc,
           "Toss Mini": toss,
         };
+        if (sense > 0) netMap["AdSense"] = sense;
+
         Object.entries(netMap).forEach(([netName, rev]) => {
           if (!networkMap[netName]) networkMap[netName] = { revenue: 0, impression: 0 };
           networkMap[netName].revenue += rev;
@@ -976,9 +1085,9 @@ export default function Dashboard() {
     });
 
     const totalRewardCost = totalExchangedPoints;
-    // Business Rule: Net Operating Margin is calculated strictly against Mission Ad Revenue (display category & Adpopcorn/Adforus networks)
-    const netProfit = rewardAdRevenue - totalRewardCost;
-    const marginRate = rewardAdRevenue > 0 ? (netProfit / rewardAdRevenue) * 100 : 0;
+    // Business Rule: Net Operating Margin (순 영업 마진) = Total Ad Revenue (총 광고 매출) - Exchanged Points Cost (포인트 환전액)
+    const netProfit = totalAdRevenue - totalRewardCost;
+    const marginRate = totalAdRevenue > 0 ? (netProfit / totalAdRevenue) * 100 : 0;
 
     // Helper for robust date string extraction (YYYY-MM-DD)
     const extractDtStr = (rawDt: any): string => {
@@ -1020,26 +1129,21 @@ export default function Dashboard() {
       };
     });
 
-    if (selectedApp === "tc" && Array.isArray(settlementRaw) && settlementRaw.length > 0) {
+    if (hasActiveSettlement) {
       settlementRaw.forEach((item) => {
         const dtStr = extractDtStr(item.date);
         if (!dtStr || !dailyMap[dtStr]) return;
 
-        const paidCoin = Number(item.content?.payingCoin?.paidCoin || 0);
-        const usedReward = Number(item.usedReward || 0);
+        const sData = getSettlementDataForApp(item, selectedApp);
+        if (!sData) return;
 
-        const ad = item.ad || { adcash: 0, adforus: 0, adsense: 0, adpopcorn: 0, buzzvil: 0, rc: 0, tossMini: 0 };
-        const b = Number(ad.buzzvil || 0);
-        const pop = Number(ad.adpopcorn || 0);
-        const forus = Number(ad.adforus || 0);
-        const sense = Number(ad.adsense || 0);
-        const cash = Number(ad.adcash || 0);
-        const rc = Number(ad.rc || 0);
-        const toss = Number(ad.tossMini || 0);
+        const { paidCoin, chargeCoin, usedReward, ad } = sData;
+        const { b, pop, forus, sense, cash, rc, toss } = ad;
+
         const dayTotalAd = b + pop + forus + sense + cash + rc + toss;
 
-        dailyMap[dtStr].serviceRev = paidCoin;
-        dailyMap[dtStr].contentPay = paidCoin;
+        dailyMap[dtStr].serviceRev = chargeCoin;
+        dailyMap[dtStr].contentPay = chargeCoin;
         dailyMap[dtStr].adRev = dayTotalAd;
         dailyMap[dtStr].rewardAdRev = isPhApp ? (cash + rc) : (pop + forus + rc);
         dailyMap[dtStr].eCost = usedReward;
@@ -1096,8 +1200,8 @@ export default function Dashboard() {
       d.serviceRev = Math.round(d.serviceRev);
       d.grossTotal = Math.round(d.serviceRev + d.adRev);
       d.cost = Math.round(d.eCost);
-      d.margin = Math.round(d.rewardAdRev - d.cost);
-      d.marginRate = d.rewardAdRev > 0 ? Number(((d.margin / d.rewardAdRev) * 100).toFixed(1)) : 0;
+      d.margin = Math.round(d.adRev - d.cost);
+      d.marginRate = d.adRev > 0 ? Number(((d.margin / d.adRev) * 100).toFixed(1)) : 0;
     });
 
     const rawDailyTrend = Object.values(dailyMap).sort((a, b) => a.dt.localeCompare(b.dt));
@@ -1158,7 +1262,7 @@ export default function Dashboard() {
       });
 
       dailyTrend = Object.values(groups).map((g) => {
-        g.marginRate = g.rewardAdRev > 0 ? Number(((g.margin / g.rewardAdRev) * 100).toFixed(1)) : 0;
+        g.marginRate = g.adRev > 0 ? Number(((g.margin / g.adRev) * 100).toFixed(1)) : 0;
         return g;
       }).sort((a, b) => a.dt.localeCompare(b.dt));
     }
@@ -1169,32 +1273,72 @@ export default function Dashboard() {
     let totalArppuWonSum = 0;
     let contentDaysCount = 0;
 
-    const contentDailyList = contentRevenueRaw.map((row) => {
-      const dtStr = row.dt ? String(row.dt).split("T")[0] : "";
-      const revWon = Number(row.revenueWon || 0);
-      const revCoin = Number(row.revenueCoin || 0);
-      const chgWon = Number(row.chargeWon || 0);
-      const chgCoin = Number(row.chargeCoin || 0);
-      const payer = Number(row.payerUu || 0);
-      const arppu = Number(row.arppuWon || 0);
+    let contentDailyList: DailyContentRevenueItem[] = [];
 
-      chargeWonSum += chgWon;
-      chargeCoinSum += chgCoin;
-      totalPayerUu += payer;
-      totalArppuWonSum += arppu;
-      if (dtStr) contentDaysCount += 1;
+    if (hasActiveSettlement) {
+      const sortedSettlement = [...settlementRaw].sort((a, b) => a.date.localeCompare(b.date));
+      contentDailyList = sortedSettlement.map((item) => {
+        const dtStr = extractDtStr(item.date);
+        const sData = getSettlementDataForApp(item, selectedApp);
+        const revWon = sData ? sData.chargeCoin : 0;
+        const paidWon = sData ? sData.paidCoin : 0;
+        const chgWon = sData ? sData.chargeCoin : 0;
 
-      return {
-        dt: dtStr,
-        formattedDt: dtStr ? dtStr.slice(5).replace("-", "/") : "",
-        revenueWon: revWon,
-        revenueCoin: revCoin,
-        chargeWon: chgWon,
-        chargeCoin: chgCoin,
-        payerUu: payer,
-        arppuWon: arppu,
-      };
-    });
+        const chRow = contentRevenueRaw.find((r) => extractDtStr(r?.dt) === dtStr);
+        const adTickWon = chRow ? Number(chRow.adTicketRevenue || 0) : 0;
+        const payer = chRow ? Number(chRow.payerUu || 0) : 0;
+        const arppu = payer > 0 ? Math.round(revWon / payer) : 0;
+
+        chargeWonSum += chgWon;
+        chargeCoinSum += chgWon;
+        totalPayerUu += payer;
+        totalArppuWonSum += arppu;
+        if (dtStr) contentDaysCount += 1;
+
+        const totalContentRevenue = paidWon + adTickWon;
+
+        return {
+          dt: dtStr,
+          formattedDt: dtStr ? dtStr.slice(5).replace("-", "/") : "",
+          totalContentRevenue,
+          revenueWon: revWon,
+          paidCoinWon: paidWon,
+          chargeWon: chgWon,
+          adTicketWon: adTickWon,
+          payerUu: payer,
+          arppuWon: arppu,
+        };
+      });
+    } else {
+      contentDailyList = contentRevenueRaw.map((row) => {
+        const dtStr = row.dt ? String(row.dt).split("T")[0] : "";
+        const revWon = Number(row.chargeWon || row.revenueWon || 0);
+        const paidWon = Number(row.revenueWon || 0);
+        const chgWon = Number(row.chargeWon || 0);
+        const adTickWon = Number(row.adTicketRevenue || 0);
+        const payer = Number(row.payerUu || 0);
+        const arppu = Number(row.arppuWon || 0);
+        const totalContentRevenue = paidWon + adTickWon;
+
+        chargeWonSum += chgWon;
+        chargeCoinSum += chgWon;
+        totalPayerUu += payer;
+        totalArppuWonSum += arppu;
+        if (dtStr) contentDaysCount += 1;
+
+        return {
+          dt: dtStr,
+          formattedDt: dtStr ? dtStr.slice(5).replace("-", "/") : "",
+          totalContentRevenue,
+          revenueWon: revWon,
+          paidCoinWon: paidWon,
+          chargeWon: chgWon,
+          adTicketWon: adTickWon,
+          payerUu: payer,
+          arppuWon: arppu,
+        };
+      });
+    }
 
     const avgPayerUu = contentDaysCount > 0 ? Math.round(totalPayerUu / contentDaysCount) : 0;
     const avgArppuWon = contentDaysCount > 0 ? Math.round(totalArppuWonSum / contentDaysCount) : 0;
@@ -1214,24 +1358,32 @@ export default function Dashboard() {
     let adCategoryDailyTrend = { dates: [] as string[], categories: {} as Record<string, number[]> };
     let networkDailyTrend = { dates: [] as string[], networks: {} as Record<string, number[]> };
 
-    if (selectedApp === "tc" && Array.isArray(settlementRaw) && settlementRaw.length > 0) {
+    if (hasActiveSettlement) {
       const sortedSettlement = [...settlementRaw].sort((a, b) => a.date.localeCompare(b.date));
       const dates = sortedSettlement.map((s) => s.date.slice(5).replace("-", "/"));
 
+      const metricsList = sortedSettlement.map((s) => {
+        const sData = getSettlementDataForApp(s, selectedApp);
+        if (sData) return sData.ad;
+        return { b: 0, pop: 0, forus: 0, sense: 0, cash: 0, rc: 0, toss: 0 };
+      });
+
       const netDaily: Record<string, number[]> = {
-        "Buzzvil": sortedSettlement.map((s) => Number(s.ad?.buzzvil || 0)),
-        "Adpopcorn": sortedSettlement.map((s) => Number(s.ad?.adpopcorn || 0)),
-        "Adforus": sortedSettlement.map((s) => Number(s.ad?.adforus || 0)),
-        "AdSense": sortedSettlement.map((s) => Number(s.ad?.adsense || 0)),
-        "AdCash": sortedSettlement.map((s) => Number(s.ad?.adcash || 0)),
-        "RC (비토스)": sortedSettlement.map((s) => Number(s.ad?.rc || 0)),
-        "Toss Mini": sortedSettlement.map((s) => Number(s.ad?.tossMini || 0)),
+        "Buzzvil": metricsList.map((m) => m.b),
+        "apWebCPC": metricsList.map((m) => m.pop),
+        "Adforus": metricsList.map((m) => m.forus),
+        "AdCash": metricsList.map((m) => m.cash),
+        "RC (비토스)": metricsList.map((m) => m.rc),
+        "Toss Mini": metricsList.map((m) => m.toss),
       };
+      if (metricsList.some((m) => m.sense > 0)) {
+        netDaily["AdSense"] = metricsList.map((m) => m.sense);
+      }
 
       const catDaily: Record<string, number[]> = {
-        reward: sortedSettlement.map((s) => Number(s.ad?.buzzvil || 0)),
-        display: sortedSettlement.map((s) => Number(s.ad?.adpopcorn || 0) + Number(s.ad?.adforus || 0) + Number(s.ad?.adsense || 0) + Number(s.ad?.adcash || 0)),
-        rc: sortedSettlement.map((s) => Number(s.ad?.rc || 0) + Number(s.ad?.tossMini || 0)),
+        reward: metricsList.map((m) => m.b),
+        display: metricsList.map((m) => m.pop + m.forus + m.sense + m.cash),
+        rc: metricsList.map((m) => m.rc + m.toss),
         adTicket: sortedSettlement.map(() => 0),
       };
 
@@ -1304,6 +1456,7 @@ export default function Dashboard() {
 
     return {
       contentPaySum,
+      paidCoinSum,
       adTicketSum,
       giftBoxSum,
       serviceTotalSum,
@@ -1382,8 +1535,8 @@ export default function Dashboard() {
     labels: (revenueSummary.dailyTrend || []).map((d) => d.formattedDt || d.dt),
     datasets: [
       {
-        label: "미션형 광고 매출",
-        data: (revenueSummary.dailyTrend || []).map((d) => Math.round(d.rewardAdRev)),
+        label: "총 광고 매출",
+        data: (revenueSummary.dailyTrend || []).map((d) => Math.round(d.adRev)),
         borderColor: "#00c980",
         backgroundColor: "transparent",
         borderWidth: 2,
@@ -1593,7 +1746,7 @@ export default function Dashboard() {
             revenueChartData={revenueChartData}
             marginChartData={marginChartData}
             revenueChartOptions={revenueChartOptions}
-            hasSettlementData={selectedApp === "tc" && Array.isArray(settlementRaw) && settlementRaw.length > 0}
+            hasSettlementData={hasActiveSettlement}
             selectedApp={selectedApp}
           />
         )}

@@ -43,6 +43,7 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
   revenueChartOptions,
   selectedApp = "tc",
 }) => {
+  const totalAdRevenue = Number(revenueSummary?.totalAdRevenue || 0);
   const rewardAdRevenue = Number(revenueSummary?.rewardAdRevenue || 0);
   const totalMissionReward = Number(revenueSummary?.totalMissionReward || 0);
   const totalExchangedPoints = Number(revenueSummary?.totalExchangedPoints || 0);
@@ -57,13 +58,13 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
     <div className="space-y-6">
       {/* ── 4-CARD TOSS KPI GRID (CRISP BORDER & SHADOW) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: 미션형 광고 매출 */}
+        {/* Card 1: 총 광고 매출 */}
         <div className="bg-white rounded-2xl border border-[#e5e8eb] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5 space-y-2">
           <div className="text-[13px] font-semibold text-[#8b95a1]">
-            미션형 광고 매출
+            총 광고 매출
           </div>
           <div className="text-[26px] font-bold text-[#191f28] tracking-[-0.04em]">
-            {Math.round(rewardAdRevenue).toLocaleString()}
+            {Math.round(totalAdRevenue).toLocaleString()}
             <span className="text-[16px] font-medium text-[#4e5968] ml-0.5">원</span>
           </div>
         </div>
@@ -114,7 +115,7 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
         <div className="flex items-center justify-between text-xs font-bold text-[#4e5968]">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-[#3182f6]" />
-            <span>일별 미션 광고 매출 vs 환전 비용 vs 순 영업 마진 추이</span>
+            <span>일별 총 광고 매출 vs 환전 비용 vs 순 영업 마진 추이</span>
           </div>
           <span className="text-[11px] text-[#8b95a1] font-semibold">단위: 원 (KRW)</span>
         </div>

@@ -41,6 +41,7 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
   const isUsageTab = revenueCategoryTab === "content_usage";
   const contentDailyList = revenueSummary?.contentDailyList || [];
   const purchaseTypeMap = revenueSummary?.purchaseTypeMap || {};
+  const paidCoinSum = Number(revenueSummary?.paidCoinSum || 0);
   const contentPaySum = Number(revenueSummary?.contentPaySum || 0);
   const grossRevenue = Number(revenueSummary?.grossRevenue || 0);
   const chargeWonSum = Number(revenueSummary?.chargeWonSum || 0);
@@ -53,10 +54,10 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
     labels: contentDailyList.map((d) => d.formattedDt || d.dt),
     datasets: [
       {
-        label: "콘텐츠 코인 결제 매출 (원)",
-        data: contentDailyList.map((d) => d.revenueWon),
+        label: "콘텐츠 총 매출 (원)",
+        data: contentDailyList.map((d) => d.totalContentRevenue ?? (d.paidCoinWon + (d.adTicketWon || 0))),
         borderColor: "#3182f6",
-        backgroundColor: "rgba(59, 130, 246, 0.08)",
+        backgroundColor: "rgba(49, 130, 246, 0.08)",
         borderWidth: 2.5,
         pointBackgroundColor: "#3182f6",
         pointBorderColor: "#fff",
@@ -67,18 +68,18 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
         fill: true,
       },
       {
-        label: "현금 코인 충전 금액 (원)",
-        data: contentDailyList.map((d) => d.chargeWon),
-        borderColor: "#00c980",
-        backgroundColor: "rgba(16, 185, 129, 0.05)",
-        borderWidth: 2.5,
-        pointBackgroundColor: "#00c980",
+        label: "광고무 매출 (원)",
+        data: contentDailyList.map((d) => d.adTicketWon || 0),
+        borderColor: "#a98eff",
+        backgroundColor: "rgba(169, 142, 255, 0.05)",
+        borderWidth: 2,
+        pointBackgroundColor: "#a98eff",
         pointBorderColor: "#fff",
         pointBorderWidth: 1.5,
-        pointRadius: 3.5,
-        pointHoverRadius: 6,
+        pointRadius: 3,
+        pointHoverRadius: 5,
         tension: 0.35,
-        fill: true,
+        fill: false,
       },
     ],
   };
@@ -423,47 +424,91 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
     );
   }
 
+  // Calculate Growth Rate vs Previous Period
+  const len = contentDailyList.length;
+  let prevTotalRev = 0, recentTotalRev = 0;
+  let prevPay = 0, recentPay = 0;
+  let prevPaidCoin = 0, recentPaidCoin = 0;
+  let prevAdTicket = 0, recentAdTicket = 0;
+
+  if (len >= 2) {
+    const mid = Math.floor(len / 2);
+    const prevPart = contentDailyList.slice(0, mid);
+    const recentPart = contentDailyList.slice(mid);
+
+    prevTotalRev = prevPart.reduce((sum, d) => sum + (d.totalContentRevenue ?? (d.paidCoinWon + (d.adTicketWon || 0))), 0);
+    recentTotalRev = recentPart.reduce((sum, d) => sum + (d.totalContentRevenue ?? (d.paidCoinWon + (d.adTicketWon || 0))), 0);
+
+    prevPay = prevPart.reduce((sum, d) => sum + (d.revenueWon || 0), 0);
+    recentPay = recentPart.reduce((sum, d) => sum + (d.revenueWon || 0), 0);
+
+    prevPaidCoin = prevPart.reduce((sum, d) => sum + (d.paidCoinWon || 0), 0);
+    recentPaidCoin = recentPart.reduce((sum, d) => sum + (d.paidCoinWon || 0), 0);
+
+    prevAdTicket = prevPart.reduce((sum, d) => sum + (d.adTicketWon || 0), 0);
+    recentAdTicket = recentPart.reduce((sum, d) => sum + (d.adTicketWon || 0), 0);
+  }
+
+  const totalRevGrowth = prevTotalRev > 0 ? ((recentTotalRev - prevTotalRev) / prevTotalRev) * 100 : 0;
+  const payGrowth = prevPay > 0 ? ((recentPay - prevPay) / prevPay) * 100 : 0;
+  const paidCoinGrowth = prevPaidCoin > 0 ? ((recentPaidCoin - prevPaidCoin) / prevPaidCoin) * 100 : 0;
+  const adTicketGrowth = prevAdTicket > 0 ? ((recentAdTicket - prevAdTicket) / prevAdTicket) * 100 : 0;
+
+  const renderGrowthBadge = (growth: number) => {
+    const isUp = growth >= 0;
+    const absVal = Math.abs(growth).toFixed(1);
+    return (
+      <span className={`inline-flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-md ${
+        isUp ? "bg-[#e8f3ff] text-[#3182f6]" : "bg-[#fff0f1] text-[#f04452]"
+      }`}>
+        {isUp ? `▲ +${absVal}%` : `▼ -${absVal}%`}
+        <span className="text-[10px] font-normal text-[#8b95a1] ml-0.5">전월대비</span>
+      </span>
+    );
+  };
+
   // --- SUB TAB 1: 코인 결제 매출 View (Default) ---
   return (
     <div className="space-y-6">
       {/* Content KPI Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-medium">
-        <div className="p-4 bg-blue-50/60 border border-blue-100 rounded-xl space-y-1.5">
-          <div className="text-[#8b95a1] font-semibold">코인 결제 매출</div>
-          <div className="text-xl font-bold text-blue-700">
-            {contentPaySum.toLocaleString()}원
+        <div className="p-5 bg-white border border-[#e5e8eb] rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-semibold text-[#8b95a1]">콘텐츠 총 매출</span>
+            {renderGrowthBadge(totalRevGrowth)}
           </div>
-          <div className="text-[11px] text-[#3182f6] font-medium">
-            코인결제 비중:{" "}
-            {grossRevenue > 0
-              ? ((contentPaySum / grossRevenue) * 100).toFixed(1)
-              : 0}%
+          <div className="text-[24px] font-bold text-[#191f28] tracking-[-0.04em]">
+            {(paidCoinSum + adTicketSum).toLocaleString()}<span className="text-[16px] text-[#4e5968] ml-0.5">원</span>
           </div>
         </div>
 
-        <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl space-y-1.5">
-          <div className="text-[#8b95a1] font-semibold">코인 충전 금액 (KRW)</div>
-          <div className="text-xl font-bold text-emerald-700">
-            {chargeWonSum.toLocaleString()}원
+        <div className="p-5 bg-white border border-[#e5e8eb] rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-semibold text-[#8b95a1]">코인 결제 매출</span>
+            {renderGrowthBadge(payGrowth)}
           </div>
-          <div className="text-[11px] text-[#00c980] font-medium">유저 코인 충전 총액</div>
+          <div className="text-[24px] font-bold text-[#191f28] tracking-[-0.04em]">
+            {contentPaySum.toLocaleString()}<span className="text-[16px] text-[#4e5968] ml-0.5">원</span>
+          </div>
         </div>
 
-        <div className="p-4 bg-purple-50/60 border border-purple-100 rounded-xl space-y-1.5">
-          <div className="text-[#8b95a1] font-semibold">광고무 지면 매출</div>
-          <div className="text-xl font-bold text-purple-700">
-            {adTicketSum.toLocaleString()}원
+        <div className="p-5 bg-white border border-[#e5e8eb] rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-semibold text-[#8b95a1]">사용 코인 (원)</span>
+            {renderGrowthBadge(paidCoinGrowth)}
           </div>
-          <div className="text-[11px] text-[#a98eff] font-medium">광고무 지면 수익</div>
+          <div className="text-[24px] font-bold text-[#191f28] tracking-[-0.04em]">
+            {paidCoinSum.toLocaleString()}<span className="text-[16px] text-[#4e5968] ml-0.5">원</span>
+          </div>
         </div>
 
-        <div className="p-4 bg-amber-50/60 border border-amber-100 rounded-xl space-y-1.5">
-          <div className="text-[#8b95a1] font-semibold">평균 ARPPU</div>
-          <div className="text-xl font-bold text-amber-700">
-            {avgArppuWon.toLocaleString()}원
+        <div className="p-5 bg-white border border-[#e5e8eb] rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-semibold text-[#8b95a1]">광고무 매출 (원)</span>
+            {renderGrowthBadge(adTicketGrowth)}
           </div>
-          <div className="text-[11px] text-amber-600 font-medium">
-            일평균 Payer: {avgPayerUu.toLocaleString()}명
+          <div className="text-[24px] font-bold text-[#191f28] tracking-[-0.04em]">
+            {adTicketSum.toLocaleString()}<span className="text-[16px] text-[#4e5968] ml-0.5">원</span>
           </div>
         </div>
       </div>
@@ -472,7 +517,7 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
       <div className="space-y-3 bg-[#f8f9fa] p-4 rounded-xl border border-[#f2f4f6]">
         <div className="flex items-center gap-2 text-xs font-bold text-[#4e5968]">
           <TrendingUp className="w-4 h-4 text-[#3182f6]" />
-          <span>일별 코인 결제 매출 vs 현금 충전액 추이 차트</span>
+          <span>일별 콘텐츠 총 매출 및 세부 추이 차트</span>
         </div>
         <div className="h-72 pt-2">
           {contentDailyList.length > 0 ? (
@@ -489,45 +534,52 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
       <div className="space-y-3 pt-1">
         <h3 className="text-xs font-bold text-[#4e5968] flex items-center gap-2">
           <Table className="w-3.5 h-3.5 text-[#3182f6]" />
-          <span>일별 콘텐츠 결제 매출 및 충전 현황 상세 테이블</span>
+          <span>일별 콘텐츠 결제 매출 현황 상세 테이블</span>
         </h3>
         <div className="overflow-x-auto border border-[#e5e8eb]/80 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-[#f8f9fa] font-bold text-[#4e5968] border-b border-[#e5e8eb]">
                 <th className="py-3 px-4">날짜 (dt)</th>
+                <th className="py-3 px-4 text-right text-[#3182f6]">콘텐츠 총 매출 (원)</th>
                 <th className="py-3 px-4 text-right">코인 결제 매출 (원)</th>
-                <th className="py-3 px-4 text-right">사용 코인</th>
-                <th className="py-3 px-4 text-right">코인 충전액 (원)</th>
+                <th className="py-3 px-4 text-right">사용 코인 (원)</th>
+                <th className="py-3 px-4 text-right">광고무 매출 (원)</th>
                 <th className="py-3 px-4 text-right">결제 유저 수</th>
                 <th className="py-3 px-4 text-right">ARPPU (원)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#f2f4f6] font-medium text-[#4e5968]">
               {contentDailyList.length > 0 ? (
-                contentDailyList.map((row) => (
-                  <tr key={row.dt} className="hover:bg-[#f8f9fa] transition-colors">
-                    <td className="py-3 px-4 font-semibold text-[#191f28]">{row.dt}</td>
-                    <td className="py-3 px-4 text-right font-medium text-[#4e5968]">
-                      {row.revenueWon.toLocaleString()}원
-                    </td>
-                    <td className="py-3 px-4 text-right font-medium text-[#4e5968]">
-                      {row.revenueCoin.toLocaleString()} 코인
-                    </td>
-                    <td className="py-3 px-4 text-right font-medium text-[#4e5968]">
-                      {row.chargeWon.toLocaleString()}원
-                    </td>
-                    <td className="py-3 px-4 text-right font-bold text-[#191f28]">
-                      {row.payerUu.toLocaleString()}명
-                    </td>
-                    <td className="py-3 px-4 text-right font-bold text-[#191f28]">
-                      {row.arppuWon.toLocaleString()}원
-                    </td>
-                  </tr>
-                ))
+                contentDailyList.map((row) => {
+                  const totalRev = row.totalContentRevenue ?? (row.paidCoinWon + (row.adTicketWon || 0));
+                  return (
+                    <tr key={row.dt} className="hover:bg-[#f8f9fa] transition-colors">
+                      <td className="py-3 px-4 font-semibold text-[#191f28]">{row.dt}</td>
+                      <td className="py-3 px-4 text-right font-bold text-[#3182f6]">
+                        {totalRev.toLocaleString()}원
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium text-[#4e5968]">
+                        {row.revenueWon.toLocaleString()}원
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium text-[#4e5968]">
+                        {row.paidCoinWon.toLocaleString()}원
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium text-[#4e5968]">
+                        {(row.adTicketWon || 0).toLocaleString()}원
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold text-[#191f28]">
+                        {row.payerUu.toLocaleString()}명
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold text-[#191f28]">
+                        {row.arppuWon.toLocaleString()}원
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-6 text-center text-[#8b95a1] font-semibold">
+                  <td colSpan={7} className="py-6 text-center text-[#8b95a1] font-semibold">
                     선택한 기간 내 상세 콘텐츠 매출 데이터가 없습니다.
                   </td>
                 </tr>

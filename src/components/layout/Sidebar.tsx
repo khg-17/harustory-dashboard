@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Menu, Users, DollarSign, BarChart2, Award, ShoppingBag, Filter, BookOpen, UserPlus, Layers, ChevronDown, ChevronRight, Gift, Calendar } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Menu, Users, DollarSign, BarChart2, Award, ShoppingBag, Filter, BookOpen, UserPlus, Layers, ChevronDown, ChevronRight, Gift, Calendar, LogOut, User } from "lucide-react";
 import { ActiveTab, RevenueCategoryTab, FunnelCategoryTab, MissionSubTab } from "@/types/dashboard";
 
 interface SidebarProps {
@@ -27,9 +28,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isSidebarCollapsed,
   setIsSidebarCollapsed
 }) => {
+  const router = useRouter();
   const [isFunnelOpen, setIsFunnelOpen] = useState<boolean>(activeTab === "funnel");
   const [isRevenueOpen, setIsRevenueOpen] = useState<boolean>(activeTab === "revenue");
   const [isMissionOpen, setIsMissionOpen] = useState<boolean>(activeTab === "mission");
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
 
   useEffect(() => {
     setIsFunnelOpen(activeTab === "funnel");
@@ -37,10 +40,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setIsMissionOpen(activeTab === "mission");
   }, [activeTab]);
 
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.authenticated && json.user?.email) {
+          setCurrentUserEmail(json.user.email);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.push("/login");
+      router.refresh();
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
+
   return (
-    <aside className={`${isSidebarCollapsed ? "w-16 p-3" : "w-60 p-4"} bg-white flex flex-col shrink-0 border-r border-[#e5e8eb]/60 space-y-6 transition-all duration-200 select-none min-h-screen`}>
+    <aside className={`${isSidebarCollapsed ? "w-16 p-3" : "w-60 p-4"} bg-white flex flex-col shrink-0 border-r border-[#e5e8eb]/60 transition-all duration-200 select-none sticky top-0 h-screen overflow-hidden`}>
       {/* Top Header: Original GURU COMPANY Logo & Collapsible Menu Toggle */}
-      <div className={`flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-between"} pb-4 border-b border-[#e5e8eb]/60`}>
+      <div className={`shrink-0 flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-between"} pb-4 mb-4 border-b border-[#e5e8eb]/60`}>
         {!isSidebarCollapsed && (
           <div className="flex flex-col items-start cursor-pointer select-none">
             <span 
@@ -67,8 +91,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
 
-      {/* Navigation Sidebar Tabs */}
-      <div className="space-y-1">
+      {/* Navigation Sidebar Tabs (Scrollable area) */}
+      <div className="flex-1 overflow-y-auto pr-1 space-y-1">
         {/* 1. 유저 현황 */}
         <button 
           onClick={() => setActiveTab("users")}
@@ -315,6 +339,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
         </div>
+      </div>
+
+      {/* User Session Profile & Logout Footer */}
+      <div className="shrink-0 mt-auto pt-3 border-t border-[#e5e8eb]/60 bg-white">
+        {!isSidebarCollapsed ? (
+          <div className="bg-[#f8f9fa] rounded-2xl p-2.5 border border-[#e5e8eb] flex items-center justify-between gap-2 shadow-2xs">
+            {/* Account Info */}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="w-7 h-7 rounded-xl bg-[#3182f6]/10 text-[#3182f6] flex items-center justify-center font-bold text-xs shrink-0">
+                <User className="w-3.5 h-3.5" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span
+                  title={currentUserEmail || "사내 계정"}
+                  className="text-[11px] font-bold text-[#191f28] truncate leading-tight"
+                >
+                  {currentUserEmail || "사내 계정"}
+                </span>
+                <span className="text-[9.5px] text-[#00c980] font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00c980]" />
+                  로그인됨
+                </span>
+              </div>
+            </div>
+
+            {/* Logout Button right next to account */}
+            <button
+              onClick={handleLogout}
+              title="로그아웃"
+              className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-bold text-[#6b7684] hover:text-[#f04452] bg-white hover:bg-[#fef2f2] border border-[#e5e8eb] hover:border-[#fee2e2] rounded-xl transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95"
+            >
+              <LogOut className="w-3 h-3" />
+              <span>로그아웃</span>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleLogout}
+            title={`로그아웃 (${currentUserEmail || "사내 계정"})`}
+            className="w-full flex items-center justify-center p-2.5 text-[#8b95a1] hover:text-[#f04452] hover:bg-[#fef2f2] rounded-xl transition-colors cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </aside>
   );

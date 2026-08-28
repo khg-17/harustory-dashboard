@@ -50,7 +50,11 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3182f6] opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#3182f6]"></span>
             </span>
-            <span>전체(tc) 일별 정산 API 데이터가 연동되었습니다. (admin.treasurecomics.com 정산 원장 연동)</span>
+            <span>
+              {selectedApp === "tc"
+                ? "전체(tc) 일별 정산 API v2 데이터가 연동되었습니다. (admin.treasurecomics.com 정산 원장 연동)"
+                : `${selectedApp} 일별 정산 API v2 앱별 데이터가 연동되었습니다. (admin.treasurecomics.com 정산 원장 연동)`}
+            </span>
           </div>
           <span className="text-[11px] text-[#4e5968] font-normal">D-1 기준 정산 원장 데이터 표출 중</span>
         </div>
