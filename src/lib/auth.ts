@@ -12,15 +12,19 @@ export interface AuthUser {
   loginTime: number;
 }
 
+const DEFAULT_DOMAINS = ["gurucompany.co.kr", "avatye.com"];
+
 /**
  * Parses and returns list of allowed domains
  */
 export function getAllowedDomains(): string[] {
-  return ALLOWED_DOMAINS_ENV
+  const parsed = ALLOWED_DOMAINS_ENV
     .replace(/["']/g, "")
     .split(",")
     .map((d) => d.trim().toLowerCase().replace(/^@/, ""))
     .filter(Boolean);
+
+  return Array.from(new Set([...DEFAULT_DOMAINS, ...parsed]));
 }
 
 /**
