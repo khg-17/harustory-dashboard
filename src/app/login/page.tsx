@@ -50,7 +50,7 @@ function LoginContent() {
               </div>
             )}
             <div className="text-[11px] font-normal text-[#6b7684] mt-1">
-              @gurucompany.co.kr 또는 @avatye.com 구글 계정으로 다시 시도해 주세요.
+              허용된 도메인 계정(@gurucompany.co.kr, @avatye.com) 또는 등록된 특정 이메일 계정으로 다시 시도해 주세요.
             </div>
           </div>
         )}

@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 
 // Environment variables or fallback default values
 const ALLOWED_DOMAINS_ENV = process.env.ALLOWED_EMAIL_DOMAIN || "gurucompany.co.kr,avatye.com";
+const ALLOWED_EMAILS_ENV = process.env.ALLOWED_EMAILS || "";
 const AUTH_SECRET_KEY = process.env.AUTH_SECRET_KEY || "guru-clickhouse-dashboard-secret-token-key-2026";
 const COOKIE_NAME = "dashboard_session";
 
@@ -23,18 +24,35 @@ export function getAllowedDomains(): string[] {
 }
 
 /**
- * Validates if an email's domain is in the allowed domains list
+ * Parses and returns list of allowed specific full email addresses
+ */
+export function getAllowedSpecificEmails(): string[] {
+  return ALLOWED_EMAILS_ENV
+    .replace(/["']/g, "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/**
+ * Validates if an email's domain OR exact email address is in the allowed list
  */
 export function validateEmailDomain(email: string): { isValid: boolean; domain: string; allowedDomains: string[] } {
   const allowed = getAllowedDomains();
+  const allowedSpecificEmails = getAllowedSpecificEmails();
+
   if (!email || !email.includes("@")) {
     return { isValid: false, domain: "", allowedDomains: allowed };
   }
 
-  const parts = email.trim().toLowerCase().split("@");
+  const normalizedEmail = email.trim().toLowerCase();
+  const parts = normalizedEmail.split("@");
   const domain = parts[parts.length - 1];
 
-  const isValid = allowed.includes(domain);
+  const isValidDomain = allowed.includes(domain);
+  const isValidEmail = allowedSpecificEmails.includes(normalizedEmail);
+
+  const isValid = isValidDomain || isValidEmail;
   return { isValid, domain, allowedDomains: allowed };
 }
 
