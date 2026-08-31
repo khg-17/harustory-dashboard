@@ -1,8 +1,5 @@
 import { cookies } from "next/headers";
 
-// Environment variables or fallback default values
-const ALLOWED_DOMAINS_ENV = process.env.ALLOWED_EMAIL_DOMAIN || "gurucompany.co.kr,avatye.com";
-const ALLOWED_EMAILS_ENV = process.env.ALLOWED_EMAILS || "";
 const AUTH_SECRET_KEY = process.env.AUTH_SECRET_KEY || "guru-clickhouse-dashboard-secret-token-key-2026";
 const COOKIE_NAME = "dashboard_session";
 
@@ -18,7 +15,8 @@ const DEFAULT_DOMAINS = ["gurucompany.co.kr", "avatye.com"];
  * Parses and returns list of allowed domains
  */
 export function getAllowedDomains(): string[] {
-  const parsed = ALLOWED_DOMAINS_ENV
+  const envVal = process.env.ALLOWED_EMAIL_DOMAIN || "";
+  const parsed = envVal
     .replace(/["']/g, "")
     .split(",")
     .map((d) => d.trim().toLowerCase().replace(/^@/, ""))
@@ -31,7 +29,8 @@ export function getAllowedDomains(): string[] {
  * Parses and returns list of allowed specific full email addresses
  */
 export function getAllowedSpecificEmails(): string[] {
-  return ALLOWED_EMAILS_ENV
+  const envVal = process.env.ALLOWED_EMAILS || "";
+  return envVal
     .replace(/["']/g, "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
