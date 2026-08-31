@@ -571,28 +571,50 @@ export async function GET(request: NextRequest) {
     } else if (type === 'mission_total') {
       if (userSegment === "all") {
         sql = `
-          SELECT *
-          FROM Report.MissionTotal__app_from_to_PV(
-            app = '${app}',
-            from = '${from}',
-            to = '${to}'
+          WITH combined AS (
+            SELECT 
+              dt,
+              uniqExactMerge(completeCount) AS completeCount,
+              uniqExactMerge(uu) AS uu,
+              sumMerge(rewardAmount) AS rewardP
+            FROM Performance.MissionDaily
+            WHERE (appID = '${app}' OR '${app}' = 'tc')
+              AND dt >= '${from}' AND dt <= '${to}'
+              AND rewardType = 'POINT'
+            GROUP BY dt
+
+            UNION ALL
+
+            SELECT 
+              dt,
+              uniqExactMerge(cnt) AS completeCount,
+              uniqExactMerge(uu) AS uu,
+              sumMerge(rewardAmount) AS rewardP
+            FROM Performance.RCDaily
+            WHERE (appID = '${app}' OR '${app}' = 'tc')
+              AND dt >= '${from}' AND dt <= '${to}'
+            GROUP BY dt
           )
+          SELECT 
+            dt,
+            sum(completeCount) AS totalCompleteCount,
+            sum(uu) AS totalParticipantUu,
+            sum(rewardP) AS totalRewardAmount
+          FROM combined
+          GROUP BY dt
           ORDER BY dt ASC
         `;
       } else {
         const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
-        let segCondMp = "";
-        let segCondRc = "";
-        if (userSegment === "new") {
-          segCondMp = `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`;
-          segCondRc = `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`;
-        } else if (userSegment === "existing") {
-          segCondMp = `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
-          segCondRc = `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
-        }
+        const segCondMp = userSegment === "new"
+          ? `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`
+          : `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
+        const segCondRc = userSegment === "new"
+          ? `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`
+          : `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
 
         sql = `
-          WITH combined AS (
+          WITH distinct_mp AS (
             SELECT 
               mp.dt AS dt,
               mp.participationSN AS itemSN,
@@ -601,15 +623,15 @@ export async function GET(request: NextRequest) {
             FROM Performance.MissionParticipation_Raw AS mp
             LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
             LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-            WHERE ${appCond}
-              AND mp.dt >= '${from}' AND mp.dt <= '${to}'
+            WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
+              AND ${appCond}
               AND mp.status = 'COMPLETED'
               AND mp.rewardType = 'POINT'
               AND mp.missionSN > 0
               ${segCondMp}
-
-            UNION ALL
-
+            GROUP BY dt, itemSN, rewardP, accountSN
+          ),
+          distinct_rc AS (
             SELECT 
               rc.dt AS dt,
               rc.seq AS itemSN,
@@ -618,218 +640,390 @@ export async function GET(request: NextRequest) {
             FROM Performance.RCPayload_Raw AS rc
             LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
             LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-            WHERE ${appCond}
-              AND rc.dt >= '${from}' AND rc.dt <= '${to}'
+            WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
+              AND ${appCond}
               AND rc.status = 2
               AND rc.subType BETWEEN 101 AND 112
               ${segCondRc}
+            GROUP BY dt, itemSN, rewardP, accountSN
+          ),
+          combined AS (
+            SELECT * FROM distinct_mp
+            UNION ALL
+            SELECT * FROM distinct_rc
           )
           SELECT 
             dt,
-            uniqExact(itemSN) AS totalCompleteCount,
+            count(itemSN) AS totalCompleteCount,
             uniqExact(accountSN) AS totalParticipantUu,
             sum(rewardP) AS totalRewardAmount
           FROM combined
           GROUP BY dt
           ORDER BY dt ASC
+          SETTINGS max_partitions_to_read = 100
         `;
       }
     } else if (type === 'missions_detail') {
-      const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
-      let segCondMp = "";
-      let segCondRc = "";
-      if (userSegment === "new") {
-        segCondMp = `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`;
-        segCondRc = `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`;
-      } else if (userSegment === "existing") {
-        segCondMp = `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
-        segCondRc = `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
+      if (userSegment === "all") {
+        sql = `
+          WITH combined AS (
+            SELECT 
+              upper(missionType) AS label,
+              uniqExactMerge(completeCount) AS completeCount,
+              uniqExactMerge(uu) AS uu,
+              sumMerge(rewardAmount) AS rewardP
+            FROM Performance.MissionDaily
+            WHERE (appID = '${app}' OR '${app}' = 'tc')
+              AND dt >= '${from}' AND dt <= '${to}'
+              AND rewardType = 'POINT'
+            GROUP BY missionType
+
+            UNION ALL
+
+            SELECT 
+              'RC' AS label,
+              uniqExactMerge(cnt) AS completeCount,
+              uniqExactMerge(uu) AS uu,
+              sumMerge(rewardAmount) AS rewardP
+            FROM Performance.RCDaily
+            WHERE (appID = '${app}' OR '${app}' = 'tc')
+              AND dt >= '${from}' AND dt <= '${to}'
+            GROUP BY label
+          ),
+          summed AS (
+            SELECT 
+              label,
+              sum(completeCount) AS completeCount,
+              sum(uu) AS uu,
+              sum(rewardP) AS rewardAmount
+            FROM combined
+            GROUP BY label
+          )
+          SELECT 
+            label,
+            multiIf(
+              label = 'CLEANING', '책 정리',
+              label = 'SNACK', '간식',
+              label = 'DRINK', '음료',
+              label = 'RECOMMENDATION', '추천작',
+              label = 'TIP', '팁',
+              label = 'SCROLL', '스크롤',
+              label = 'RC', 'RC',
+              '기타'
+            ) AS missionName,
+            completeCount,
+            uu,
+            rewardAmount,
+            if(uu > 0, round(completeCount / uu, 1), 0) AS avgPerUser,
+            if(completeCount > 0, round(rewardAmount / completeCount, 1), 0) AS rewardPerComplete
+          FROM summed
+          ORDER BY completeCount DESC
+        `;
+      } else {
+        const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
+        const segCondMp = userSegment === "new"
+          ? `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`
+          : `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
+        const segCondRc = userSegment === "new"
+          ? `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`
+          : `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
+
+        sql = `
+          WITH distinct_mp AS (
+            SELECT 
+              mp.dt AS dt,
+              mp.participationSN AS itemSN,
+              upper(m.missionType) AS label,
+              toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
+              mp.accountSN AS accountSN
+            FROM Performance.MissionParticipation_Raw AS mp
+            INNER JOIN Performance.Mission_V AS m ON m.missionSN = mp.missionSN
+            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
+            LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
+            WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
+              AND ${appCond}
+              AND mp.status = 'COMPLETED'
+              AND mp.rewardType = 'POINT'
+              AND mp.missionSN > 0
+              ${segCondMp}
+            GROUP BY dt, itemSN, label, rewardP, accountSN
+          ),
+          distinct_rc AS (
+            SELECT 
+              rc.dt AS dt,
+              rc.seq AS itemSN,
+              'RC' AS label,
+              toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
+              rc.accountSN AS accountSN
+            FROM Performance.RCPayload_Raw AS rc
+            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
+            LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
+            WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
+              AND ${appCond}
+              AND rc.status = 2
+              AND rc.subType BETWEEN 101 AND 112
+              ${segCondRc}
+            GROUP BY dt, itemSN, label, rewardP, accountSN
+          ),
+          combined AS (
+            SELECT * FROM distinct_mp
+            UNION ALL
+            SELECT * FROM distinct_rc
+          ),
+          summed AS (
+            SELECT 
+              label,
+              count(itemSN) AS completeCount,
+              uniqExact(accountSN) AS uu,
+              sum(rewardP) AS rewardAmount
+            FROM combined
+            GROUP BY label
+          )
+          SELECT 
+            label,
+            multiIf(
+              label = 'CLEANING', '책 정리',
+              label = 'SNACK', '간식',
+              label = 'DRINK', '음료',
+              label = 'RECOMMENDATION', '추천작',
+              label = 'TIP', '팁',
+              label = 'SCROLL', '스크롤',
+              label = 'RC', 'RC',
+              '기타'
+            ) AS missionName,
+            completeCount,
+            uu,
+            rewardAmount,
+            if(uu > 0, round(completeCount / uu, 1), 0) AS avgPerUser,
+            if(completeCount > 0, round(rewardAmount / completeCount, 1), 0) AS rewardPerComplete
+          FROM summed
+          ORDER BY completeCount DESC
+          SETTINGS max_partitions_to_read = 100
+        `;
       }
-
-      sql = `
-        WITH combined AS (
-          SELECT 
-            mp.dt AS dt,
-            upper(m.missionType) AS label,
-            mp.participationSN AS itemSN,
-            toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
-            mp.accountSN AS accountSN
-          FROM Performance.MissionParticipation_Raw AS mp
-          INNER JOIN Performance.Mission_V AS m ON m.missionSN = mp.missionSN
-          LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
-          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-          WHERE ${appCond}
-            AND mp.dt >= '${from}' AND mp.dt <= '${to}'
-            AND mp.status = 'COMPLETED'
-            AND mp.rewardType = 'POINT'
-            AND mp.missionSN > 0
-            ${segCondMp}
-
-          UNION ALL
-
-          SELECT 
-            rc.dt AS dt,
-            'RC' AS label,
-            rc.seq AS itemSN,
-            toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
-            rc.accountSN AS accountSN
-          FROM Performance.RCPayload_Raw AS rc
-          LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
-          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-          WHERE ${appCond}
-            AND rc.dt >= '${from}' AND rc.dt <= '${to}'
-            AND rc.status = 2
-            AND rc.subType BETWEEN 101 AND 112
-            ${segCondRc}
-        )
-        SELECT 
-          label,
-          multiIf(
-            label = 'CLEANING', '책 정리',
-            label = 'SNACK', '간식',
-            label = 'DRINK', '음료',
-            label = 'RECOMMENDATION', '추천작',
-            label = 'TIP', '팁',
-            label = 'SCROLL', '스크롤',
-            label = 'RC', 'RC',
-            '기타'
-          ) AS missionName,
-          count(itemSN) AS completeCount,
-          uniqExact(accountSN) AS uu,
-          sum(rewardP) AS rewardAmount,
-          if(uu > 0, round(completeCount / uu, 1), 0) AS avgPerUser,
-          if(completeCount > 0, round(rewardAmount / completeCount, 1), 0) AS rewardPerComplete
-        FROM combined
-        GROUP BY label, missionName
-        ORDER BY completeCount DESC
-      `;
     } else if (type === 'mission_daily_trend') {
-      const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
-      let segCondMp = "";
-      let segCondRc = "";
-      if (userSegment === "new") {
-        segCondMp = `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`;
-        segCondRc = `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`;
-      } else if (userSegment === "existing") {
-        segCondMp = `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
-        segCondRc = `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
+      if (userSegment === "all") {
+        sql = `
+          WITH combined AS (
+            SELECT 
+              dt,
+              upper(missionType) AS label,
+              uniqExactMerge(completeCount) AS completeCount,
+              uniqExactMerge(uu) AS uu,
+              sumMerge(rewardAmount) AS rewardP
+            FROM Performance.MissionDaily
+            WHERE (appID = '${app}' OR '${app}' = 'tc')
+              AND dt >= '${from}' AND dt <= '${to}'
+              AND rewardType = 'POINT'
+            GROUP BY dt, missionType
+
+            UNION ALL
+
+            SELECT 
+              dt,
+              'RC' AS label,
+              uniqExactMerge(cnt) AS completeCount,
+              uniqExactMerge(uu) AS uu,
+              sumMerge(rewardAmount) AS rewardP
+            FROM Performance.RCDaily
+            WHERE (appID = '${app}' OR '${app}' = 'tc')
+              AND dt >= '${from}' AND dt <= '${to}'
+            GROUP BY dt, label
+          )
+          SELECT 
+            dt,
+            label,
+            multiIf(
+              label = 'CLEANING', '책 정리',
+              label = 'SNACK', '간식',
+              label = 'DRINK', '음료',
+              label = 'RECOMMENDATION', '추천작',
+              label = 'TIP', '팁',
+              label = 'SCROLL', '스크롤',
+              label = 'RC', 'RC',
+              '기타'
+            ) AS missionName,
+            completeCount,
+            uu,
+            rewardP AS rewardAmount,
+            if(uu > 0, round(completeCount / uu, 1), 0) AS avgPerUser,
+            if(completeCount > 0, round(rewardP / completeCount, 1), 0) AS rewardPerComplete
+          FROM combined
+          ORDER BY dt ASC, completeCount DESC
+        `;
+      } else {
+        const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
+        const segCondMp = userSegment === "new"
+          ? `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`
+          : `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
+        const segCondRc = userSegment === "new"
+          ? `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`
+          : `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
+
+        sql = `
+          WITH distinct_mp AS (
+            SELECT 
+              mp.dt AS dt,
+              mp.participationSN AS itemSN,
+              upper(m.missionType) AS label,
+              toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
+              mp.accountSN AS accountSN
+            FROM Performance.MissionParticipation_Raw AS mp
+            INNER JOIN Performance.Mission_V AS m ON m.missionSN = mp.missionSN
+            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
+            LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
+            WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
+              AND ${appCond}
+              AND mp.status = 'COMPLETED'
+              AND mp.rewardType = 'POINT'
+              AND mp.missionSN > 0
+              ${segCondMp}
+            GROUP BY dt, itemSN, label, rewardP, accountSN
+          ),
+          distinct_rc AS (
+            SELECT 
+              rc.dt AS dt,
+              rc.seq AS itemSN,
+              'RC' AS label,
+              toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
+              rc.accountSN AS accountSN
+            FROM Performance.RCPayload_Raw AS rc
+            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
+            LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
+            WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
+              AND ${appCond}
+              AND rc.status = 2
+              AND rc.subType BETWEEN 101 AND 112
+              ${segCondRc}
+            GROUP BY dt, itemSN, label, rewardP, accountSN
+          ),
+          combined AS (
+            SELECT * FROM distinct_mp
+            UNION ALL
+            SELECT * FROM distinct_rc
+          )
+          SELECT 
+            dt,
+            label,
+            multiIf(
+              label = 'CLEANING', '책 정리',
+              label = 'SNACK', '간식',
+              label = 'DRINK', '음료',
+              label = 'RECOMMENDATION', '추천작',
+              label = 'TIP', '팁',
+              label = 'SCROLL', '스크롤',
+              label = 'RC', 'RC',
+              '기타'
+            ) AS missionName,
+            count(itemSN) AS completeCount,
+            uniqExact(accountSN) AS uu,
+            sum(rewardP) AS rewardAmount,
+            if(uu > 0, round(completeCount / uu, 1), 0) AS avgPerUser,
+            if(completeCount > 0, round(rewardP / completeCount, 1), 0) AS rewardPerComplete
+          FROM combined
+          GROUP BY dt, label, missionName
+          ORDER BY dt ASC, completeCount DESC
+          SETTINGS max_partitions_to_read = 100
+        `;
       }
-
-      sql = `
-        WITH combined AS (
-          SELECT 
-            mp.dt AS dt,
-            upper(m.missionType) AS label,
-            mp.participationSN AS itemSN,
-            toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
-            mp.accountSN AS accountSN
-          FROM Performance.MissionParticipation_Raw AS mp
-          INNER JOIN Performance.Mission_V AS m ON m.missionSN = mp.missionSN
-          LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
-          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-          WHERE ${appCond}
-            AND mp.dt >= '${from}' AND mp.dt <= '${to}'
-            AND mp.status = 'COMPLETED'
-            AND mp.rewardType = 'POINT'
-            AND mp.missionSN > 0
-            ${segCondMp}
-
-          UNION ALL
-
-          SELECT 
-            rc.dt AS dt,
-            'RC' AS label,
-            rc.seq AS itemSN,
-            toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
-            rc.accountSN AS accountSN
-          FROM Performance.RCPayload_Raw AS rc
-          LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
-          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-          WHERE ${appCond}
-            AND rc.dt >= '${from}' AND rc.dt <= '${to}'
-            AND rc.status = 2
-            AND rc.subType BETWEEN 101 AND 112
-            ${segCondRc}
-        )
-        SELECT 
-          dt,
-          label,
-          multiIf(
-            label = 'CLEANING', '책 정리',
-            label = 'SNACK', '간식',
-            label = 'DRINK', '음료',
-            label = 'RECOMMENDATION', '추천작',
-            label = 'TIP', '팁',
-            label = 'SCROLL', '스크롤',
-            label = 'RC', 'RC',
-            '기타'
-          ) AS missionName,
-          count(itemSN) AS completeCount,
-          uniqExact(accountSN) AS uu,
-          sum(rewardP) AS rewardAmount,
-          if(uu > 0, round(completeCount / uu, 1), 0) AS avgPerUser,
-          if(completeCount > 0, round(rewardAmount / completeCount, 1), 0) AS rewardPerComplete
-        FROM combined
-        GROUP BY dt, label, missionName
-        ORDER BY dt ASC, completeCount DESC
-      `;
     } else if (type === 'mission_by_type') {
-      const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
-      let segCondMp = "";
-      let segCondRc = "";
-      if (userSegment === "new") {
-        segCondMp = `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`;
-        segCondRc = `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`;
-      } else if (userSegment === "existing") {
-        segCondMp = `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
-        segCondRc = `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
+      if (userSegment === "all") {
+        sql = `
+          WITH combined AS (
+            SELECT 
+              upper(missionType) AS missionType,
+              uniqExactMerge(completeCount) AS completeCount,
+              uniqExactMerge(uu) AS uu,
+              sumMerge(rewardAmount) AS rewardP
+            FROM Performance.MissionDaily
+            WHERE (appID = '${app}' OR '${app}' = 'tc')
+              AND dt >= '${from}' AND dt <= '${to}'
+              AND rewardType = 'POINT'
+            GROUP BY missionType
+
+            UNION ALL
+
+            SELECT 
+              'RC' AS missionType,
+              uniqExactMerge(cnt) AS completeCount,
+              uniqExactMerge(uu) AS uu,
+              sumMerge(rewardAmount) AS rewardP
+            FROM Performance.RCDaily
+            WHERE (appID = '${app}' OR '${app}' = 'tc')
+              AND dt >= '${from}' AND dt <= '${to}'
+            GROUP BY missionType
+          )
+          SELECT 
+            missionType,
+            sum(completeCount) AS completeCount,
+            sum(uu) AS uu,
+            sum(rewardP) AS rewardAmount
+          FROM combined
+          GROUP BY missionType
+          ORDER BY completeCount DESC
+        `;
+      } else {
+        const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
+        const segCondMp = userSegment === "new"
+          ? `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`
+          : `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
+        const segCondRc = userSegment === "new"
+          ? `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`
+          : `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
+
+        sql = `
+          WITH distinct_mp AS (
+            SELECT 
+              mp.dt AS dt,
+              mp.participationSN AS itemSN,
+              upper(m.missionType) AS missionType,
+              toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
+              mp.accountSN AS accountSN
+            FROM Performance.MissionParticipation_Raw AS mp
+            INNER JOIN Performance.Mission_V AS m ON m.missionSN = mp.missionSN
+            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
+            LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
+            WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
+              AND ${appCond}
+              AND mp.status = 'COMPLETED'
+              AND mp.rewardType = 'POINT'
+              AND mp.missionSN > 0
+              ${segCondMp}
+            GROUP BY dt, itemSN, missionType, rewardP, accountSN
+          ),
+          distinct_rc AS (
+            SELECT 
+              rc.dt AS dt,
+              rc.seq AS itemSN,
+              'RC' AS missionType,
+              toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
+              rc.accountSN AS accountSN
+            FROM Performance.RCPayload_Raw AS rc
+            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
+            LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
+            WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
+              AND ${appCond}
+              AND rc.status = 2
+              AND rc.subType BETWEEN 101 AND 112
+              ${segCondRc}
+            GROUP BY dt, itemSN, missionType, rewardP, accountSN
+          ),
+          combined AS (
+            SELECT * FROM distinct_mp
+            UNION ALL
+            SELECT * FROM distinct_rc
+          )
+          SELECT 
+            missionType,
+            count(itemSN) AS completeCount,
+            uniqExact(accountSN) AS uu,
+            sum(rewardP) AS rewardAmount
+          FROM combined
+          GROUP BY missionType
+          ORDER BY completeCount DESC
+          SETTINGS max_partitions_to_read = 100
+        `;
       }
-
-      sql = `
-        WITH combined AS (
-          SELECT 
-            mp.dt AS dt,
-            upper(m.missionType) AS missionType,
-            mp.participationSN AS itemSN,
-            toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
-            mp.accountSN AS accountSN
-          FROM Performance.MissionParticipation_Raw AS mp
-          INNER JOIN Performance.Mission_V AS m ON m.missionSN = mp.missionSN
-          LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
-          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-          WHERE ${appCond}
-            AND mp.dt >= '${from}' AND mp.dt <= '${to}'
-            AND mp.status = 'COMPLETED'
-            AND mp.rewardType = 'POINT'
-            AND mp.missionSN > 0
-            ${segCondMp}
-
-          UNION ALL
-
-          SELECT 
-            rc.dt AS dt,
-            'RC' AS missionType,
-            rc.seq AS itemSN,
-            toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
-            rc.accountSN AS accountSN
-          FROM Performance.RCPayload_Raw AS rc
-          LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
-          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-          WHERE ${appCond}
-            AND rc.dt >= '${from}' AND rc.dt <= '${to}'
-            AND rc.status = 2
-            AND rc.subType BETWEEN 101 AND 112
-            ${segCondRc}
-        )
-        SELECT 
-          missionType,
-          count(itemSN) AS completeCount,
-          uniqExact(accountSN) AS uu,
-          sum(rewardP) AS rewardAmount
-        FROM combined
-        GROUP BY missionType
-        ORDER BY completeCount DESC
-      `;
     } else if (type === 'attendance_daily') {
       const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
       const addDaysStr = (dStr: string, days: number) => {

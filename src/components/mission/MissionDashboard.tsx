@@ -291,19 +291,19 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
     const typeGroupMap: Record<string, { completeCount: number; rewardP: number; uuSum: number }> = {};
     const dateMap: Record<string, { completeCount: number; rewardP: number; earningUu: number }> = {};
 
-    const rawRows = (missionDailyTrendRaw && missionDailyTrendRaw.length > 0)
-      ? missionDailyTrendRaw
-      : (missionByTypeRaw && missionByTypeRaw.length > 0)
-        ? missionByTypeRaw
+    const summarySource = (missionByTypeRaw && missionByTypeRaw.length > 0)
+      ? missionByTypeRaw
+      : (missionsDetailRaw && missionsDetailRaw.length > 0)
+        ? missionsDetailRaw
         : [];
 
-    if (rawRows.length > 0) {
-      rawRows.forEach((row: any) => {
+    if (summarySource.length > 0) {
+      summarySource.forEach((row: any) => {
         const typeKey = row.missionType || row.label || "기타";
         if (typeKey === "ATTENDANCE") return;
 
         const cCount = Number(row.completeCount) || 0;
-        const rP = Number(row.rewardAmount) || (cCount * 2);
+        const rP = Number(row.rewardAmount ?? row.rewardP) || 0;
         const uuVal = Number(row.uu) || 0;
 
         completeCountSum += cCount;
@@ -314,7 +314,29 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
         }
         typeGroupMap[typeKey].completeCount += cCount;
         typeGroupMap[typeKey].rewardP += rP;
-        typeGroupMap[typeKey].uuSum += uuVal;
+        typeGroupMap[typeKey].uuSum = uuVal;
+      });
+    }
+
+    if (missionDailyTrendRaw && missionDailyTrendRaw.length > 0) {
+      missionDailyTrendRaw.forEach((row: any) => {
+        const typeKey = row.missionType || row.label || "기타";
+        if (typeKey === "ATTENDANCE") return;
+
+        const cCount = Number(row.completeCount) || 0;
+        const rP = Number(row.rewardAmount ?? row.rewardP) || 0;
+
+        if (summarySource.length === 0) {
+          completeCountSum += cCount;
+          rewardAmountP += rP;
+
+          if (!typeGroupMap[typeKey]) {
+            typeGroupMap[typeKey] = { completeCount: 0, rewardP: 0, uuSum: 0 };
+          }
+          typeGroupMap[typeKey].completeCount += cCount;
+          typeGroupMap[typeKey].rewardP += rP;
+          typeGroupMap[typeKey].uuSum = Math.max(typeGroupMap[typeKey].uuSum, Number(row.uu) || 0);
+        }
 
         const dtStr = row.dt ? String(row.dt).slice(0, 10) : "";
         if (dtStr) {
@@ -322,23 +344,6 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
           dateMap[dtStr].completeCount += cCount;
           dateMap[dtStr].rewardP += rP;
         }
-      });
-    } else if (missionsDetailRaw && missionsDetailRaw.length > 0) {
-      missionsDetailRaw.forEach((row) => {
-        const typeKey = row.label || "기타";
-        const cCount = Number(row.completeCount) || 0;
-        const uuVal = Number(row.uu) || 0;
-        const rP = cCount * 2;
-
-        completeCountSum += cCount;
-        rewardAmountP += rP;
-
-        if (!typeGroupMap[typeKey]) {
-          typeGroupMap[typeKey] = { completeCount: 0, rewardP: 0, uuSum: 0 };
-        }
-        typeGroupMap[typeKey].completeCount += cCount;
-        typeGroupMap[typeKey].rewardP += rP;
-        typeGroupMap[typeKey].uuSum += uuVal;
       });
     }
 
@@ -423,7 +428,7 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
       rewardShareChart,
       completionCountChart,
     };
-  }, [missionByTypeRaw, missionDailyTrendRaw, missionsDetailRaw, earningActivityRaw]);
+  }, [missionByTypeRaw, missionDailyTrendRaw, missionsDetailRaw, earningActivityRaw, missionTotalRaw, overviewData]);
 
   // Daily Reward P Line Chart Data
   const rewardTrendChartData = useMemo(() => {
@@ -446,7 +451,7 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
       missionNameMap[mKey] = mName;
 
       const cCount = Number(row.completeCount) || 0;
-      const rP = Number((row as any).rewardAmount) || (cCount * 2);
+      const rP = Number((row as any).rewardAmount ?? (row as any).rewardP) || 0;
 
       if (!dateMissionPMap[dt]) dateMissionPMap[dt] = {};
       dateMissionPMap[dt][mKey] = (dateMissionPMap[dt][mKey] || 0) + rP;
@@ -532,7 +537,7 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
       missionNameMap[mKey] = mName;
 
       const cCount = Number(row.completeCount) || 0;
-      const rP = Number((row as any).rewardAmount) || (cCount * 2);
+      const rP = Number((row as any).rewardAmount ?? (row as any).rewardP) || 0;
 
       if (!dateMissionMap[dt]) dateMissionMap[dt] = {};
       if (!dateMissionMap[dt][mKey]) dateMissionMap[dt][mKey] = { rP: 0, cCount: 0 };
@@ -656,7 +661,7 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
       if (key === "ATTENDANCE") return;
 
       const cCount = Number(row.completeCount) || 0;
-      const rP = Number(row.rewardAmount) || (cCount * 2);
+      const rP = Number(row.rewardAmount ?? row.rewardP) || 0;
       const uuVal = Number(row.uu) || 0;
 
       if (!dateGroupMap[key]) {
