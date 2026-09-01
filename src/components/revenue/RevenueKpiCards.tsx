@@ -73,7 +73,7 @@ export const RevenueKpiCards: React.FC<RevenueKpiCardsProps> = ({ revenueSummary
       <div className="bg-white rounded-2xl border border-[#e5e8eb] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-[13px] font-semibold text-[#8b95a1]">
-            코인결제 매출 ({contentRatio}%)
+            콘텐츠 매출 ({contentRatio}%)
           </span>
           {renderGrowthBadge(contentGrowth)}
         </div>
@@ -86,7 +86,7 @@ export const RevenueKpiCards: React.FC<RevenueKpiCardsProps> = ({ revenueSummary
       <div className="bg-white rounded-2xl border border-[#e5e8eb] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-[13px] font-semibold text-[#8b95a1]">
-            네트워크 광고 매출 ({adRatio}%)
+            광고 매출 ({adRatio}%)
           </span>
           {renderGrowthBadge(adGrowth)}
         </div>

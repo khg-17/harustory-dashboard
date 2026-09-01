@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const fromParam = searchParams.get('from') || '';
     const toParam = searchParams.get('to') || '';
+    const appSNParam = searchParams.get('appSN') || '';
 
     // Calculate KST yesterday limit (yyyyMMdd)
     const nowUtc = new Date();
@@ -85,7 +86,10 @@ export async function GET(req: NextRequest) {
     const chunks = getDateChunks(startDate, endDate, 7);
 
     const chunkFetchPromises = chunks.map(async (chunk) => {
-      const targetUrl = `${apiUrl}?startDate=${chunk.startDate}&endDate=${chunk.endDate}`;
+      let targetUrl = `${apiUrl}?startDate=${chunk.startDate}&endDate=${chunk.endDate}`;
+      if (appSNParam) {
+        targetUrl += `&appSN=${encodeURIComponent(appSNParam)}`;
+      }
       try {
         const response = await fetch(targetUrl, {
           method: 'GET',

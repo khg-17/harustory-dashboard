@@ -294,10 +294,23 @@ export interface SettlementAdData {
   tossMini: number;
 }
 
+export interface SettlementAdFreeData {
+  adcash?: number;
+  adforus?: number;
+  apWebCPC?: number;
+  buzzvil?: number;
+  tossMini?: number;
+  adsense?: number;
+}
+
 export interface SettlementAppData {
   appSN: number;
   appName: string | null;
-  content: SettlementContentData;
+  payingCoin?: SettlementContentCoin;
+  chargeCoin?: number;
+  adFree?: SettlementAdFreeData;
+  contentRevenue?: number;
+  content?: SettlementContentData;
   usedReward: number;
   receivedReward?: SettlementReceivedReward;
   ad: SettlementAdData;
@@ -306,6 +319,10 @@ export interface SettlementAppData {
 export interface SettlementDailyItem {
   date: string; // yyyy-MM-dd
   apps?: SettlementAppData[];
+  payingCoin?: SettlementContentCoin;
+  chargeCoin?: number;
+  adFree?: SettlementAdFreeData;
+  contentRevenue?: number;
   content?: SettlementContentData;
   usedReward?: number;
   receivedReward?: SettlementReceivedReward;

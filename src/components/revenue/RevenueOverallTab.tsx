@@ -50,7 +50,7 @@ export const RevenueOverallTab: React.FC<RevenueOverallTabProps> = ({
       <div className="flex items-center justify-between text-xs font-bold text-[#4e5968]">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-[#3182f6]" />
-          <span>일별 코인결제 vs 네트워크 광고 매출 통합 추이</span>
+          <span>일별 콘텐츠 vs 광고 매출 통합 추이</span>
         </div>
         <span className="text-[11px] text-[#8b95a1] font-semibold">단위: 원 (KRW)</span>
       </div>
@@ -95,8 +95,8 @@ export const RevenueOverallTab: React.FC<RevenueOverallTabProps> = ({
                 <thead>
                   <tr className="bg-[#f8f9fa] font-bold text-[#4e5968] border-b border-[#e5e8eb]">
                     <th className="py-3.5 px-4">날짜 / 기간 (dt)</th>
-                    <th className="py-3.5 px-4 text-right">코인결제 매출</th>
-                    <th className="py-3.5 px-4 text-right">네트워크 광고 매출</th>
+                    <th className="py-3.5 px-4 text-right">콘텐츠 매출</th>
+                    <th className="py-3.5 px-4 text-right">광고 매출</th>
                     <th className="py-3.5 px-4 text-right">전체 총 매출</th>
                     <th className="py-3.5 px-4 text-right">콘텐츠 비중 (%)</th>
                   </tr>

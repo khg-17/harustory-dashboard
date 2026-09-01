@@ -120,14 +120,16 @@ export default function Dashboard() {
 
     if (selectedApp === "tc") {
       if (Array.isArray(item.apps) && item.apps.length > 0) {
-        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0;
+        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0;
         let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0;
 
         item.apps.forEach((app) => {
-          paidCoin += Number(app.content?.payingCoin?.paidCoin || 0);
-          freeCoin += Number(app.content?.payingCoin?.freeCoin || 0);
-          chargeCoin += Number(app.content?.chargeCoin || 0);
+          paidCoin += Number(app.payingCoin?.paidCoin ?? app.content?.payingCoin?.paidCoin ?? 0);
+          freeCoin += Number(app.payingCoin?.freeCoin ?? app.content?.payingCoin?.freeCoin ?? 0);
+          chargeCoin += Number(app.chargeCoin ?? app.content?.chargeCoin ?? 0);
           usedReward += Number(app.usedReward || 0);
+          contentRevenue += Number(app.contentRevenue || 0);
+
           const ad: Partial<SettlementAdData> = app.ad || {};
           b += Number(ad.buzzvil || 0);
           pop += Number(ad.apWebCPC ?? ad.adpopcorn ?? 0);
@@ -143,15 +145,17 @@ export default function Dashboard() {
           freeCoin,
           chargeCoin,
           usedReward,
+          contentRevenue,
           ad: { b, pop, forus, sense, cash, rc, toss },
         };
       } else {
         const ad: Partial<SettlementAdData> = item.ad || {};
         return {
-          paidCoin: Number(item.content?.payingCoin?.paidCoin || 0),
-          freeCoin: Number(item.content?.payingCoin?.freeCoin || 0),
-          chargeCoin: Number(item.content?.chargeCoin || 0),
+          paidCoin: Number(item.payingCoin?.paidCoin ?? item.content?.payingCoin?.paidCoin ?? 0),
+          freeCoin: Number(item.payingCoin?.freeCoin ?? item.content?.payingCoin?.freeCoin ?? 0),
+          chargeCoin: Number(item.chargeCoin ?? item.content?.chargeCoin ?? 0),
           usedReward: Number(item.usedReward || 0),
+          contentRevenue: Number(item.contentRevenue || 0),
           ad: {
             b: Number(ad.buzzvil || 0),
             pop: Number(ad.apWebCPC ?? ad.adpopcorn ?? 0),
@@ -188,14 +192,16 @@ export default function Dashboard() {
       });
 
       if (matchedApps.length > 0) {
-        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0;
+        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0;
         let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0;
 
         matchedApps.forEach((app) => {
-          paidCoin += Number(app.content?.payingCoin?.paidCoin || 0);
-          freeCoin += Number(app.content?.payingCoin?.freeCoin || 0);
-          chargeCoin += Number(app.content?.chargeCoin || 0);
+          paidCoin += Number(app.payingCoin?.paidCoin ?? app.content?.payingCoin?.paidCoin ?? 0);
+          freeCoin += Number(app.payingCoin?.freeCoin ?? app.content?.payingCoin?.freeCoin ?? 0);
+          chargeCoin += Number(app.chargeCoin ?? app.content?.chargeCoin ?? 0);
           usedReward += Number(app.usedReward || 0);
+          contentRevenue += Number(app.contentRevenue || 0);
+
           const ad: Partial<SettlementAdData> = app.ad || {};
           b += Number(ad.buzzvil || 0);
           pop += Number(ad.apWebCPC ?? ad.adpopcorn ?? 0);
@@ -211,6 +217,7 @@ export default function Dashboard() {
           freeCoin,
           chargeCoin,
           usedReward,
+          contentRevenue,
           ad: { b, pop, forus, sense, cash, rc, toss },
         };
       }
@@ -998,14 +1005,15 @@ export default function Dashboard() {
         const sData = getSettlementDataForApp(item, selectedApp);
         if (!sData) return;
 
-        const { paidCoin, chargeCoin, usedReward, ad } = sData;
+        const { paidCoin, chargeCoin, usedReward, contentRevenue, ad } = sData;
         const { b, pop, forus, sense, cash, rc, toss } = ad;
 
         const dayTotalAd = b + pop + forus + sense + cash + rc + toss;
+        const realContentRev = (contentRevenue && contentRevenue > 0) ? contentRevenue : paidCoin;
 
-        contentPaySum += chargeCoin;
+        contentPaySum += realContentRev;
         paidCoinSum += paidCoin;
-        serviceTotalSum += chargeCoin;
+        serviceTotalSum += realContentRev;
         totalAdRevenue += dayTotalAd;
         rewardAdRevenue += isPhApp ? (cash + rc) : (pop + forus + rc);
         totalExchangedPoints += usedReward;
@@ -1027,8 +1035,8 @@ export default function Dashboard() {
 
         const catMap: Record<string, number> = {
           "reward": b,
-          "display": pop + forus + sense + cash,
-          "rc": rc + toss,
+          "display": pop + forus + sense + cash + toss,
+          "rc": rc,
         };
         Object.entries(catMap).forEach(([catName, rev]) => {
           if (!adCategoryMap[catName]) adCategoryMap[catName] = { revenue: 0, impression: 0 };
@@ -1137,13 +1145,14 @@ export default function Dashboard() {
         const sData = getSettlementDataForApp(item, selectedApp);
         if (!sData) return;
 
-        const { paidCoin, chargeCoin, usedReward, ad } = sData;
+        const { paidCoin, chargeCoin, usedReward, contentRevenue, ad } = sData;
         const { b, pop, forus, sense, cash, rc, toss } = ad;
 
         const dayTotalAd = b + pop + forus + sense + cash + rc + toss;
+        const realContentRev = (contentRevenue && contentRevenue > 0) ? contentRevenue : paidCoin;
 
-        dailyMap[dtStr].serviceRev = chargeCoin;
-        dailyMap[dtStr].contentPay = chargeCoin;
+        dailyMap[dtStr].serviceRev = realContentRev;
+        dailyMap[dtStr].contentPay = realContentRev;
         dailyMap[dtStr].adRev = dayTotalAd;
         dailyMap[dtStr].rewardAdRev = isPhApp ? (cash + rc) : (pop + forus + rc);
         dailyMap[dtStr].eCost = usedReward;
@@ -1280,14 +1289,14 @@ export default function Dashboard() {
       contentDailyList = sortedSettlement.map((item) => {
         const dtStr = extractDtStr(item.date);
         const sData = getSettlementDataForApp(item, selectedApp);
-        const revWon = sData ? sData.chargeCoin : 0;
         const paidWon = sData ? sData.paidCoin : 0;
         const chgWon = sData ? sData.chargeCoin : 0;
+        const realContentRev = sData ? ((sData.contentRevenue && sData.contentRevenue > 0) ? sData.contentRevenue : paidWon) : 0;
 
         const chRow = contentRevenueRaw.find((r) => extractDtStr(r?.dt) === dtStr);
         const adTickWon = chRow ? Number(chRow.adTicketRevenue || 0) : 0;
         const payer = chRow ? Number(chRow.payerUu || 0) : 0;
-        const arppu = payer > 0 ? Math.round(revWon / payer) : 0;
+        const arppu = payer > 0 ? Math.round(realContentRev / payer) : 0;
 
         chargeWonSum += chgWon;
         chargeCoinSum += chgWon;
@@ -1295,13 +1304,13 @@ export default function Dashboard() {
         totalArppuWonSum += arppu;
         if (dtStr) contentDaysCount += 1;
 
-        const totalContentRevenue = paidWon + adTickWon;
+        const totalContentRevenue = realContentRev;
 
         return {
           dt: dtStr,
           formattedDt: dtStr ? dtStr.slice(5).replace("-", "/") : "",
           totalContentRevenue,
-          revenueWon: revWon,
+          revenueWon: realContentRev,
           paidCoinWon: paidWon,
           chargeWon: chgWon,
           adTicketWon: adTickWon,
@@ -1382,8 +1391,8 @@ export default function Dashboard() {
 
       const catDaily: Record<string, number[]> = {
         reward: metricsList.map((m) => m.b),
-        display: metricsList.map((m) => m.pop + m.forus + m.sense + m.cash),
-        rc: metricsList.map((m) => m.rc + m.toss),
+        display: metricsList.map((m) => m.pop + m.forus + m.sense + m.cash + m.toss),
+        rc: metricsList.map((m) => m.rc),
         adTicket: sortedSettlement.map(() => 0),
       };
 
@@ -1502,7 +1511,7 @@ export default function Dashboard() {
         fill: true,
       },
       {
-        label: "인앱 코인결제 매출",
+        label: "콘텐츠 매출",
         data: (revenueSummary.dailyTrend || []).map((d) => d.serviceRev),
         borderColor: "#3182f6",
         backgroundColor: "transparent",
@@ -1515,7 +1524,7 @@ export default function Dashboard() {
         tension: 0.35,
       },
       {
-        label: "네트워크 광고 매출",
+        label: "광고 매출",
         data: (revenueSummary.dailyTrend || []).map((d) => d.adRev),
         borderColor: "#a98eff",
         backgroundColor: "transparent",
@@ -1633,7 +1642,7 @@ export default function Dashboard() {
   // CSV Exporter for Revenue
   const downloadRevenueCSV = () => {
     if (revenueSummary.dailyTrend.length === 0) return;
-    let csv = "날짜(dt),인앱코인결제매출(원),네트워크광고매출(원),전체총매출(원),미션리워드비용(원),포인트환전비용(원),총비용(원),순영업마진(원),손익마진율(%)\n";
+    let csv = "날짜(dt),콘텐츠매출(원),광고매출(원),전체총매출(원),미션리워드비용(원),포인트환전비용(원),총비용(원),순영업마진(원),손익마진율(%)\n";
 
     revenueSummary.dailyTrend.forEach((row) => {
       csv += `"${row.dt}",${row.serviceRev},${row.adRev},${row.grossTotal},${row.mCost},${row.eCost},${row.cost},${row.margin},${row.marginRate}%\n`;
