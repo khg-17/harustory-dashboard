@@ -428,6 +428,7 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
   const len = contentDailyList.length;
   let prevTotalRev = 0, recentTotalRev = 0;
   let prevPay = 0, recentPay = 0;
+  let prevCharge = 0, recentCharge = 0;
   let prevPaidCoin = 0, recentPaidCoin = 0;
   let prevAdTicket = 0, recentAdTicket = 0;
 
@@ -442,6 +443,9 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
     prevPay = prevPart.reduce((sum, d) => sum + (d.revenueWon || 0), 0);
     recentPay = recentPart.reduce((sum, d) => sum + (d.revenueWon || 0), 0);
 
+    prevCharge = prevPart.reduce((sum, d) => sum + (d.chargeWon || 0), 0);
+    recentCharge = recentPart.reduce((sum, d) => sum + (d.chargeWon || 0), 0);
+
     prevPaidCoin = prevPart.reduce((sum, d) => sum + (d.paidCoinWon || 0), 0);
     recentPaidCoin = recentPart.reduce((sum, d) => sum + (d.paidCoinWon || 0), 0);
 
@@ -451,6 +455,7 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
 
   const totalRevGrowth = prevTotalRev > 0 ? ((recentTotalRev - prevTotalRev) / prevTotalRev) * 100 : 0;
   const payGrowth = prevPay > 0 ? ((recentPay - prevPay) / prevPay) * 100 : 0;
+  const chargeGrowth = prevCharge > 0 ? ((recentCharge - prevCharge) / prevCharge) * 100 : 0;
   const paidCoinGrowth = prevPaidCoin > 0 ? ((recentPaidCoin - prevPaidCoin) / prevPaidCoin) * 100 : 0;
   const adTicketGrowth = prevAdTicket > 0 ? ((recentAdTicket - prevAdTicket) / prevAdTicket) * 100 : 0;
 
@@ -484,11 +489,11 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
 
         <div className="p-5 bg-white border border-[#e5e8eb] rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[13px] font-semibold text-[#8b95a1]">코인 결제 매출</span>
-            {renderGrowthBadge(payGrowth)}
+            <span className="text-[13px] font-semibold text-[#8b95a1]">코인 충전 (코인)</span>
+            {renderGrowthBadge(chargeGrowth)}
           </div>
           <div className="text-[24px] font-bold text-[#191f28] tracking-[-0.04em]">
-            {contentPaySum.toLocaleString()}<span className="text-[16px] text-[#4e5968] ml-0.5">원</span>
+            {chargeWonSum.toLocaleString()}<span className="text-[16px] text-[#4e5968] ml-0.5"> 코인</span>
           </div>
         </div>
 
@@ -524,7 +529,7 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
             <Line data={contentLineChartData} options={lineChartOptions} />
           ) : (
             <div className="flex items-center justify-center h-full text-xs font-semibold text-[#8b95a1]">
-              조회된 콘텐츠 결제 데이터가 없습니다.
+              조회된 콘텐츠 매출 데이터가 없습니다.
             </div>
           )}
         </div>
@@ -534,7 +539,7 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
       <div className="space-y-3 pt-1">
         <h3 className="text-xs font-bold text-[#4e5968] flex items-center gap-2">
           <Table className="w-3.5 h-3.5 text-[#3182f6]" />
-          <span>일별 콘텐츠 결제 매출 현황 상세 테이블</span>
+          <span>일별 콘텐츠 매출 현황 상세 테이블</span>
         </h3>
         <div className="overflow-x-auto border border-[#e5e8eb]/80 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
           <table className="w-full text-left border-collapse text-xs">
@@ -542,7 +547,7 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
               <tr className="bg-[#f8f9fa] font-bold text-[#4e5968] border-b border-[#e5e8eb]">
                 <th className="py-3 px-4">날짜 (dt)</th>
                 <th className="py-3 px-4 text-right text-[#3182f6]">콘텐츠 총 매출 (원)</th>
-                <th className="py-3 px-4 text-right">코인 결제 매출 (원)</th>
+                <th className="py-3 px-4 text-right">코인 충전 (코인)</th>
                 <th className="py-3 px-4 text-right">사용 코인 (원)</th>
                 <th className="py-3 px-4 text-right">광고무 매출 (원)</th>
                 <th className="py-3 px-4 text-right">결제 유저 수</th>
@@ -560,7 +565,7 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
                         {totalRev.toLocaleString()}원
                       </td>
                       <td className="py-3 px-4 text-right font-medium text-[#4e5968]">
-                        {row.revenueWon.toLocaleString()}원
+                        {row.chargeWon.toLocaleString()} 코인
                       </td>
                       <td className="py-3 px-4 text-right font-medium text-[#4e5968]">
                         {row.paidCoinWon.toLocaleString()}원
