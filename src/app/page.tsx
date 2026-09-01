@@ -118,9 +118,19 @@ export default function Dashboard() {
   const getSettlementDataForApp = (item: SettlementDailyItem, selectedApp: string) => {
     if (!item) return null;
 
+    const calcAdFree = (adFreeObj: any) => {
+      if (!adFreeObj) return 0;
+      return Number(adFreeObj.adcash || 0) +
+             Number(adFreeObj.adforus || 0) +
+             Number(adFreeObj.apWebCPC || 0) +
+             Number(adFreeObj.buzzvil || 0) +
+             Number(adFreeObj.tossMini || 0) +
+             Number(adFreeObj.adsense || 0);
+    };
+
     if (selectedApp === "tc") {
       if (Array.isArray(item.apps) && item.apps.length > 0) {
-        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0;
+        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0, adFree = 0;
         let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0;
 
         item.apps.forEach((app) => {
@@ -129,6 +139,7 @@ export default function Dashboard() {
           chargeCoin += Number(app.chargeCoin ?? app.content?.chargeCoin ?? 0);
           usedReward += Number(app.usedReward || 0);
           contentRevenue += Number(app.contentRevenue || 0);
+          adFree += calcAdFree(app.adFree);
 
           const ad: Partial<SettlementAdData> = app.ad || {};
           b += Number(ad.buzzvil || 0);
@@ -146,6 +157,7 @@ export default function Dashboard() {
           chargeCoin,
           usedReward,
           contentRevenue,
+          adFree,
           ad: { b, pop, forus, sense, cash, rc, toss },
         };
       } else {
@@ -156,6 +168,7 @@ export default function Dashboard() {
           chargeCoin: Number(item.chargeCoin ?? item.content?.chargeCoin ?? 0),
           usedReward: Number(item.usedReward || 0),
           contentRevenue: Number(item.contentRevenue || 0),
+          adFree: calcAdFree(item.adFree),
           ad: {
             b: Number(ad.buzzvil || 0),
             pop: Number(ad.apWebCPC ?? ad.adpopcorn ?? 0),
@@ -192,7 +205,7 @@ export default function Dashboard() {
       });
 
       if (matchedApps.length > 0) {
-        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0;
+        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0, adFree = 0;
         let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0;
 
         matchedApps.forEach((app) => {
@@ -201,6 +214,7 @@ export default function Dashboard() {
           chargeCoin += Number(app.chargeCoin ?? app.content?.chargeCoin ?? 0);
           usedReward += Number(app.usedReward || 0);
           contentRevenue += Number(app.contentRevenue || 0);
+          adFree += calcAdFree(app.adFree);
 
           const ad: Partial<SettlementAdData> = app.ad || {};
           b += Number(ad.buzzvil || 0);
@@ -218,6 +232,7 @@ export default function Dashboard() {
           chargeCoin,
           usedReward,
           contentRevenue,
+          adFree,
           ad: { b, pop, forus, sense, cash, rc, toss },
         };
       }
@@ -1005,7 +1020,7 @@ export default function Dashboard() {
         const sData = getSettlementDataForApp(item, selectedApp);
         if (!sData) return;
 
-        const { paidCoin, chargeCoin, usedReward, contentRevenue, ad } = sData;
+        const { paidCoin, chargeCoin, usedReward, contentRevenue, adFree, ad } = sData;
         const { b, pop, forus, sense, cash, rc, toss } = ad;
 
         const dayTotalAd = b + pop + forus + sense + cash + rc + toss;
@@ -1291,10 +1306,10 @@ export default function Dashboard() {
         const sData = getSettlementDataForApp(item, selectedApp);
         const paidWon = sData ? sData.paidCoin : 0;
         const chgWon = sData ? sData.chargeCoin : 0;
+        const adTickWon = sData ? (sData.adFree || 0) : 0;
         const realContentRev = sData ? ((sData.contentRevenue && sData.contentRevenue > 0) ? sData.contentRevenue : paidWon) : 0;
 
         const chRow = contentRevenueRaw.find((r) => extractDtStr(r?.dt) === dtStr);
-        const adTickWon = chRow ? Number(chRow.adTicketRevenue || 0) : 0;
         const payer = chRow ? Number(chRow.payerUu || 0) : 0;
         const arppu = payer > 0 ? Math.round(realContentRev / payer) : 0;
 
@@ -1373,8 +1388,8 @@ export default function Dashboard() {
 
       const metricsList = sortedSettlement.map((s) => {
         const sData = getSettlementDataForApp(s, selectedApp);
-        if (sData) return sData.ad;
-        return { b: 0, pop: 0, forus: 0, sense: 0, cash: 0, rc: 0, toss: 0 };
+        if (sData) return { ...sData.ad, adFree: sData.adFree || 0 };
+        return { b: 0, pop: 0, forus: 0, sense: 0, cash: 0, rc: 0, toss: 0, adFree: 0 };
       });
 
       const netDaily: Record<string, number[]> = {
@@ -1393,7 +1408,7 @@ export default function Dashboard() {
         reward: metricsList.map((m) => m.b),
         display: metricsList.map((m) => m.pop + m.forus + m.sense + m.cash + m.toss),
         rc: metricsList.map((m) => m.rc),
-        adTicket: sortedSettlement.map(() => 0),
+        adTicket: metricsList.map((m) => m.adFree),
       };
 
       adCategoryDailyTrend = { dates, categories: catDaily };
