@@ -1171,7 +1171,14 @@ export default function Dashboard() {
         dailyMap[dtStr].adRev = dayTotalAd;
         dailyMap[dtStr].rewardAdRev = isPhApp ? (cash + rc) : (pop + forus + rc);
         dailyMap[dtStr].eCost = usedReward;
-        dailyMap[dtStr].mCost = usedReward;
+      });
+
+      // Populate mCost (적립 알바비 P) from missionTotalRaw even when active settlement is used for revenue
+      missionTotalRaw.forEach((row) => {
+        const dtStr = extractDtStr(row.dt);
+        if (!dtStr || !dailyMap[dtStr]) return;
+        const mRev = parseRewardAmount(row);
+        dailyMap[dtStr].mCost += mRev;
       });
     } else {
       serviceRevenueRaw.forEach((row) => {
