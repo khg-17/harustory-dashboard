@@ -38,25 +38,31 @@ export function getAllowedSpecificEmails(): string[] {
 }
 
 /**
- * Validates if an email's domain OR exact email address is in the allowed list
+ * Validates if an email address is authorized to log in.
+ * If ALLOWED_EMAILS is configured, ONLY emails in ALLOWED_EMAILS are permitted (Strict Whitelist).
+ * If ALLOWED_EMAILS is empty, falls back to domain-level check.
  */
 export function validateEmailDomain(email: string): { isValid: boolean; domain: string; allowedDomains: string[] } {
-  const allowed = getAllowedDomains();
   const allowedSpecificEmails = getAllowedSpecificEmails();
+  const allowedDomains = getAllowedDomains();
 
   if (!email || !email.includes("@")) {
-    return { isValid: false, domain: "", allowedDomains: allowed };
+    return { isValid: false, domain: "", allowedDomains };
   }
 
   const normalizedEmail = email.trim().toLowerCase();
   const parts = normalizedEmail.split("@");
   const domain = parts[parts.length - 1];
 
-  const isValidDomain = allowed.includes(domain);
-  const isValidEmail = allowedSpecificEmails.includes(normalizedEmail);
+  // If specific emails whitelist is configured, strictly check specific allowed emails ONLY
+  if (allowedSpecificEmails.length > 0) {
+    const isValid = allowedSpecificEmails.includes(normalizedEmail);
+    return { isValid, domain, allowedDomains };
+  }
 
-  const isValid = isValidDomain || isValidEmail;
-  return { isValid, domain, allowedDomains: allowed };
+  // Fallback to domain check if ALLOWED_EMAILS is empty
+  const isValid = allowedDomains.includes(domain);
+  return { isValid, domain, allowedDomains };
 }
 
 /**

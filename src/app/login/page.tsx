@@ -28,29 +28,25 @@ function LoginContent() {
 
       {/* Main Card Container */}
       <div className="bg-white rounded-2xl p-6 border border-[#e5e8eb] shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-        {/* Domain Badge */}
+        {/* Access Restriction Badge */}
         <div className="mb-5 text-center">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#f0f6ff] text-[#1b64da] text-xs font-semibold">
-            <span>허용 도메인:</span>
-            {allowedDomains.map((d) => (
-              <span key={d} className="font-bold">
-                @{d}
-              </span>
-            ))}
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#f0f6ff] text-[#1b64da] text-xs font-semibold shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-[#3182f6] animate-pulse"></span>
+            <span>사전 승인 이메일 전용 로그인</span>
           </div>
         </div>
 
         {/* Error Alert Box */}
         {errorParam === "domain_not_allowed" && (
           <div className="mb-5 p-3.5 rounded-xl bg-[#fff5f5] border border-[#fee2e2] text-[#f04452] text-xs font-semibold leading-relaxed animate-fade-in">
-            ⚠️ 허용되지 않은 이메일 계정입니다.
+            ⚠️ 접근 권한이 없는 이메일 계정입니다.
             {unauthorizedEmail && (
               <div className="text-[11px] font-normal text-[#e11d48] mt-0.5 truncate">
                 ({unauthorizedEmail})
               </div>
             )}
             <div className="text-[11px] font-normal text-[#6b7684] mt-1">
-              허용된 도메인 계정(@gurucompany.co.kr, @avatye.com) 또는 등록된 특정 이메일 계정으로 다시 시도해 주세요.
+              대시보드 허용 목록에 등록된 지정 이메일 계정으로 로그인해 주세요.
             </div>
           </div>
         )}
