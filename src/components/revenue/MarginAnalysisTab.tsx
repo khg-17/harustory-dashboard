@@ -69,10 +69,10 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
           </div>
         </div>
 
-        {/* Card 2: 미션 지급 리워드 */}
+        {/* Card 2: 적립 알바비 (P) */}
         <div className="bg-white rounded-2xl border border-[#e5e8eb] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5 space-y-2">
           <div className="text-[13px] font-semibold text-[#8b95a1]">
-            미션 지급 리워드
+            적립 알바비 (P)
           </div>
           <div className="text-[26px] font-bold text-[#191f28] tracking-[-0.04em]">
             {totalMissionReward.toLocaleString()}
@@ -143,7 +143,7 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
                 <th className="py-3.5 px-4">날짜 (dt)</th>
                 <th className="py-3.5 px-4 text-right">총 광고 매출 (원)</th>
                 <th className="py-3.5 px-4 text-right">미션 광고 매출 (원)</th>
-                <th className="py-3.5 px-4 text-right">미션 지급 리워드 (P)</th>
+                <th className="py-3.5 px-4 text-right">적립 알바비 (P)</th>
                 <th className="py-3.5 px-4 text-right">포인트 환전 (원)</th>
                 <th className="py-3.5 px-4 text-right">순 영업 마진 (원)</th>
                 <th className="py-3.5 px-4 text-right">손익 마진율 (%)</th>
