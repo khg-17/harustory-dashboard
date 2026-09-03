@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ArrowRight,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { Line } from "react-chartjs-2";
 import {
@@ -65,13 +66,89 @@ interface FunnelDashboardProps {
   setFunnelCategoryTab?: (tab: FunnelCategoryTab) => void;
 }
 
-const PRIMARY_BLUE = "#3182F6";
-const METRIC_TEXT = "#191F28";
-const SECONDARY_TEXT = "#4E5968";
-const MUTED_TEXT = "#8B95A1";
-const BORDER_COLOR = "#E5E8EB";
-const DROPOFF_BG = "#FFF2F2";
-const DROPOFF_TEXT = "#E8344E";
+const presetTemplatesMap: Record<string, { name: string; steps: CustomStepConfig[] }> = {
+  bookMission: {
+    name: "책 정리하기",
+    steps: [
+      { id: "step-1", label: "reward_otter_click_book_1" },
+      { id: "step-2", label: "reward_otter_click_book_2" },
+      { id: "step-3", label: "reward_otter_click_book_3" },
+      { id: "step-4", label: "reward_otter_click_book_4" },
+      { id: "step-5", label: "reward_otter_click_book_5" },
+      { id: "step-6", label: "reward_otter_click_book_6" },
+      { id: "step-7", label: "reward_otter_click_book_7" },
+      { id: "step-8", label: "reward_otter_click_book_8" },
+      { id: "step-9", label: "reward_book_mission_complete_click" },
+    ],
+  },
+  drinkMission: {
+    name: "음료 (미션 영역)",
+    steps: [
+      { id: "step-1", label: "reward_mission_click_drink" },
+      { id: "step-2", label: "reward_drink_ad_click" },
+      { id: "step-3", label: "reward_drink_mission_complete_click" },
+    ],
+  },
+  drinkOtter: {
+    name: "음료 (해달 영역)",
+    steps: [
+      { id: "step-1", label: "reward_otter_click_drink" },
+      { id: "step-2", label: "reward_drink_ad_click" },
+      { id: "step-3", label: "reward_drink_mission_complete_click" },
+    ],
+  },
+  snackMission: {
+    name: "간식 (미션 영역)",
+    steps: [
+      { id: "step-1", label: "reward_mission_click_snack" },
+      { id: "step-2", label: "reward_snack_ad_click" },
+      { id: "step-3", label: "reward_snack_mission_complete_click" },
+    ],
+  },
+  snackOtter: {
+    name: "간식 (해달 영역)",
+    steps: [
+      { id: "step-1", label: "reward_otter_click_snack" },
+      { id: "step-2", label: "reward_snack_ad_click" },
+      { id: "step-3", label: "reward_snack_mission_complete_click" },
+    ],
+  },
+  exchange: {
+    name: "알바비 교환",
+    steps: [
+      { id: "step-1", label: "reward_exchange_click" },
+      { id: "step-2", label: "reward_exchange_money_click" },
+      { id: "step-3", label: "reward_exchange_confirm_click" },
+      { id: "step-4", label: "reward_exchange_result_click" },
+    ],
+  },
+  tip: {
+    name: "팁 받기",
+    steps: [
+      { id: "step-1", label: "reward_tip_icon_click" },
+      { id: "step-2", label: "reward_tip_ad_click" },
+      { id: "step-3", label: "reward_tip_confirm_click" },
+    ],
+  },
+  rotation: {
+    name: "로테이션 1회 완료",
+    steps: [
+      { id: "step-1", label: "reward_otter_book_dialogue1_view" },
+      { id: "step-2", label: "reward_otter_book_dialogue2_view" },
+      { id: "step-3", label: "reward_otter_book_dialogue3_view" },
+      { id: "step-4", label: "reward_otter_book_dialogue4_view" },
+      { id: "step-5", label: "reward_otter_book_dialogue5_view" },
+      { id: "step-6", label: "reward_otter_book_dialogue6_view" },
+      { id: "step-7", label: "reward_otter_snack_dialogue_view" },
+      { id: "step-8", label: "reward_otter_drink_dialogue_view" },
+      { id: "step-9", label: "reward_otter_episode_dialogue_view" },
+      { id: "step-10", label: "reward_otter_specgame_dialogue_view" },
+      { id: "step-11", label: "reward_otter_fortune_dialogue_view" },
+      { id: "step-12", label: "reward_otter_scroll_dialogue_view" },
+      { id: "step-13", label: "reward_otter_webtoon_dialogue_view" },
+    ],
+  },
+};
 
 export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
   funnels,
@@ -84,143 +161,42 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
   funnelCategoryTab = "detail",
   setFunnelCategoryTab,
 }) => {
-  // Main Navigation Sub-Tab ("step_conversion" | "daily_trend" | "cohort_compare" | "all_benchmark")
+  // Sub-Tab Navigation ("step_conversion" | "daily_trend" | "cohort_compare" | "all_benchmark")
   const [funnelSubTab, setFunnelSubTab] = useState<"step_conversion" | "daily_trend" | "cohort_compare" | "all_benchmark">("step_conversion");
 
   const [metricMode, setMetricMode] = useState<"users" | "sessions">("users");
   const [selectedFunnelId, setSelectedFunnelId] = useState<string>("bookMission");
   const [stepSearches, setStepSearches] = useState<Record<string, string>>({});
   const [showEditSteps, setShowEditSteps] = useState<boolean>(false);
+  const [isFetchingFunnel, setIsFetchingFunnel] = useState<boolean>(false);
 
-  const [customSteps, setCustomSteps] = useState<CustomStepConfig[]>([
-    { id: "step-1", label: "reward_otter_book_dialogue1_view" },
-    { id: "step-2", label: "reward_otter_click_book_1" },
-    { id: "step-3", label: "reward_otter_book_dialogue6_view" },
-    { id: "step-4", label: "reward_book_mission_complete_click" },
-  ]);
-
-  useEffect(() => {
-    try {
-      const savedKey = `clickhouse_custom_funnel_${selectedApp}`;
-      const saved = localStorage.getItem(savedKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 2) {
-          setCustomSteps(parsed);
-          setSelectedFunnelId("custom");
-        }
-      }
-    } catch (e) {
-      console.warn("Failed to load saved funnel steps:", e);
-    }
-  }, [selectedApp]);
-
-  const saveCustomStepsToStorage = (steps: CustomStepConfig[]) => {
-    try {
-      localStorage.setItem(`clickhouse_custom_funnel_${selectedApp}`, JSON.stringify(steps));
-    } catch (e) {
-      console.warn("Failed to save funnel steps:", e);
-    }
-  };
-
-  const presetTemplatesMap: Record<string, { name: string; steps: CustomStepConfig[] }> = {
-    bookMission: {
-      name: "책 정리하기",
-      steps: [
-        { id: "step-1", label: "reward_otter_click_book_1" },
-        { id: "step-2", label: "reward_otter_click_book_2" },
-        { id: "step-3", label: "reward_otter_click_book_3" },
-        { id: "step-4", label: "reward_otter_click_book_4" },
-        { id: "step-5", label: "reward_otter_click_book_5" },
-        { id: "step-6", label: "reward_otter_click_book_6" },
-        { id: "step-7", label: "reward_otter_click_book_7" },
-        { id: "step-8", label: "reward_otter_click_book_8" },
-        { id: "step-9", label: "reward_book_mission_complete_click" },
-      ],
-    },
-    drinkMission: {
-      name: "음료 (미션 영역)",
-      steps: [
-        { id: "step-1", label: "reward_mission_click_drink" },
-        { id: "step-2", label: "reward_drink_ad_click" },
-        { id: "step-3", label: "reward_drink_mission_complete_click" },
-      ],
-    },
-    drinkOtter: {
-      name: "음료 (해달 영역)",
-      steps: [
-        { id: "step-1", label: "reward_otter_click_drink" },
-        { id: "step-2", label: "reward_drink_ad_click" },
-        { id: "step-3", label: "reward_drink_mission_complete_click" },
-      ],
-    },
-    snackMission: {
-      name: "간식 (미션 영역)",
-      steps: [
-        { id: "step-1", label: "reward_mission_click_snack" },
-        { id: "step-2", label: "reward_snack_ad_click" },
-        { id: "step-3", label: "reward_snack_mission_complete_click" },
-      ],
-    },
-    snackOtter: {
-      name: "간식 (해달 영역)",
-      steps: [
-        { id: "step-1", label: "reward_otter_click_snack" },
-        { id: "step-2", label: "reward_snack_ad_click" },
-        { id: "step-3", label: "reward_snack_mission_complete_click" },
-      ],
-    },
-    exchange: {
-      name: "알바비 교환",
-      steps: [
-        { id: "step-1", label: "reward_exchange_click" },
-        { id: "step-2", label: "reward_exchange_money_click" },
-        { id: "step-3", label: "reward_exchange_confirm_click" },
-        { id: "step-4", label: "reward_exchange_result_click" },
-      ],
-    },
-    tip: {
-      name: "팁 받기",
-      steps: [
-        { id: "step-1", label: "reward_tip_icon_click" },
-        { id: "step-2", label: "reward_tip_ad_click" },
-        { id: "step-3", label: "reward_tip_confirm_click" },
-      ],
-    },
-    rotation: {
-      name: "로테이션 1회 완료",
-      steps: [
-        { id: "step-1", label: "reward_otter_book_dialogue1_view" },
-        { id: "step-2", label: "reward_otter_book_dialogue2_view" },
-        { id: "step-3", label: "reward_otter_book_dialogue3_view" },
-        { id: "step-4", label: "reward_otter_book_dialogue4_view" },
-        { id: "step-5", label: "reward_otter_book_dialogue5_view" },
-        { id: "step-6", label: "reward_otter_book_dialogue6_view" },
-        { id: "step-7", label: "reward_otter_snack_dialogue_view" },
-        { id: "step-8", label: "reward_otter_drink_dialogue_view" },
-        { id: "step-9", label: "reward_otter_episode_dialogue_view" },
-        { id: "step-10", label: "reward_otter_specgame_dialogue_view" },
-        { id: "step-11", label: "reward_otter_fortune_dialogue_view" },
-        { id: "step-12", label: "reward_otter_scroll_dialogue_view" },
-        { id: "step-13", label: "reward_otter_webtoon_dialogue_view" },
-      ],
-    },
-  };
+  // Active Funnel Step Definitions
+  const [customSteps, setCustomSteps] = useState<CustomStepConfig[]>(presetTemplatesMap.bookMission.steps);
 
   const loadPresetTemplate = (presetKey: string) => {
     setSelectedFunnelId(presetKey);
+    setDynamicCustomFunnelSteps([]);
+    setNewUserFunnelSteps([]);
+    setDailyFunnelTrendRaw([]);
+    setIsFetchingFunnel(true);
+
     if (presetTemplatesMap[presetKey]) {
       setCustomSteps(presetTemplatesMap[presetKey].steps);
     } else if (presetKey === "custom") {
       try {
-        const saved = localStorage.getItem(`clickhouse_custom_funnel_${selectedApp}`);
+        const savedKey = `clickhouse_custom_funnel_${selectedApp}`;
+        const saved = localStorage.getItem(savedKey);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length >= 2) setCustomSteps(parsed);
+          if (Array.isArray(parsed) && parsed.length >= 2) {
+            setCustomSteps(parsed);
+            return;
+          }
         }
       } catch (e) {
         console.warn("Failed to load saved custom steps:", e);
       }
+      setCustomSteps(presetTemplatesMap.bookMission.steps);
     }
   };
 
@@ -230,7 +206,11 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
     const defaultLabel = eventCatalog[customSteps.length % Math.max(1, eventCatalog.length)]?.label || "";
     const updated = [...customSteps, { id: nextId, label: defaultLabel }];
     setCustomSteps(updated);
-    saveCustomStepsToStorage(updated);
+    try {
+      localStorage.setItem(`clickhouse_custom_funnel_${selectedApp}`, JSON.stringify(updated));
+    } catch (e) {
+      console.warn("Failed to save custom steps:", e);
+    }
   };
 
   const handleRemoveStep = (id: string) => {
@@ -238,7 +218,11 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
     setSelectedFunnelId("custom");
     const updated = customSteps.filter((s) => s.id !== id);
     setCustomSteps(updated);
-    saveCustomStepsToStorage(updated);
+    try {
+      localStorage.setItem(`clickhouse_custom_funnel_${selectedApp}`, JSON.stringify(updated));
+    } catch (e) {
+      console.warn("Failed to save custom steps:", e);
+    }
   };
 
   const handleMoveStep = (index: number, direction: "up" | "down") => {
@@ -251,27 +235,38 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
     newSteps[index] = newSteps[targetIdx];
     newSteps[targetIdx] = temp;
     setCustomSteps(newSteps);
-    saveCustomStepsToStorage(newSteps);
+    try {
+      localStorage.setItem(`clickhouse_custom_funnel_${selectedApp}`, JSON.stringify(newSteps));
+    } catch (e) {
+      console.warn("Failed to save custom steps:", e);
+    }
   };
 
   const handleStepLabelChange = (id: string, newLabel: string) => {
     setSelectedFunnelId("custom");
     const updated = customSteps.map((s) => (s.id === id ? { ...s, label: newLabel } : s));
     setCustomSteps(updated);
-    saveCustomStepsToStorage(updated);
+    try {
+      localStorage.setItem(`clickhouse_custom_funnel_${selectedApp}`, JSON.stringify(updated));
+    } catch (e) {
+      console.warn("Failed to save custom steps:", e);
+    }
   };
 
-  // 1. Overall Custom Funnel
+  // 1. Fetch Custom Funnel Data from ClickHouse
   const [dynamicCustomFunnelSteps, setDynamicCustomFunnelSteps] = useState<FunnelStepItem[]>([]);
   useEffect(() => {
     if (customSteps.length < 2) {
       setDynamicCustomFunnelSteps([]);
+      setIsFetchingFunnel(false);
       return;
     }
     const stepLabels = customSteps.map((s) => s.label).filter(Boolean);
     if (stepLabels.length < 2) return;
 
     let isMounted = true;
+    setIsFetchingFunnel(true);
+
     const fetchCustomFunnel = async () => {
       try {
         const res = await fetch(
@@ -280,9 +275,13 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
           )}`
         );
         const json = await res.json();
-        if (isMounted && json.success && Array.isArray(json.data)) setDynamicCustomFunnelSteps(json.data);
+        if (isMounted && json.success && Array.isArray(json.data)) {
+          setDynamicCustomFunnelSteps(json.data);
+        }
       } catch (e) {
         console.warn("Failed to fetch custom funnel:", e);
+      } finally {
+        if (isMounted) setIsFetchingFunnel(false);
       }
     };
     fetchCustomFunnel();
@@ -291,7 +290,7 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
     };
   }, [customSteps, selectedApp, fromDate, toDate]);
 
-  // 2. New User Funnel
+  // 2. Fetch New User Cohort Funnel Data
   const [newUserFunnelSteps, setNewUserFunnelSteps] = useState<FunnelStepItem[]>([]);
   useEffect(() => {
     if (customSteps.length < 2) {
@@ -310,7 +309,9 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
           )}`
         );
         const json = await res.json();
-        if (isMounted && json.success && Array.isArray(json.data)) setNewUserFunnelSteps(json.data);
+        if (isMounted && json.success && Array.isArray(json.data)) {
+          setNewUserFunnelSteps(json.data);
+        }
       } catch (e) {
         console.warn("Failed to fetch new user funnel:", e);
       }
@@ -321,7 +322,7 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
     };
   }, [customSteps, selectedApp, fromDate, toDate]);
 
-  // 3. Daily Funnel Trend Data
+  // 3. Fetch Daily Funnel Trend Data
   const [dailyFunnelTrendRaw, setDailyFunnelTrendRaw] = useState<Array<{ dt: string; step: number; reachedSessionCount: number; reachedUserCount: number }>>([]);
   useEffect(() => {
     if (customSteps.length < 2) {
@@ -340,7 +341,9 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
           )}`
         );
         const json = await res.json();
-        if (isMounted && json.success && Array.isArray(json.data)) setDailyFunnelTrendRaw(json.data);
+        if (isMounted && json.success && Array.isArray(json.data)) {
+          setDailyFunnelTrendRaw(json.data);
+        }
       } catch (e) {
         console.warn("Failed to fetch daily funnel trend:", e);
       }
@@ -363,20 +366,18 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
     return isNaN(num) ? "0.0%" : `${num.toFixed(1)}%`;
   };
 
-  // Main Journey Nodes Processing
+  // Process Main Journey Nodes for Current Active Funnel
   const journeyNodes: JourneyNodeData[] = useMemo(() => {
     if (customSteps.length === 0) return [];
     let step1Count = 0;
     let prevCount = 0;
     const nodes: JourneyNodeData[] = [];
-    const activeFunnelSteps =
-      dynamicCustomFunnelSteps.length > 0 ? dynamicCustomFunnelSteps : funnelSteps.filter((s) => s.funnel === selectedFunnelId);
     let prevUserVal = 0;
     let prevSessionVal = 0;
 
     customSteps.forEach((step, idx) => {
       const stepNum = idx + 1;
-      const dbMatch = activeFunnelSteps.find((s) => Number(s.step) === stepNum);
+      const dbMatch = dynamicCustomFunnelSteps.find((s) => Number(s.step) === stepNum);
       let userCount = 0,
         sessionCount = 0;
 
@@ -442,7 +443,7 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
       });
     });
     return nodes;
-  }, [customSteps, eventCatalog, funnelSteps, selectedFunnelId, metricMode, dynamicCustomFunnelSteps]);
+  }, [customSteps, dynamicCustomFunnelSteps, eventCatalog, metricMode]);
 
   // Overall Summary Metrics
   const overallSummary = useMemo(() => {
@@ -538,13 +539,13 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
         {
           label: "최종 전환율 (%)",
           data: dailyTrendData.conversionRates || [],
-          borderColor: PRIMARY_BLUE,
+          borderColor: "#3182F6",
           backgroundColor: "rgba(49, 130, 246, 0.05)",
           fill: true,
           tension: 0.2,
           borderWidth: 2,
           pointBackgroundColor: "#FFFFFF",
-          pointBorderColor: PRIMARY_BLUE,
+          pointBorderColor: "#3182F6",
           pointBorderWidth: 2,
           pointRadius: 3,
         },
@@ -552,7 +553,7 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
     };
   }, [dailyTrendData]);
 
-  // Cohort Comparison (New vs Returning)
+  // Cohort Comparison Data
   const cohortComparisonData = useMemo(() => {
     if (customSteps.length < 2) return null;
 
@@ -621,21 +622,11 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
   const presetBenchmarkRows = useMemo(() => {
     return Object.entries(presetTemplatesMap).map(([key, template]) => {
       const tSteps = template.steps;
-      const dbSteps = funnelSteps.filter((s) => s.funnel === key);
+      const firstEv = eventCatalog.find((e) => e.label === tSteps[0]?.label);
+      const lastEv = eventCatalog.find((e) => e.label === tSteps[tSteps.length - 1]?.label);
 
-      let startUsers = 0;
-      let endUsers = 0;
-
-      if (dbSteps.length >= 2) {
-        startUsers = Number(dbSteps[0].reachedUserCount) || 0;
-        endUsers = Number(dbSteps[dbSteps.length - 1].reachedUserCount) || 0;
-      } else {
-        const firstEv = eventCatalog.find((e) => e.label === tSteps[0]?.label);
-        const lastEv = eventCatalog.find((e) => e.label === tSteps[tSteps.length - 1]?.label);
-        startUsers = Number(firstEv?.totalEventCount) || 0;
-        endUsers = Number(lastEv?.totalEventCount) || 0;
-      }
-
+      let startUsers = Number(firstEv?.totalEventCount) || 0;
+      let endUsers = Number(lastEv?.totalEventCount) || 0;
       if (startUsers < endUsers) endUsers = startUsers;
       const conversionRate = startUsers > 0 ? Math.min(100, (endUsers / startUsers) * 100) : 0;
 
@@ -648,7 +639,7 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
         conversionRate,
       };
     });
-  }, [funnelSteps, eventCatalog]);
+  }, [eventCatalog]);
 
   return (
     <div className="bg-white rounded-3xl border border-[#E5E8EB] overflow-hidden shadow-xs space-y-0">
@@ -710,29 +701,32 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
           </div>
         </div>
 
-        {/* CONTROL TOOLBAR: TEMPLATE PILLS & CONTROLS */}
+        {/* CONTROL TOOLBAR: DROPDOWN SELECT & METRIC TOGGLE */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#E5E8EB]/50">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-semibold text-[#8B95A1] mr-1">퍼널:</span>
-            {Object.entries(presetTemplatesMap).map(([key, template]) => (
-              <button
-                key={key}
-                onClick={() => loadPresetTemplate(key)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  selectedFunnelId === key
-                    ? "bg-[#3182F6] text-white font-bold"
-                    : "bg-white text-[#4E5968] border border-[#E5E8EB] hover:bg-[#F2F4F6]"
-                }`}
+          {/* Top-Level Funnel Select Dropdown */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[#191F28]">퍼널 템플릿 선택:</span>
+            <div className="relative">
+              <select
+                value={selectedFunnelId}
+                onChange={(e) => loadPresetTemplate(e.target.value)}
+                className="bg-white border border-[#D1D6DB] text-xs font-bold text-[#191F28] rounded-xl px-3.5 py-1.5 pr-8 focus:ring-2 focus:ring-[#3182F6] focus:outline-none appearance-none cursor-pointer shadow-2xs"
               >
-                {template.name} ({template.steps.length}단계)
-              </button>
-            ))}
+                {Object.entries(presetTemplatesMap).map(([key, template]) => (
+                  <option key={key} value={key}>
+                    {template.name} ({template.steps.length}단계)
+                  </option>
+                ))}
+                <option value="custom">커스텀 직접 편집 경로 ({customSteps.length}단계)</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-[#8B95A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowEditSteps(!showEditSteps)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium border flex items-center gap-1 transition-all cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1 transition-all cursor-pointer ${
                 showEditSteps
                   ? "bg-[#E8F3FF] border-[#3182F6] text-[#3182F6]"
                   : "bg-white border-[#E5E8EB] text-[#4E5968] hover:bg-[#F2F4F6]"
@@ -875,79 +869,86 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
             </div>
           )}
 
-          {/* STEP FLOW LIST VIEW */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-bold text-[#191F28]">단계별 전환 현황</h3>
+          {/* LOADING STATE OR STEP FLOW LIST VIEW */}
+          {isFetchingFunnel ? (
+            <div className="py-16 text-center space-y-3 bg-[#FAFBFD] rounded-2xl border border-[#F2F4F6]">
+              <Loader2 className="w-6 h-6 text-[#3182F6] animate-spin mx-auto" />
+              <p className="text-xs font-bold text-[#191F28]">선택한 퍼널({presetTemplatesMap[selectedFunnelId]?.name || selectedFunnelId}) 데이터를 ClickHouse에서 조회하는 중입니다...</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-[#191F28]">단계별 전환 현황</h3>
 
-            <div className="space-y-2.5">
-              {journeyNodes.map((node, index) => {
-                const curVal = metricMode === "users" ? node.userCount : node.sessionCount;
-                const barRatio = maxBarValue > 0 ? (curVal / maxBarValue) * 100 : 0;
-                const dropVal = metricMode === "users" ? node.dropUserCount : node.dropSessionCount;
-                const hasDrop = index < journeyNodes.length - 1 && dropVal > 0;
+              <div className="space-y-2.5">
+                {journeyNodes.map((node, index) => {
+                  const curVal = metricMode === "users" ? node.userCount : node.sessionCount;
+                  const barRatio = maxBarValue > 0 ? (curVal / maxBarValue) * 100 : 0;
+                  const dropVal = metricMode === "users" ? node.dropUserCount : node.dropSessionCount;
+                  const hasDrop = index < journeyNodes.length - 1 && dropVal > 0;
 
-                return (
-                  <div key={node.stepId} className="bg-white border border-[#E5E8EB] rounded-2xl p-4 space-y-3 shadow-2xs hover:border-[#3182F6]/40 transition-colors">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                      {/* Left: Step Number & Label */}
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-6 h-6 rounded-lg bg-[#E8F3FF] text-[#3182F6] font-bold text-xs flex items-center justify-center shrink-0">
-                          {node.stepIndex}
-                        </span>
-                        <span className="font-bold text-[#191F28] text-sm">{node.label}</span>
-                      </div>
-
-                      {/* Right: Integrated Metrics (Reached + Dropoff Side-by-Side) */}
-                      <div className="flex items-center gap-4 text-xs shrink-0 self-end sm:self-auto">
-                        {/* Reached Metrics */}
-                        <div className="text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <span className="font-bold text-[#191F28] text-sm tabular-nums">
-                              {formatNum(curVal)} {metricMode === "users" ? "명" : "회"}
-                            </span>
-                            <span className="font-bold text-xs text-[#3182F6] bg-[#E8F3FF] px-2 py-0.5 rounded-md tabular-nums">
-                              {index === 0 ? "100.0%" : formatPct(node.cumConversionRate)}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-[#8B95A1] mt-0.5">도달 (전체 대비)</p>
+                  return (
+                    <div key={node.stepId} className="bg-white border border-[#E5E8EB] rounded-2xl p-4 space-y-3 shadow-2xs hover:border-[#3182F6]/40 transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        {/* Left: Step Number & Label */}
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-6 h-6 rounded-lg bg-[#E8F3FF] text-[#3182F6] font-bold text-xs flex items-center justify-center shrink-0">
+                            {node.stepIndex}
+                          </span>
+                          <span className="font-bold text-[#191F28] text-sm">{node.label}</span>
                         </div>
 
-                        {/* Dropoff Metrics */}
-                        {hasDrop ? (
-                          <div className="text-right border-l border-[#E5E8EB] pl-4">
+                        {/* Right: Integrated Metrics */}
+                        <div className="flex items-center gap-4 text-xs shrink-0 self-end sm:self-auto">
+                          {/* Reached Metrics */}
+                          <div className="text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              <span className="font-bold text-[#E8344E] text-xs tabular-nums">
-                                -{formatNum(dropVal)} 명
+                              <span className="font-bold text-[#191F28] text-sm tabular-nums">
+                                {formatNum(curVal)} {metricMode === "users" ? "명" : "회"}
                               </span>
-                              <span className="font-bold text-[11px] text-[#E8344E] bg-[#FFF2F2] px-1.5 py-0.5 rounded-md tabular-nums">
-                                -{(100 - node.conversionRate).toFixed(1)}%
+                              <span className="font-bold text-xs text-[#3182F6] bg-[#E8F3FF] px-2 py-0.5 rounded-md tabular-nums">
+                                {index === 0 ? "100.0%" : formatPct(node.cumConversionRate)}
                               </span>
                             </div>
-                            <p className="text-[11px] text-[#8B95A1] mt-0.5">이탈 (구간 대비)</p>
+                            <p className="text-[11px] text-[#8B95A1] mt-0.5">도달 (전체 대비)</p>
                           </div>
-                        ) : index === journeyNodes.length - 1 ? (
-                          <div className="text-right border-l border-[#E5E8EB] pl-4">
-                            <span className="font-bold text-xs text-[#00C980] bg-[#E6F9F2] px-2 py-0.5 rounded-md">
-                              최종 완료
-                            </span>
-                            <p className="text-[11px] text-[#8B95A1] mt-0.5">최종 단계</p>
-                          </div>
-                        ) : null}
+
+                          {/* Dropoff Metrics */}
+                          {hasDrop ? (
+                            <div className="text-right border-l border-[#E5E8EB] pl-4">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <span className="font-bold text-[#E8344E] text-xs tabular-nums">
+                                  -{formatNum(dropVal)} 명
+                                </span>
+                                <span className="font-bold text-[11px] text-[#E8344E] bg-[#FFF2F2] px-1.5 py-0.5 rounded-md tabular-nums">
+                                  -{(100 - node.conversionRate).toFixed(1)}%
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-[#8B95A1] mt-0.5">이탈 (구간 대비)</p>
+                            </div>
+                          ) : index === journeyNodes.length - 1 ? (
+                            <div className="text-right border-l border-[#E5E8EB] pl-4">
+                              <span className="font-bold text-xs text-[#00C980] bg-[#E6F9F2] px-2 py-0.5 rounded-md">
+                                최종 완료
+                              </span>
+                              <p className="text-[11px] text-[#8B95A1] mt-0.5">최종 단계</p>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="w-full bg-[#F2F4F6] h-2.5 rounded-lg overflow-hidden relative">
+                        <div
+                          className="h-full rounded-lg bg-[#3182F6] transition-all duration-300"
+                          style={{ width: `${Math.max(1, barRatio)}%` }}
+                        />
                       </div>
                     </div>
-
-                    {/* Progress Bar */}
-                    <div className="w-full bg-[#F2F4F6] h-2.5 rounded-lg overflow-hidden relative">
-                      <div
-                        className="h-full rounded-lg bg-[#3182F6] transition-all duration-300"
-                        style={{ width: `${Math.max(1, barRatio)}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* DETAILED DATA TABLE */}
           <div className="space-y-3 pt-2">
