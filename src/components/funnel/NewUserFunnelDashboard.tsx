@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Plus, Trash2, ArrowUp, ArrowDown, ChevronDown, SlidersHorizontal, Maximize2, Minimize2 } from "lucide-react";
+import { Plus, Trash2, ArrowUp, ArrowDown, ChevronDown, SlidersHorizontal, Maximize2, Minimize2, ArrowRight } from "lucide-react";
 import { 
   FunnelItem, 
   FunnelStepItem, 
@@ -519,74 +519,79 @@ export const NewUserFunnelDashboard: React.FC<NewUserFunnelDashboardProps> = ({
         </div>
       </div>
 
-      {/* ── FUNNEL BARS SECTION (High Density Compact Rows) ── */}
-      <div className="p-5 md:p-6 space-y-2">
-        {computedJourney.map((step, index) => {
-          const barRatio = maxBarWidth > 0 ? (step.count / maxBarWidth) * 100 : 0;
-          const hasDrop = index < computedJourney.length - 1 && step.dropOffCount > 0;
-
-          return (
-            <div
-              key={step.id}
-              className="bg-white border border-[#E5E8EB] rounded-xl px-4 py-2.5 space-y-2 shadow-2xs hover:border-[#3182F6]/50 transition-all"
-            >
-              {/* Header Row: Step Number & Label, Metrics */}
-              <div className="flex items-center justify-between gap-3 text-xs">
-                {/* Step Badge & Label */}
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="px-2 py-0.5 rounded-md bg-[#E8F3FF] text-[#3182F6] font-extrabold text-xs shrink-0">
-                    Step {step.stepNumber}
-                  </span>
-                  <span className="font-bold text-[#191F28] text-xs sm:text-sm truncate">
-                    {formatEventLabel(step.label)}
-                  </span>
-                </div>
-
-                {/* Metrics */}
-                <div className="flex items-center gap-3 shrink-0 tabular-nums">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-[#191F28] text-xs sm:text-sm">
-                      {step.count.toLocaleString()} {metricMode === "users" ? "명" : "회"}
-                    </span>
-                    <span className="font-extrabold text-xs text-[#3182F6] bg-[#E8F3FF] px-2 py-0.5 rounded-md">
-                      {index === 0 ? "100.0%" : `${step.overallRate.toFixed(1)}%`}
-                    </span>
-                  </div>
-
-                  {hasDrop ? (
-                    <div className="flex items-center gap-1 bg-[#FFF2F2] border border-[#FFE0E0] px-2 py-0.5 rounded-md text-[#E8344E] font-bold text-xs">
-                      <span>-{step.dropOffCount.toLocaleString()} 명</span>
-                      <span className="text-[11px]">(-{step.dropOffRate.toFixed(1)}%)</span>
-                    </div>
-                  ) : index === computedJourney.length - 1 ? (
-                    <span className="font-bold text-xs text-[#00C980] bg-[#E6F9F2] px-2 py-0.5 rounded-md">
-                      최종 완료
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* Prominent, Thick Progress Bar with Inner Text/Gradient */}
-              <div className="w-full bg-[#F2F4F6] h-5 rounded-lg overflow-hidden relative flex items-center">
-                <div
-                  className="h-full rounded-lg bg-gradient-to-r from-[#3182F6] to-[#1D6CE5] transition-all duration-300 relative flex items-center justify-end pr-2"
-                  style={{ width: `${Math.max(2, barRatio)}%` }}
-                >
-                  {barRatio > 12 && (
-                    <span className="text-[11px] font-extrabold text-white drop-shadow-xs">
-                      {barRatio.toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-                {barRatio <= 12 && (
-                  <span className="text-[11px] font-bold text-[#8B95A1] pl-2">
-                    {barRatio.toFixed(1)}%
-                  </span>
-                )}
-              </div>
+      {/* ── FUNNEL BARS SECTION (Side-by-Side Stepped Funnel Columns - Zero Vertical Scroll) ── */}
+      <div className="p-5 md:p-6">
+        <div className="bg-[#FAFBFD] border border-[#E5E8EB] rounded-2xl p-5 space-y-4 shadow-2xs overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[#E5E8EB] pb-3">
+            <div>
+              <h3 className="text-xs font-bold text-[#191F28] flex items-center gap-1.5">
+                <SlidersHorizontal className="w-4 h-4 text-[#3182F6]" />
+                <span>신규 유저 퍼널 가로 한눈에 차트</span>
+              </h3>
+              <p className="text-[11px] text-[#8B95A1] mt-0.5">
+                세로 스크롤 없이 모든 퍼널 단계를 좌-우 가로 스텝 막대로 한눈에 비교합니다.
+              </p>
             </div>
-          );
-        })}
+            <span className="text-xs font-bold text-[#3182F6] bg-[#E8F3FF] px-2.5 py-1 rounded-lg">
+              신규 전환율: {summaryKpi.totalConversionRate.toFixed(1)}%
+            </span>
+          </div>
+
+          <div className="overflow-x-auto pb-2">
+            <div className="flex items-end gap-2.5 min-w-max pt-6 pb-2 px-2">
+              {computedJourney.map((step, index) => {
+                const barRatio = maxBarWidth > 0 ? (step.count / maxBarWidth) * 100 : 0;
+                const hasDrop = index < computedJourney.length - 1 && step.dropOffCount > 0;
+
+                return (
+                  <React.Fragment key={step.id}>
+                    <div className="w-28 sm:w-32 flex flex-col items-center gap-2 shrink-0">
+                      <div className="text-center space-y-0.5">
+                        <span className="font-extrabold text-[#3182F6] text-xs bg-[#E8F3FF] px-2 py-0.5 rounded-md inline-block">
+                          {index === 0 ? "100.0%" : `${step.overallRate.toFixed(1)}%`}
+                        </span>
+                        <p className="font-bold text-[#191F28] text-xs tabular-nums mt-1">
+                          {step.count.toLocaleString()} {metricMode === "users" ? "명" : "회"}
+                        </p>
+                      </div>
+
+                      <div className="w-full bg-[#EBF0F5] h-44 rounded-2xl relative overflow-hidden flex items-end p-1">
+                        <div
+                          className="w-full rounded-xl bg-gradient-to-t from-[#1D6CE5] to-[#3182F6] transition-all duration-300 relative flex items-start justify-center pt-2"
+                          style={{ height: `${Math.max(6, barRatio)}%` }}
+                        >
+                          <span className="text-[10px] font-extrabold text-white drop-shadow-xs">
+                            Step {step.stepNumber}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-center w-full">
+                        <p className="text-xs font-bold text-[#191F28] truncate px-1" title={formatEventLabel(step.label)}>
+                          {formatEventLabel(step.label)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {index < computedJourney.length - 1 && (
+                      <div className="flex flex-col items-center justify-center self-center py-6 text-center shrink-0">
+                        <ArrowRight className="w-4 h-4 text-[#B0B8C1] mb-1" />
+                        {hasDrop ? (
+                          <div className="bg-[#FFF2F2] border border-[#FFE0E0] px-1.5 py-0.5 rounded-md text-[10px] font-bold text-[#E8344E] tabular-nums whitespace-nowrap">
+                            -{step.dropOffCount.toLocaleString()}
+                            <div className="text-[9px] font-medium">-{step.dropOffRate.toFixed(1)}%</div>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-[#B0B8C1]">0</span>
+                        )}
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ── DETAIL TABLE SECTION ── */}

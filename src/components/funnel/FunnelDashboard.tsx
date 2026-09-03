@@ -739,10 +739,10 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
                     ? "bg-white text-[#3182F6] font-bold shadow-2xs"
                     : "text-[#6B7684] hover:text-[#191F28]"
                 }`}
-                title="한눈에 편안하게 보는 시각 차트 뷰"
+                title="가로 한눈에 보기 퍼널 차트 (스크롤 제로)"
               >
                 <Eye className="w-3.5 h-3.5" />
-                <span>시각 차트</span>
+                <span>가로 한눈에 차트</span>
               </button>
               <button
                 onClick={() => setViewMode("soft_cards")}
@@ -751,10 +751,10 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
                     ? "bg-white text-[#191F28] font-bold shadow-2xs"
                     : "text-[#6B7684] hover:text-[#191F28]"
                 }`}
-                title="눈이 편안한 카드 뷰"
+                title="소프트 카드 뷰"
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
-                <span>소프트 카드</span>
+                <span>컴팩트 카드</span>
               </button>
               <button
                 onClick={() => setViewMode("clean_table")}
@@ -923,17 +923,17 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {/* ── MODE A: VISUAL CHART VIEW (Amplitude Style - Eye Comfort) ── */}
+              {/* ── MODE A: SIDE-BY-SIDE HORIZONTAL STEPPED FUNNEL COLUMNS (Amplitude Style - ZERO VERTICAL SCROLL) ── */}
               {viewMode === "visual_chart" && (
-                <div className="bg-[#FAFBFD] border border-[#E5E8EB] rounded-2xl p-5 space-y-4 shadow-2xs">
+                <div className="bg-[#FAFBFD] border border-[#E5E8EB] rounded-2xl p-5 space-y-4 shadow-2xs overflow-hidden">
                   <div className="flex items-center justify-between border-b border-[#E5E8EB] pb-3">
                     <div>
                       <h3 className="text-xs font-bold text-[#191F28] flex items-center gap-1.5">
                         <Eye className="w-4 h-4 text-[#3182F6]" />
-                        <span>시각 통합 퍼널 차트</span>
+                        <span>가로 한눈에 보기 퍼널 차트</span>
                       </h3>
                       <p className="text-[11px] text-[#8B95A1] mt-0.5">
-                        눈의 피로를 최소화한 소프트 슬레이트 차트로 각 단계의 비중을 한눈에 파악합니다.
+                        세로 스크롤 필요 없이 모든 단계를 좌-우 가로 차트로 한눈에 파악합니다.
                       </p>
                     </div>
                     <span className="text-xs font-bold text-[#3182F6] bg-[#E8F3FF] px-2.5 py-1 rounded-lg">
@@ -941,57 +941,67 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
                     </span>
                   </div>
 
-                  <div className="space-y-2.5 pt-1">
-                    {journeyNodes.map((node, index) => {
-                      const curVal = metricMode === "users" ? node.userCount : node.sessionCount;
-                      const barRatio = maxBarValue > 0 ? (curVal / maxBarValue) * 100 : 0;
-                      const dropVal = metricMode === "users" ? node.dropUserCount : node.dropSessionCount;
-                      const hasDrop = index < journeyNodes.length - 1 && dropVal > 0;
+                  {/* HORIZONTAL STEPPED COLUMNS CONTAINER */}
+                  <div className="overflow-x-auto pb-2">
+                    <div className="flex items-end gap-2.5 min-w-max pt-6 pb-2 px-2">
+                      {journeyNodes.map((node, index) => {
+                        const curVal = metricMode === "users" ? node.userCount : node.sessionCount;
+                        const barRatio = maxBarValue > 0 ? (curVal / maxBarValue) * 100 : 0;
+                        const dropVal = metricMode === "users" ? node.dropUserCount : node.dropSessionCount;
+                        const hasDrop = index < journeyNodes.length - 1 && dropVal > 0;
 
-                      return (
-                        <div key={`vc_${node.stepId}`} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs font-medium text-[#333D4B]">
-                            <div className="flex items-center gap-2">
-                              <span className="w-5 h-5 rounded-md bg-[#E8F3FF] text-[#3182F6] font-bold text-[11px] flex items-center justify-center shrink-0">
-                                {node.stepIndex}
-                              </span>
-                              <span className="font-bold text-[#191F28]">{node.label}</span>
-                            </div>
-                            <div className="flex items-center gap-3 tabular-nums text-xs">
-                              <span className="font-bold text-[#191F28]">
-                                {formatNum(curVal)} {metricMode === "users" ? "명" : "회"}
-                              </span>
-                              <span className="font-bold text-[#3182F6]">
-                                {index === 0 ? "100.0%" : formatPct(node.cumConversionRate)}
-                              </span>
-                              {hasDrop && (
-                                <span className="text-[#E8344E] font-bold text-[11px]">
-                                  (-{formatNum(dropVal)}명)
+                        return (
+                          <React.Fragment key={`col_${node.stepId}`}>
+                            {/* SINGLE STEP COLUMN */}
+                            <div className="w-28 sm:w-32 flex flex-col items-center gap-2 shrink-0">
+                              {/* TOP METRICS (% & USER COUNT) */}
+                              <div className="text-center space-y-0.5">
+                                <span className="font-extrabold text-[#3182F6] text-xs bg-[#E8F3FF] px-2 py-0.5 rounded-md inline-block">
+                                  {index === 0 ? "100.0%" : formatPct(node.cumConversionRate)}
                                 </span>
-                              )}
-                            </div>
-                          </div>
+                                <p className="font-bold text-[#191F28] text-xs tabular-nums mt-1">
+                                  {formatNum(curVal)} {metricMode === "users" ? "명" : "회"}
+                                </p>
+                              </div>
 
-                          <div className="w-full bg-[#EBF0F5] h-6 rounded-xl overflow-hidden relative flex items-center">
-                            <div
-                              className="h-full rounded-xl bg-gradient-to-r from-[#3182F6] to-[#4A5568] transition-all duration-300 relative flex items-center justify-end pr-2.5"
-                              style={{ width: `${Math.max(2, barRatio)}%` }}
-                            >
-                              {barRatio > 10 && (
-                                <span className="text-[11px] font-bold text-white drop-shadow-xs">
-                                  {barRatio.toFixed(1)}%
-                                </span>
-                              )}
+                              {/* VERTICAL BAR */}
+                              <div className="w-full bg-[#EBF0F5] h-44 rounded-2xl relative overflow-hidden flex items-end p-1">
+                                <div
+                                  className="w-full rounded-xl bg-gradient-to-t from-[#1D6CE5] to-[#3182F6] transition-all duration-300 relative flex items-start justify-center pt-2"
+                                  style={{ height: `${Math.max(6, barRatio)}%` }}
+                                >
+                                  <span className="text-[10px] font-extrabold text-white drop-shadow-xs">
+                                    Step {node.stepIndex}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* BOTTOM EVENT LABEL */}
+                              <div className="text-center w-full">
+                                <p className="text-xs font-bold text-[#191F28] truncate px-1" title={node.label}>
+                                  {node.label}
+                                </p>
+                              </div>
                             </div>
-                            {barRatio <= 10 && (
-                              <span className="text-[11px] font-semibold text-[#6B7684] pl-2">
-                                {barRatio.toFixed(1)}%
-                              </span>
+
+                            {/* INTER-STEP DROPOFF CONNECTOR */}
+                            {index < journeyNodes.length - 1 && (
+                              <div className="flex flex-col items-center justify-center self-center py-6 text-center shrink-0">
+                                <ArrowRight className="w-4 h-4 text-[#B0B8C1] mb-1" />
+                                {hasDrop ? (
+                                  <div className="bg-[#FFF2F2] border border-[#FFE0E0] px-1.5 py-0.5 rounded-md text-[10px] font-bold text-[#E8344E] tabular-nums whitespace-nowrap">
+                                    -{formatNum(dropVal)}
+                                    <div className="text-[9px] font-medium">-{(100 - node.conversionRate).toFixed(1)}%</div>
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] text-[#B0B8C1]">0</span>
+                                )}
+                              </div>
                             )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
