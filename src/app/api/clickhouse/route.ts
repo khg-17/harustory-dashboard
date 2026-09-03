@@ -317,7 +317,9 @@ export async function GET(request: NextRequest) {
     from = `${y}-${m}-${d}`;
   }
 
-  const cacheKey = `${type}_${app}_${from}_${to}_${label}_${userSegment}`;
+  const steps = searchParams.get('steps') || '';
+  const newUserOnly = searchParams.get('newUserOnly') || '';
+  const cacheKey = `${type}_${app}_${from}_${to}_${label}_${userSegment}_${steps}_${newUserOnly}`;
 
   // 1.5 Deterministic Memory Cache Check: Return cached response immediately for identical request parameters
   if (responseCache.has(cacheKey)) {

@@ -260,7 +260,8 @@ export const NewUserFunnelDashboard: React.FC<NewUserFunnelDashboardProps> = ({
       try {
         const stepsQuery = stepLabels.join(",");
         const res = await fetch(
-          `/api/clickhouse?type=custom_funnel&app=${selectedApp}&from=${fromDate}&to=${toDate}&steps=${encodeURIComponent(stepsQuery)}&newUserOnly=1`
+          `/api/clickhouse?type=custom_funnel&app=${selectedApp}&from=${fromDate}&to=${toDate}&steps=${encodeURIComponent(stepsQuery)}&newUserOnly=1&_t=${Date.now()}`,
+          { cache: "no-store" }
         );
         const json = await res.json();
         if (isMounted && json.success && Array.isArray(json.data)) {

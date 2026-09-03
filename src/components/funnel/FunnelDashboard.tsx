@@ -181,7 +181,7 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
     setIsFetchingFunnel(true);
 
     if (presetTemplatesMap[presetKey]) {
-      setCustomSteps(presetTemplatesMap[presetKey].steps);
+      setCustomSteps([...presetTemplatesMap[presetKey].steps]);
     } else if (presetKey === "custom") {
       try {
         const savedKey = `clickhouse_custom_funnel_${selectedApp}`;
@@ -189,14 +189,14 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length >= 2) {
-            setCustomSteps(parsed);
+            setCustomSteps([...parsed]);
             return;
           }
         }
       } catch (e) {
         console.warn("Failed to load saved custom steps:", e);
       }
-      setCustomSteps(presetTemplatesMap.bookMission.steps);
+      setCustomSteps([...presetTemplatesMap.bookMission.steps]);
     }
   };
 
@@ -272,7 +272,8 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
         const res = await fetch(
           `/api/clickhouse?type=custom_funnel&app=${selectedApp}&from=${fromDate}&to=${toDate}&steps=${encodeURIComponent(
             stepLabels.join(",")
-          )}`
+          )}&_t=${Date.now()}`,
+          { cache: "no-store" }
         );
         const json = await res.json();
         if (isMounted && json.success && Array.isArray(json.data)) {
@@ -306,7 +307,8 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
         const res = await fetch(
           `/api/clickhouse?type=custom_funnel&app=${selectedApp}&from=${fromDate}&to=${toDate}&newUserOnly=1&steps=${encodeURIComponent(
             stepLabels.join(",")
-          )}`
+          )}&_t=${Date.now()}`,
+          { cache: "no-store" }
         );
         const json = await res.json();
         if (isMounted && json.success && Array.isArray(json.data)) {
@@ -338,7 +340,8 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
         const res = await fetch(
           `/api/clickhouse?type=funnel_daily_trend&app=${selectedApp}&from=${fromDate}&to=${toDate}&steps=${encodeURIComponent(
             stepLabels.join(",")
-          )}`
+          )}&_t=${Date.now()}`,
+          { cache: "no-store" }
         );
         const json = await res.json();
         if (isMounted && json.success && Array.isArray(json.data)) {
