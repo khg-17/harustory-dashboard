@@ -519,32 +519,71 @@ export const NewUserFunnelDashboard: React.FC<NewUserFunnelDashboardProps> = ({
         </div>
       </div>
 
-      {/* ── FUNNEL BARS SECTION (Adaptive Spacing) ── */}
-      <div className={`p-5 md:p-6 ${useCompactMode ? "space-y-2.5" : "space-y-5"}`}>
+      {/* ── FUNNEL BARS SECTION (High Density Compact Rows) ── */}
+      <div className="p-5 md:p-6 space-y-2">
         {computedJourney.map((step, index) => {
           const barRatio = maxBarWidth > 0 ? (step.count / maxBarWidth) * 100 : 0;
+          const hasDrop = index < computedJourney.length - 1 && step.dropOffCount > 0;
+
           return (
-            <div key={step.id}>
-              <div className={`flex items-baseline justify-between ${useCompactMode ? "mb-1" : "mb-2"}`}>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-[11px] font-medium text-[#B0B8C1]">{step.stepNumber}</span>
-                  <span className={`font-semibold text-[#333D4B] ${useCompactMode ? "text-[13px]" : "text-[14px]"}`}>{formatEventLabel(step.label)}</span>
+            <div
+              key={step.id}
+              className="bg-white border border-[#E5E8EB] rounded-xl px-4 py-2.5 space-y-2 shadow-2xs hover:border-[#3182F6]/50 transition-all"
+            >
+              {/* Header Row: Step Number & Label, Metrics */}
+              <div className="flex items-center justify-between gap-3 text-xs">
+                {/* Step Badge & Label */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="px-2 py-0.5 rounded-md bg-[#E8F3FF] text-[#3182F6] font-extrabold text-xs shrink-0">
+                    Step {step.stepNumber}
+                  </span>
+                  <span className="font-bold text-[#191F28] text-xs sm:text-sm truncate">
+                    {formatEventLabel(step.label)}
+                  </span>
                 </div>
-                <div className="flex items-baseline gap-2.5">
-                  <span className={`font-bold text-[#191F28] tabular-nums ${useCompactMode ? "text-[16px]" : "text-[20px]"}`}>{step.count.toLocaleString()}</span>
-                  <span className={`font-semibold tabular-nums ${useCompactMode ? "text-[12px]" : "text-[13px]"}`} style={{ color: TOSS_BLUE }}>{step.overallRate.toFixed(1)}%</span>
+
+                {/* Metrics */}
+                <div className="flex items-center gap-3 shrink-0 tabular-nums">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-[#191F28] text-xs sm:text-sm">
+                      {step.count.toLocaleString()} {metricMode === "users" ? "명" : "회"}
+                    </span>
+                    <span className="font-extrabold text-xs text-[#3182F6] bg-[#E8F3FF] px-2 py-0.5 rounded-md">
+                      {index === 0 ? "100.0%" : `${step.overallRate.toFixed(1)}%`}
+                    </span>
+                  </div>
+
+                  {hasDrop ? (
+                    <div className="flex items-center gap-1 bg-[#FFF2F2] border border-[#FFE0E0] px-2 py-0.5 rounded-md text-[#E8344E] font-bold text-xs">
+                      <span>-{step.dropOffCount.toLocaleString()} 명</span>
+                      <span className="text-[11px]">(-{step.dropOffRate.toFixed(1)}%)</span>
+                    </div>
+                  ) : index === computedJourney.length - 1 ? (
+                    <span className="font-bold text-xs text-[#00C980] bg-[#E6F9F2] px-2 py-0.5 rounded-md">
+                      최종 완료
+                    </span>
+                  ) : null}
                 </div>
               </div>
-              <div className={`w-full bg-[#F2F4F6] rounded-lg overflow-hidden ${useCompactMode ? "h-7" : "h-10 rounded-xl"}`}>
-                <div className="h-full rounded-lg transition-all duration-500 ease-out"
-                  style={{ width: `${Math.max(2, barRatio)}%`, backgroundColor: index === 0 ? TOSS_BLUE : `rgba(49, 130, 246, ${Math.max(0.3, 0.85 - index * 0.05)})` }} />
-              </div>
-              {index < computedJourney.length - 1 && step.dropOffCount > 0 && (
-                <div className={`flex items-center justify-between px-1 ${useCompactMode ? "mt-0.5" : "mt-1.5 mb-1"}`}>
-                  <span className="text-[10px] text-[#B0B8C1]">이탈 <span className="text-[#8B95A1] font-medium">{step.dropOffCount.toLocaleString()}{metricMode === "users" ? "명" : "회"}</span></span>
-                  <span className="text-[10px] text-[#E8344E] font-medium tabular-nums">−{step.dropOffRate.toFixed(1)}%</span>
+
+              {/* Prominent, Thick Progress Bar with Inner Text/Gradient */}
+              <div className="w-full bg-[#F2F4F6] h-5 rounded-lg overflow-hidden relative flex items-center">
+                <div
+                  className="h-full rounded-lg bg-gradient-to-r from-[#3182F6] to-[#1D6CE5] transition-all duration-300 relative flex items-center justify-end pr-2"
+                  style={{ width: `${Math.max(2, barRatio)}%` }}
+                >
+                  {barRatio > 12 && (
+                    <span className="text-[11px] font-extrabold text-white drop-shadow-xs">
+                      {barRatio.toFixed(1)}%
+                    </span>
+                  )}
                 </div>
-              )}
+                {barRatio <= 12 && (
+                  <span className="text-[11px] font-bold text-[#8B95A1] pl-2">
+                    {barRatio.toFixed(1)}%
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}
