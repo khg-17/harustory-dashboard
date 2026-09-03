@@ -22,7 +22,7 @@ import {
   Table as TableIcon,
   LayoutGrid,
 } from "lucide-react";
-import { Line } from "react-chartjs-2";
+import { Line, Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -451,6 +451,27 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
     return nodes;
   }, [customSteps, dynamicCustomFunnelSteps, metricMode]);
 
+  // Executive Standard Chart.js Bar Chart Data
+  const funnelBarChartData: ChartData<"bar"> = useMemo(() => {
+    return {
+      labels: journeyNodes.map((node) => `Step ${node.stepIndex}`),
+      datasets: [
+        {
+          label: metricMode === "users" ? "도달 유저 수 (명)" : "도달 세션 수 (회)",
+          data: journeyNodes.map((node) => (metricMode === "users" ? node.userCount : node.sessionCount)),
+          backgroundColor: journeyNodes.map((_, idx) =>
+            idx === 0
+              ? "rgba(49, 130, 246, 0.9)"
+              : `rgba(49, 130, 246, ${Math.max(0.35, 0.85 - idx * 0.05)})`
+          ),
+          borderColor: "#3182F6",
+          borderWidth: 1.5,
+          borderRadius: 6,
+        },
+      ],
+    };
+  }, [journeyNodes, metricMode]);
+
   // Overall Summary Metrics
   const overallSummary = useMemo(() => {
     if (journeyNodes.length < 2) return null;
@@ -739,10 +760,10 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
                     ? "bg-white text-[#3182F6] font-bold shadow-2xs"
                     : "text-[#6B7684] hover:text-[#191F28]"
                 }`}
-                title="가로 한눈에 보기 퍼널 차트 (스크롤 제로)"
+                title="한눈에 들어오는 통합 차트 뷰 (스크롤 제로)"
               >
                 <Eye className="w-3.5 h-3.5" />
-                <span>가로 한눈에 차트</span>
+                <span>통합 차트 뷰</span>
               </button>
               <button
                 onClick={() => setViewMode("soft_cards")}
@@ -751,10 +772,10 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
                     ? "bg-white text-[#191F28] font-bold shadow-2xs"
                     : "text-[#6B7684] hover:text-[#191F28]"
                 }`}
-                title="소프트 카드 뷰"
+                title="컴팩트 리스트 뷰"
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
-                <span>컴팩트 카드</span>
+                <span>컴팩트 리스트</span>
               </button>
               <button
                 onClick={() => setViewMode("clean_table")}
@@ -923,17 +944,17 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {/* ── MODE A: SIDE-BY-SIDE HORIZONTAL STEPPED FUNNEL COLUMNS (Amplitude Style - ZERO VERTICAL SCROLL) ── */}
+              {/* ── MODE A: EXECUTIVE STANDARD CHART.JS BAR CHART (Fits 100% in screen, 0 scrolling) ── */}
               {viewMode === "visual_chart" && (
-                <div className="bg-[#FAFBFD] border border-[#E5E8EB] rounded-2xl p-5 space-y-4 shadow-2xs overflow-hidden">
+                <div className="bg-[#FAFBFD] border border-[#E5E8EB] rounded-2xl p-5 space-y-4 shadow-2xs">
                   <div className="flex items-center justify-between border-b border-[#E5E8EB] pb-3">
                     <div>
                       <h3 className="text-xs font-bold text-[#191F28] flex items-center gap-1.5">
-                        <Eye className="w-4 h-4 text-[#3182F6]" />
-                        <span>가로 한눈에 보기 퍼널 차트</span>
+                        <BarChart2 className="w-4 h-4 text-[#3182F6]" />
+                        <span>통합 퍼널 막대 차트</span>
                       </h3>
                       <p className="text-[11px] text-[#8B95A1] mt-0.5">
-                        세로 스크롤 필요 없이 모든 단계를 좌-우 가로 차트로 한눈에 파악합니다.
+                        스크롤 없이 화면 폭에 맞춰 모든 단계의 감쇄 지표를 한눈에 파악합니다.
                       </p>
                     </div>
                     <span className="text-xs font-bold text-[#3182F6] bg-[#E8F3FF] px-2.5 py-1 rounded-lg">
@@ -941,67 +962,48 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
                     </span>
                   </div>
 
-                  {/* HORIZONTAL STEPPED COLUMNS CONTAINER */}
-                  <div className="overflow-x-auto pb-2">
-                    <div className="flex items-end gap-2.5 min-w-max pt-6 pb-2 px-2">
-                      {journeyNodes.map((node, index) => {
-                        const curVal = metricMode === "users" ? node.userCount : node.sessionCount;
-                        const barRatio = maxBarValue > 0 ? (curVal / maxBarValue) * 100 : 0;
-                        const dropVal = metricMode === "users" ? node.dropUserCount : node.dropSessionCount;
-                        const hasDrop = index < journeyNodes.length - 1 && dropVal > 0;
-
-                        return (
-                          <React.Fragment key={`col_${node.stepId}`}>
-                            {/* SINGLE STEP COLUMN */}
-                            <div className="w-28 sm:w-32 flex flex-col items-center gap-2 shrink-0">
-                              {/* TOP METRICS (% & USER COUNT) */}
-                              <div className="text-center space-y-0.5">
-                                <span className="font-extrabold text-[#3182F6] text-xs bg-[#E8F3FF] px-2 py-0.5 rounded-md inline-block">
-                                  {index === 0 ? "100.0%" : formatPct(node.cumConversionRate)}
-                                </span>
-                                <p className="font-bold text-[#191F28] text-xs tabular-nums mt-1">
-                                  {formatNum(curVal)} {metricMode === "users" ? "명" : "회"}
-                                </p>
-                              </div>
-
-                              {/* VERTICAL BAR */}
-                              <div className="w-full bg-[#EBF0F5] h-44 rounded-2xl relative overflow-hidden flex items-end p-1">
-                                <div
-                                  className="w-full rounded-xl bg-gradient-to-t from-[#1D6CE5] to-[#3182F6] transition-all duration-300 relative flex items-start justify-center pt-2"
-                                  style={{ height: `${Math.max(6, barRatio)}%` }}
-                                >
-                                  <span className="text-[10px] font-extrabold text-white drop-shadow-xs">
-                                    Step {node.stepIndex}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* BOTTOM EVENT LABEL */}
-                              <div className="text-center w-full">
-                                <p className="text-xs font-bold text-[#191F28] truncate px-1" title={node.label}>
-                                  {node.label}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* INTER-STEP DROPOFF CONNECTOR */}
-                            {index < journeyNodes.length - 1 && (
-                              <div className="flex flex-col items-center justify-center self-center py-6 text-center shrink-0">
-                                <ArrowRight className="w-4 h-4 text-[#B0B8C1] mb-1" />
-                                {hasDrop ? (
-                                  <div className="bg-[#FFF2F2] border border-[#FFE0E0] px-1.5 py-0.5 rounded-md text-[10px] font-bold text-[#E8344E] tabular-nums whitespace-nowrap">
-                                    -{formatNum(dropVal)}
-                                    <div className="text-[9px] font-medium">-{(100 - node.conversionRate).toFixed(1)}%</div>
-                                  </div>
-                                ) : (
-                                  <span className="text-[10px] text-[#B0B8C1]">0</span>
-                                )}
-                              </div>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </div>
+                  {/* CHART CANVAS */}
+                  <div className="h-64 pt-2">
+                    <Bar
+                      data={funnelBarChartData}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: { display: false },
+                          tooltip: {
+                            callbacks: {
+                              title: (items: any) => {
+                                const idx = items[0]?.dataIndex;
+                                return journeyNodes[idx] ? `Step ${journeyNodes[idx].stepIndex}: ${journeyNodes[idx].label}` : "";
+                              },
+                              label: (ctx: any) => {
+                                const idx = ctx.dataIndex;
+                                const node = journeyNodes[idx];
+                                if (!node) return "";
+                                const countStr = `${formatNum(ctx.raw)} ${metricMode === "users" ? "명" : "회"}`;
+                                const pctStr = idx === 0 ? "100.0%" : formatPct(node.cumConversionRate);
+                                const dropVal = metricMode === "users" ? node.dropUserCount : node.dropSessionCount;
+                                return [
+                                  ` 도달: ${countStr} (${pctStr})`,
+                                  idx > 0 && dropVal > 0 ? ` 이탈: -${formatNum(dropVal)} 명 (-${(100 - node.conversionRate).toFixed(1)}%)` : "",
+                                ].filter(Boolean);
+                              },
+                            },
+                          },
+                        },
+                        scales: {
+                          x: {
+                            grid: { display: false },
+                            ticks: { color: "#191F28", font: { weight: "bold", size: 11 } },
+                          },
+                          y: {
+                            grid: { color: "#F2F4F6" },
+                            ticks: { color: "#8B95A1", font: { size: 10 } },
+                          },
+                        },
+                      }}
+                    />
                   </div>
                 </div>
               )}
