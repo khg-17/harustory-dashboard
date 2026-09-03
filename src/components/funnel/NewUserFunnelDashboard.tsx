@@ -228,8 +228,8 @@ export const NewUserFunnelDashboard: React.FC<NewUserFunnelDashboardProps> = ({
               ? "rgba(49, 130, 246, 0.9)"
               : `rgba(49, 130, 246, ${Math.max(0.35, 0.85 - idx * 0.05)})`
           ),
-          borderColor: "#3182F6",
-          borderWidth: 1.5,
+          borderColor: "transparent",
+          borderWidth: 0,
           borderRadius: 6,
         },
       ],
@@ -383,11 +383,8 @@ export const NewUserFunnelDashboard: React.FC<NewUserFunnelDashboardProps> = ({
             <div>
               <h3 className="text-xs font-bold text-[#191F28] flex items-center gap-1.5">
                 <SlidersHorizontal className="w-4 h-4 text-[#3182F6]" />
-                <span>신규 유저 퍼널 막대 차트</span>
+                <span>신규 유저 퍼널 전환 현황</span>
               </h3>
-              <p className="text-[11px] text-[#8B95A1] mt-0.5">
-                스크롤 없이 화면 폭에 맞춰 신규 가입 유저의 온보딩 이탈을 한눈에 파악합니다.
-              </p>
             </div>
             <span className="text-xs font-bold text-[#3182F6] bg-[#E8F3FF] px-2.5 py-1 rounded-lg">
               신규 전환율: {summaryKpi.totalConversionRate.toFixed(1)}%

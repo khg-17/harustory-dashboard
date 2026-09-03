@@ -464,8 +464,8 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
               ? "rgba(49, 130, 246, 0.9)"
               : `rgba(49, 130, 246, ${Math.max(0.35, 0.85 - idx * 0.05)})`
           ),
-          borderColor: "#3182F6",
-          borderWidth: 1.5,
+          borderColor: "transparent",
+          borderWidth: 0,
           borderRadius: 6,
         },
       ],
@@ -951,11 +951,8 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
                     <div>
                       <h3 className="text-xs font-bold text-[#191F28] flex items-center gap-1.5">
                         <BarChart2 className="w-4 h-4 text-[#3182F6]" />
-                        <span>통합 퍼널 막대 차트</span>
+                        <span>단계별 전환 현황</span>
                       </h3>
-                      <p className="text-[11px] text-[#8B95A1] mt-0.5">
-                        스크롤 없이 화면 폭에 맞춰 모든 단계의 감쇄 지표를 한눈에 파악합니다.
-                      </p>
                     </div>
                     <span className="text-xs font-bold text-[#3182F6] bg-[#E8F3FF] px-2.5 py-1 rounded-lg">
                       전체 전환율: {overallSummary ? formatPct(overallSummary.overallConversion) : "0%"}
