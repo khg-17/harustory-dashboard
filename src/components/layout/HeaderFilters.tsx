@@ -65,17 +65,17 @@ export const HeaderFilters: React.FC<HeaderFiltersProps> = ({
           </select>
         </div>
 
-        <div className="h-4 w-[1px] bg-[#e5e8eb]" />
+        <div className="hidden sm:block h-4 w-[1px] bg-[#e5e8eb]" />
 
         {/* 2. Date Quick Presets & Range */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Calendar className="w-3.5 h-3.5 text-[#8b95a1]" />
           <span className="font-semibold text-[#8b95a1]">조회 기간</span>
 
-          <div className="flex bg-[#f2f4f6] p-1 rounded-xl gap-0.5">
+          <div className="flex bg-[#f2f4f6] p-1 rounded-xl gap-0.5 overflow-x-auto max-w-full">
             <button
               onClick={() => handleDatePreset("7d")}
-              className={`px-3 py-1 text-xs transition-all cursor-pointer rounded-lg ${
+              className={`px-2.5 sm:px-3 py-1 text-xs transition-all cursor-pointer rounded-lg whitespace-nowrap ${
                 datePreset === "7d"
                   ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                   : "text-[#6b7684] font-medium hover:text-[#191f28]"
@@ -85,7 +85,7 @@ export const HeaderFilters: React.FC<HeaderFiltersProps> = ({
             </button>
             <button
               onClick={() => handleDatePreset("30d")}
-              className={`px-3 py-1 text-xs transition-all cursor-pointer rounded-lg ${
+              className={`px-2.5 sm:px-3 py-1 text-xs transition-all cursor-pointer rounded-lg whitespace-nowrap ${
                 datePreset === "30d"
                   ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                   : "text-[#6b7684] font-medium hover:text-[#191f28]"
@@ -95,7 +95,7 @@ export const HeaderFilters: React.FC<HeaderFiltersProps> = ({
             </button>
             <button
               onClick={() => handleDatePreset("month")}
-              className={`px-3 py-1 text-xs transition-all cursor-pointer rounded-lg ${
+              className={`px-2.5 sm:px-3 py-1 text-xs transition-all cursor-pointer rounded-lg whitespace-nowrap ${
                 datePreset === "month"
                   ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                   : "text-[#6b7684] font-medium hover:text-[#191f28]"
@@ -113,7 +113,7 @@ export const HeaderFilters: React.FC<HeaderFiltersProps> = ({
                 setFromDate(e.target.value);
                 setDatePreset("custom");
               }}
-              className="bg-transparent text-xs font-medium focus:outline-none w-26 cursor-pointer text-[#4e5968]"
+              className="bg-transparent text-xs font-medium focus:outline-none w-24 sm:w-26 cursor-pointer text-[#4e5968]"
             />
             <span className="text-[#8b95a1]">~</span>
             <input
@@ -123,12 +123,12 @@ export const HeaderFilters: React.FC<HeaderFiltersProps> = ({
                 setToDate(e.target.value);
                 setDatePreset("custom");
               }}
-              className="bg-transparent text-xs font-medium focus:outline-none w-26 cursor-pointer text-[#4e5968]"
+              className="bg-transparent text-xs font-medium focus:outline-none w-24 sm:w-26 cursor-pointer text-[#4e5968]"
             />
           </div>
         </div>
 
-        <div className="h-4 w-[1px] bg-[#e5e8eb]" />
+        <div className="hidden sm:block h-4 w-[1px] bg-[#e5e8eb]" />
 
         {/* 3. Unit Selector */}
         <div className="flex items-center gap-2">

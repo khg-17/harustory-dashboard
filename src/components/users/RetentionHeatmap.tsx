@@ -170,7 +170,7 @@ export const RetentionHeatmap: React.FC<RetentionHeatmapProps> = ({
           </span>
         </div>
 
-        <div className="h-64 pt-1">
+        <div className="h-56 sm:h-64 md:h-72 pt-1 relative w-full">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-full text-[#8b95a1]">
               <RefreshCw className="w-6 h-6 animate-spin text-[#3182f6]" />

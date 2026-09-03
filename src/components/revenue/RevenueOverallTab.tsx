@@ -68,7 +68,7 @@ export const RevenueOverallTab: React.FC<RevenueOverallTabProps> = ({
               <TrendingUp className="w-3.5 h-3.5 text-[#3182f6]" />
               <span>일별/기간별 통합 매출 추이 차트</span>
             </div>
-            <div className="h-72 pt-1">
+            <div className="h-64 sm:h-72 md:h-80 pt-1 relative w-full">
               {dailyTrend.length > 0 ? (
                 <Line data={revenueChartData} options={revenueChartOptions} />
               ) : (

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Menu } from "lucide-react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -191,16 +191,38 @@ export default function Dashboard() {
         harustory: ["harustory", "하루스토리"],
         toss: ["toss", "토스"],
         kakaopay: ["kakaopay", "카카오", "카카오페이"],
-        "ph-hw": ["ph-hw", "하루날씨", "포인트홈", "point home"],
+        kbpay: ["kbpay", "kb pay", "kb페이"],
+        digiloca: ["digiloca", "디지로카"],
+        olock: ["olock", "오락"],
+        pass: ["pass"],
+        passbykt: ["passbykt", "pass by kt", "kt pass"],
+        okcashback: ["okcashback", "ok캐쉬백"],
+        benepia: ["benepia", "베네피아"],
+        benecafe: ["benecafe", "베네카페"],
+        happytoon: ["happytoon", "해피툰"],
+        haruweather: ["haruweather", "하루날씨"],
+        pocketcu: ["pocketcu", "포켓cu"],
+        rround: ["rround", "알라운드", "라운드"],
+        wabank: ["wabank", "와뱅", "광주와뱅크"],
+        zaritalk: ["zaritalk", "자리톡"],
+        zum: ["zum", "줌"],
+        "3o3": ["3o3", "삼쩜삼"],
+        bitwalk: ["bitwalk", "비트워크"],
+        bppay: ["bppay", "bp페이", "비플페이"],
+        memog: ["memog", "메모g"],
+        treasurer: ["treasurer", "트레저러"],
+        upluspage: ["upluspage", "유플러스페이지"],
+        "ph-hw": ["ph-hw", "하루날씨", "포인트홈", "point home", "포인트홈-하루날씨"],
       };
 
-      const targetAliases = APP_ALIAS_MAP[selLower] || [selLower];
+      const norm = (s: string) => s.toLowerCase().replace(/[\s\-_]/g, "");
+      const targetAliases = (APP_ALIAS_MAP[selLower] || [selLower]).map(norm);
 
       const matchedApps = item.apps.filter((app) => {
         if (!app.appName) return false;
-        const appNameLower = app.appName.toLowerCase();
+        const appNorm = norm(app.appName);
         return targetAliases.some(
-          (alias) => appNameLower.includes(alias) || alias.includes(appNameLower)
+          (alias) => appNorm.includes(alias) || alias.includes(appNorm)
         );
       });
 
@@ -270,6 +292,7 @@ export default function Dashboard() {
 
   // Collapsible Sidebar State
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
 
   // Custom Heatmap Floating Tooltip State
   const [heatmapTooltip, setHeatmapTooltip] = useState<CustomTooltipState | null>(null);
@@ -351,6 +374,7 @@ export default function Dashboard() {
           contentPurchaseRes,
           earningPointsRes,
           missionTotalRes,
+          settlementRes,
         ] = await Promise.all([
           fetch(`/api/clickhouse?type=service_total_revenue&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
           fetch(`/api/clickhouse?type=ad_revenue&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
@@ -358,6 +382,7 @@ export default function Dashboard() {
           fetch(`/api/clickhouse?type=content_purchase&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
           fetch(`/api/clickhouse?type=earning&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
           fetch(`/api/clickhouse?type=mission_total&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
+          fetch(`/api/settlement?from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
         ]);
 
         const [
@@ -367,6 +392,7 @@ export default function Dashboard() {
           contentPurchaseJson,
           earningPointsJson,
           missionTotalJson,
+          settlementJson,
         ] = await Promise.all([
           serviceRevRes.json(),
           adRevRes.json(),
@@ -374,6 +400,7 @@ export default function Dashboard() {
           contentPurchaseRes.json(),
           earningPointsRes.json(),
           missionTotalRes.json(),
+          settlementRes ? settlementRes.json().catch(() => null) : Promise.resolve(null),
         ]);
 
         if (serviceRevJson.success && Array.isArray(serviceRevJson.data)) setServiceRevenueRaw(serviceRevJson.data);
@@ -385,17 +412,9 @@ export default function Dashboard() {
           setMissionTotalRaw(missionTotalJson.data);
         }
 
-        // Fetch External Settlement API v2 (supports all apps breakdown)
-        try {
-          const settlementRes = await fetch(`/api/settlement?from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts);
-          const settlementJson = await settlementRes.json();
-          if (settlementJson.success && Array.isArray(settlementJson.data)) {
-            setSettlementRaw(settlementJson.data);
-          } else {
-            setSettlementRaw([]);
-          }
-        } catch (e) {
-          console.warn("Settlement API fetch warning:", e);
+        if (settlementJson && settlementJson.success && Array.isArray(settlementJson.data)) {
+          setSettlementRaw(settlementJson.data);
+        } else {
           setSettlementRaw([]);
         }
 
@@ -1000,13 +1019,6 @@ export default function Dashboard() {
     let giftBoxSum = 0;
     let serviceTotalSum = 0;
 
-    serviceRevenueRaw.forEach((row) => {
-      contentPaySum += Number(row.contentPayRevenue || 0);
-      adTicketSum += Number(row.adTicketRevenue || 0);
-      giftBoxSum += Number(row.giftBoxRevenue || 0);
-      serviceTotalSum += Number(row.serviceTotalRevenue || 0);
-    });
-
     const adCategoryMap: Record<string, { revenue: number; impression: number }> = {};
     const networkMap: Record<string, { revenue: number; impression: number }> = {};
     let totalAdRevenue = 0;
@@ -1028,6 +1040,7 @@ export default function Dashboard() {
 
         contentPaySum += realContentRev;
         paidCoinSum += paidCoin;
+        adTicketSum += (adFree || 0);
         serviceTotalSum += realContentRev;
         totalAdRevenue += dayTotalAd;
         rewardAdRevenue += isPhApp ? (cash + rc) : (pop + forus + rc);
@@ -1121,16 +1134,24 @@ export default function Dashboard() {
       return str;
     };
 
-    // Gather all unique dates across all revenue and reward sources
-    const allRevenueDates = Array.from(
-      new Set([
-        ...(serviceRevenueRaw || []).map((r) => extractDtStr(r?.dt)),
-        ...(adRevenueRaw || []).map((r) => extractDtStr(r?.dt)),
-        ...(missionTotalRaw || []).map((r) => extractDtStr(r?.dt)),
-        ...(earningRaw || []).map((r) => extractDtStr(r?.dt)),
-        ...(settlementRaw || []).map((r) => extractDtStr(r?.date)),
-      ])
-    ).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    // Generate strict date array between fromDate and toDate
+    const generateDateRange = (fromStr: string, toStr: string): string[] => {
+      const dates: string[] = [];
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fromStr) || !/^\d{4}-\d{2}-\d{2}$/.test(toStr)) return dates;
+      let curr = new Date(fromStr + "T00:00:00");
+      const end = new Date(toStr + "T00:00:00");
+      while (curr <= end) {
+        const y = curr.getFullYear();
+        const m = String(curr.getMonth() + 1).padStart(2, "0");
+        const d = String(curr.getDate()).padStart(2, "0");
+        dates.push(`${y}-${m}-${d}`);
+        curr.setDate(curr.getDate() + 1);
+      }
+      return dates;
+    };
+
+    // Gather all unique dates strictly within the selected range (fromDate ~ toDate)
+    const allRevenueDates = generateDateRange(fromDate, toDate);
 
     const dailyMap: Record<string, DailyRevenueTrendItem> = {};
     allRevenueDates.forEach((dtStr) => {
@@ -1421,9 +1442,7 @@ export default function Dashboard() {
       adCategoryDailyTrend = { dates, categories: catDaily };
       networkDailyTrend = { dates, networks: netDaily };
     } else {
-      const allAdDates = Array.from(
-        new Set(adRevenueRaw.map((r) => (r.dt ? String(r.dt).split("T")[0] : "")).filter(Boolean))
-      ).sort();
+      const allAdDates = generateDateRange(fromDate, toDate);
 
       const adCategoryDailyMap: Record<string, number[]> = { reward: [], display: [], rc: [], adTicket: [] };
       const networkDailyMap: Record<string, number[]> = {};
@@ -1464,9 +1483,7 @@ export default function Dashboard() {
     }
 
     // Calculate Purchase Type Daily Trend
-    const allPurchaseDates = Array.from(
-      new Set(contentPurchaseRaw.map((r) => (r.dt ? String(r.dt).split("T")[0] : "")).filter(Boolean))
-    ).sort();
+    const allPurchaseDates = generateDateRange(fromDate, toDate);
 
     const purchaseTypeDailyMap: Record<number, number[]> = { 10: [], 20: [], 11: [], 12: [], 13: [] };
 
@@ -1694,10 +1711,33 @@ export default function Dashboard() {
         setMissionSubTab={setMissionSubTab}
         isSidebarCollapsed={isSidebarCollapsed}
         setIsSidebarCollapsed={setIsSidebarCollapsed}
+        isMobileOpen={isMobileOpen}
+        setIsMobileOpen={setIsMobileOpen}
       />
 
-      {/* Main Content Area (Full width expansion for funnel analytics tab) */}
-      <div className={`flex-1 p-8 space-y-6 overflow-y-auto ${activeTab === "funnel" ? "w-full max-w-none" : "max-w-[1400px]"}`}>
+      {/* Main Content Area */}
+      <div className="flex-1 p-4 sm:p-6 md:p-8 space-y-6 overflow-y-auto w-full max-w-none">
+        {/* Mobile Top Header Bar */}
+        <div className="md:hidden flex items-center justify-between bg-white p-3.5 border border-[#e5e8eb] shadow-[0_2px_8px_rgba(0,0,0,0.04)] rounded-2xl">
+          <button
+            onClick={() => setIsMobileOpen(true)}
+            className="p-2 text-[#4e5968] hover:text-[#191f28] hover:bg-[#f2f4f6] rounded-xl cursor-pointer"
+            title="메뉴 열기"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex flex-col items-center">
+            <span className="text-sm font-bold text-[#191f28] tracking-widest font-sans uppercase">GURU COMPANY</span>
+            <span className="text-[9.5px] text-[#8b95a1] font-semibold">대시보드 모바일 뷰</span>
+          </div>
+          <button
+            onClick={fetchDashboardData}
+            className="p-2 text-[#4e5968] hover:text-[#191f28] hover:bg-[#f2f4f6] rounded-xl cursor-pointer"
+            title="실시간 갱신"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-[#3182f6]" : ""}`} />
+          </button>
+        </div>
         {/* Title Row */}
         <div className="flex items-center justify-between">
           <h1 className="text-[26px] font-bold text-[#191f28] tracking-[-0.04em]">

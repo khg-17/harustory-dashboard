@@ -119,7 +119,7 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
           </div>
           <span className="text-[11px] text-[#8b95a1] font-semibold">단위: 원 (KRW)</span>
         </div>
-        <div className="h-72 pt-1">
+        <div className="h-64 sm:h-72 md:h-80 pt-1 relative w-full">
           <Line data={marginChartData} options={revenueChartOptions} />
         </div>
       </div>

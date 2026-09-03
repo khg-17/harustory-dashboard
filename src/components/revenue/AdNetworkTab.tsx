@@ -119,7 +119,7 @@ export const AdNetworkTab: React.FC<AdNetworkTabProps> = ({ revenueSummary }) =>
           </div>
           <span className="text-[11px] text-[#8b95a1] font-semibold">단위: 원 (KRW)</span>
         </div>
-        <div className="h-72 pt-2">
+        <div className="h-64 sm:h-72 md:h-80 pt-2 relative w-full">
           {netDates.length > 0 ? (
             <Line data={adNetworkLineChartData} options={lineOptions} />
           ) : (

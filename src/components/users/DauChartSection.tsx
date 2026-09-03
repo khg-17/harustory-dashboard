@@ -132,7 +132,7 @@ export const DauChartSection: React.FC<DauChartSectionProps> = ({
           <span className="text-xs font-semibold">ClickHouse에서 지표 데이터를 조회하는 중입니다...</span>
         </div>
       ) : viewMode === "chart" ? (
-        <div className="h-80 pt-2">
+        <div className="h-64 sm:h-72 md:h-80 pt-2 relative w-full">
           {chartProcessedData.length > 0 ? (
             <Line data={dauChartData} options={dauChartOptions} />
           ) : (

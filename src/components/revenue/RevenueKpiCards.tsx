@@ -55,7 +55,7 @@ export const RevenueKpiCards: React.FC<RevenueKpiCardsProps> = ({ revenueSummary
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {/* 1. Gross Revenue Card */}
       <div className="bg-white rounded-2xl border border-[#e5e8eb] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5 space-y-2">
         <div className="flex items-center justify-between">

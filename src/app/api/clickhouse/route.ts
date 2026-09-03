@@ -527,6 +527,46 @@ export async function GET(request: NextRequest) {
       } else {
         sql = `SELECT 1 AS step, 0 AS reachedSessionCount, 0 AS reachedUserCount`;
       }
+    } else if (type === 'funnel_daily_trend') {
+      const stepsParam = searchParams.get('steps') || '';
+      const stepList = stepsParam.split(',').map(s => s.trim()).filter(Boolean);
+
+      if (stepList.length >= 2) {
+        const appCond = app === 'tc' ? "(1 = 1)" : `ual.appID = '${app}'`;
+        const stepConds = stepList.map(s => {
+          if (s === 'reward_mission_complete_any' || s === 'any_mission_complete' || s === 'mission_complete_any') {
+            return `(ual.label IN ('reward_book_mission_complete_click', 'reward_otter_click_book_8', 'reward_snack_ad_click', 'reward_snack_mission_complete_click', 'reward_drink_ad_click', 'reward_drink_mission_complete_click', 'reward_episode_mission_complete_click', 'reward_mission_complete_click', 'reward_scroll_mission_complete_click', 'reward_tip_ad_click', 'reward_tip_confirm_click'))`;
+          }
+          if (s === 'reward_attendance_day_any' || s === 'reward_attendance_day{n}_click') {
+            return `(ual.label LIKE 'reward_attendance_day%_click' OR ual.label LIKE 'reward_attendance_day%_complete_click')`;
+          }
+          return `ual.label = '${s.replace(/'/g, "''")}'`;
+        }).join(', ');
+
+        sql = `
+          SELECT 
+            dt,
+            level_step AS step, 
+            countIf(level >= level_step) AS reachedSessionCount, 
+            uniqExactIf(accountSN, level >= level_step) AS reachedUserCount 
+          FROM (
+            SELECT 
+              toDate(toTimeZone(ual.ts, 'Asia/Seoul')) AS dt,
+              ual.accountSN AS accountSN, 
+              windowFunnel(86400)(toDateTime(ual.ts), ${stepConds}) AS level 
+            FROM Log.UserActionLog AS ual
+            WHERE ual.env = 'prod' 
+              AND ${appCond} 
+              AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= '${from}' 
+              AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) <= '${to}' 
+            GROUP BY dt, ual.appID, ual.accountSN, if(ual.parentSessionID != '', ual.parentSessionID, ual.sessionID)
+          ) ARRAY JOIN range(1, ${stepList.length + 1}) AS level_step 
+          GROUP BY dt, level_step 
+          ORDER BY dt ASC, level_step ASC
+        `;
+      } else {
+        sql = `SELECT '2026-09-01' AS dt, 1 AS step, 0 AS reachedSessionCount, 0 AS reachedUserCount`;
+      }
     } else if (type === 'churn') {
       const churnSql = `
         SELECT

@@ -14,6 +14,8 @@ interface SidebarProps {
   setMissionSubTab?: (subTab: MissionSubTab) => void;
   isSidebarCollapsed: boolean;
   setIsSidebarCollapsed: (collapsed: boolean) => void;
+  isMobileOpen?: boolean;
+  setIsMobileOpen?: (open: boolean) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -26,7 +28,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   missionSubTab = "general",
   setMissionSubTab,
   isSidebarCollapsed,
-  setIsSidebarCollapsed
+  setIsSidebarCollapsed,
+  isMobileOpen = false,
+  setIsMobileOpen
 }) => {
   const router = useRouter();
   const [isFunnelOpen, setIsFunnelOpen] = useState<boolean>(activeTab === "funnel");
@@ -61,7 +65,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  return (
+  const closeMobile = () => {
+    if (setIsMobileOpen) setIsMobileOpen(false);
+  };
+
+  const sidebarContent = (
     <aside className={`${isSidebarCollapsed ? "w-16 p-3" : "w-60 p-4"} bg-white flex flex-col shrink-0 border-r border-[#e5e8eb]/60 transition-all duration-200 select-none sticky top-0 h-screen overflow-hidden`}>
       {/* Top Header: Original GURU COMPANY Logo & Collapsible Menu Toggle */}
       <div className={`shrink-0 flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-between"} pb-4 mb-4 border-b border-[#e5e8eb]/60`}>
@@ -385,5 +393,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        {sidebarContent}
+      </div>
+
+      {/* Mobile Drawer Overlay & Slide-over Sidebar */}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
+            onClick={closeMobile}
+          />
+          <div className="relative z-10 w-64 max-w-[80vw] bg-white h-full shadow-2xl overflow-y-auto">
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+    </>
   );
 };

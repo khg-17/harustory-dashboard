@@ -276,7 +276,7 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
               <TrendingUp className="w-4 h-4 text-[#3182f6]" />
               <span>일별 회차 이용 구분별 이용 건수 추이 차트</span>
             </div>
-            <div className="h-72 pt-2">
+            <div className="h-64 sm:h-72 md:h-80 pt-2 relative w-full">
               {purchaseDates.length > 0 ? (
                 <Line data={purchaseTypeLineChartData} options={purchaseOptions} />
               ) : (
@@ -476,14 +476,14 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
   return (
     <div className="space-y-6">
       {/* Content KPI Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-medium">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-medium">
         <div className="p-5 bg-white border border-[#e5e8eb] rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[13px] font-semibold text-[#8b95a1]">콘텐츠 총 매출</span>
             {renderGrowthBadge(totalRevGrowth)}
           </div>
           <div className="text-[24px] font-bold text-[#191f28] tracking-[-0.04em]">
-            {(paidCoinSum + adTicketSum).toLocaleString()}<span className="text-[16px] text-[#4e5968] ml-0.5">원</span>
+            {(contentPaySum || (paidCoinSum + adTicketSum)).toLocaleString()}<span className="text-[16px] text-[#4e5968] ml-0.5">원</span>
           </div>
         </div>
 
@@ -524,7 +524,7 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
           <TrendingUp className="w-4 h-4 text-[#3182f6]" />
           <span>일별 콘텐츠 총 매출 및 세부 추이 차트</span>
         </div>
-        <div className="h-72 pt-2">
+        <div className="h-64 sm:h-72 md:h-80 pt-2 relative w-full">
           {contentDailyList.length > 0 ? (
             <Line data={contentLineChartData} options={lineChartOptions} />
           ) : (

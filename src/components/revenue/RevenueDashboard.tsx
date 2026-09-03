@@ -86,10 +86,10 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
 
             {/* Sub-category Tabs for 광고 매출 상세 */}
             {(revenueCategoryTab === "overall" || revenueCategoryTab === "ad_category" || revenueCategoryTab === "ad_network" || revenueCategoryTab === "ad") && (
-              <div className="flex bg-[#f2f4f6] p-1 rounded-xl gap-0.5 text-xs ml-2">
+              <div className="flex bg-[#f2f4f6] p-1 rounded-xl gap-0.5 text-xs ml-2 overflow-x-auto max-w-full">
                 <button
                   onClick={() => setRevenueCategoryTab("overall")}
-                  className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg ${
+                  className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg whitespace-nowrap ${
                     revenueCategoryTab === "overall"
                       ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                       : "text-[#6b7684] font-medium hover:text-[#191f28]"
@@ -99,7 +99,7 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
                 </button>
                 <button
                   onClick={() => setRevenueCategoryTab("ad_category")}
-                  className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg ${
+                  className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg whitespace-nowrap ${
                     revenueCategoryTab === "ad_category" || revenueCategoryTab === "ad"
                       ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                       : "text-[#6b7684] font-medium hover:text-[#191f28]"
@@ -109,7 +109,7 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
                 </button>
                 <button
                   onClick={() => setRevenueCategoryTab("ad_network")}
-                  className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg ${
+                  className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg whitespace-nowrap ${
                     revenueCategoryTab === "ad_network"
                       ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                       : "text-[#6b7684] font-medium hover:text-[#191f28]"
@@ -122,10 +122,10 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
 
             {/* Sub-category Tabs for 콘텐츠 매출 상세 */}
             {(revenueCategoryTab === "content" || revenueCategoryTab === "content_pay" || revenueCategoryTab === "content_usage") && (
-              <div className="flex bg-[#f2f4f6] p-1 rounded-xl gap-0.5 text-xs ml-2">
+              <div className="flex bg-[#f2f4f6] p-1 rounded-xl gap-0.5 text-xs ml-2 overflow-x-auto max-w-full">
                 <button
                   onClick={() => setRevenueCategoryTab("content_pay")}
-                  className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg ${
+                  className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg whitespace-nowrap ${
                     revenueCategoryTab === "content" || revenueCategoryTab === "content_pay"
                       ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                       : "text-[#6b7684] font-medium hover:text-[#191f28]"
@@ -135,7 +135,7 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
                 </button>
                 <button
                   onClick={() => setRevenueCategoryTab("content_usage")}
-                  className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg ${
+                  className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg whitespace-nowrap ${
                     revenueCategoryTab === "content_usage"
                       ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                       : "text-[#6b7684] font-medium hover:text-[#191f28]"
