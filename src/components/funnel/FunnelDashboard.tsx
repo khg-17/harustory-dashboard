@@ -18,6 +18,9 @@ import {
   ArrowRight,
   CheckCircle2,
   Loader2,
+  Eye,
+  Table as TableIcon,
+  LayoutGrid,
 } from "lucide-react";
 import { Line } from "react-chartjs-2";
 import {
@@ -163,6 +166,9 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
 }) => {
   // Sub-Tab Navigation ("step_conversion" | "daily_trend" | "cohort_compare" | "all_benchmark")
   const [funnelSubTab, setFunnelSubTab] = useState<"step_conversion" | "daily_trend" | "cohort_compare" | "all_benchmark">("step_conversion");
+
+  // Eye-Comfort Viewing Mode ("visual_chart" | "soft_cards" | "clean_table")
+  const [viewMode, setViewMode] = useState<"visual_chart" | "soft_cards" | "clean_table">("visual_chart");
 
   const [metricMode, setMetricMode] = useState<"users" | "sessions">("users");
   const [selectedFunnelId, setSelectedFunnelId] = useState<string>("bookMission");
@@ -443,7 +449,7 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
       });
     });
     return nodes;
-  }, [customSteps, dynamicCustomFunnelSteps, eventCatalog, metricMode]);
+  }, [customSteps, dynamicCustomFunnelSteps, metricMode]);
 
   // Overall Summary Metrics
   const overallSummary = useMemo(() => {
@@ -705,7 +711,7 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#E5E8EB]/50">
           {/* Top-Level Funnel Select Dropdown */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[#191F28]">퍼널 템플릿 선택:</span>
+            <span className="text-xs font-bold text-[#191F28]">퍼널 템플릿:</span>
             <div className="relative">
               <select
                 value={selectedFunnelId}
@@ -723,7 +729,47 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            {/* EYE-COMFORT VIEWING MODE TOGGLE */}
+            <div className="flex items-center bg-[#F2F4F6] p-0.5 rounded-lg text-xs gap-0.5">
+              <button
+                onClick={() => setViewMode("visual_chart")}
+                className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                  viewMode === "visual_chart"
+                    ? "bg-white text-[#3182F6] font-bold shadow-2xs"
+                    : "text-[#6B7684] hover:text-[#191F28]"
+                }`}
+                title="한눈에 편안하게 보는 시각 차트 뷰"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>시각 차트</span>
+              </button>
+              <button
+                onClick={() => setViewMode("soft_cards")}
+                className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                  viewMode === "soft_cards"
+                    ? "bg-white text-[#191F28] font-bold shadow-2xs"
+                    : "text-[#6B7684] hover:text-[#191F28]"
+                }`}
+                title="눈이 편안한 카드 뷰"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>소프트 카드</span>
+              </button>
+              <button
+                onClick={() => setViewMode("clean_table")}
+                className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                  viewMode === "clean_table"
+                    ? "bg-white text-[#191F28] font-bold shadow-2xs"
+                    : "text-[#6B7684] hover:text-[#191F28]"
+                }`}
+                title="눈피로 제로 무음 표 뷰"
+              >
+                <TableIcon className="w-3.5 h-3.5" />
+                <span>간결한 표</span>
+              </button>
+            </div>
+
             <button
               onClick={() => setShowEditSteps(!showEditSteps)}
               className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1 transition-all cursor-pointer ${
@@ -876,120 +922,224 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
               <p className="text-xs font-bold text-[#191F28]">선택한 퍼널({presetTemplatesMap[selectedFunnelId]?.name || selectedFunnelId}) 데이터를 ClickHouse에서 조회하는 중입니다...</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-[#191F28]">단계별 전환 현황</h3>
-                <span className="text-[11px] text-[#8B95A1]">막대를 통해 전체 도달 비율을 한눈에 파악합니다.</span>
-              </div>
+            <div className="space-y-4">
+              {/* ── MODE A: VISUAL CHART VIEW (Amplitude Style - Eye Comfort) ── */}
+              {viewMode === "visual_chart" && (
+                <div className="bg-[#FAFBFD] border border-[#E5E8EB] rounded-2xl p-5 space-y-4 shadow-2xs">
+                  <div className="flex items-center justify-between border-b border-[#E5E8EB] pb-3">
+                    <div>
+                      <h3 className="text-xs font-bold text-[#191F28] flex items-center gap-1.5">
+                        <Eye className="w-4 h-4 text-[#3182F6]" />
+                        <span>시각 통합 퍼널 차트</span>
+                      </h3>
+                      <p className="text-[11px] text-[#8B95A1] mt-0.5">
+                        눈의 피로를 최소화한 소프트 슬레이트 차트로 각 단계의 비중을 한눈에 파악합니다.
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-[#3182F6] bg-[#E8F3FF] px-2.5 py-1 rounded-lg">
+                      전체 전환율: {overallSummary ? formatPct(overallSummary.overallConversion) : "0%"}
+                    </span>
+                  </div>
 
-              <div className="space-y-2">
-                {journeyNodes.map((node, index) => {
-                  const curVal = metricMode === "users" ? node.userCount : node.sessionCount;
-                  const barRatio = maxBarValue > 0 ? (curVal / maxBarValue) * 100 : 0;
-                  const dropVal = metricMode === "users" ? node.dropUserCount : node.dropSessionCount;
-                  const hasDrop = index < journeyNodes.length - 1 && dropVal > 0;
+                  <div className="space-y-2.5 pt-1">
+                    {journeyNodes.map((node, index) => {
+                      const curVal = metricMode === "users" ? node.userCount : node.sessionCount;
+                      const barRatio = maxBarValue > 0 ? (curVal / maxBarValue) * 100 : 0;
+                      const dropVal = metricMode === "users" ? node.dropUserCount : node.dropSessionCount;
+                      const hasDrop = index < journeyNodes.length - 1 && dropVal > 0;
 
-                  return (
-                    <div
-                      key={node.stepId}
-                      className="bg-white border border-[#E5E8EB] rounded-xl px-4 py-2.5 space-y-2 shadow-2xs hover:border-[#3182F6]/50 transition-all"
-                    >
-                      {/* Header Row: Step Number & Label, Metrics */}
-                      <div className="flex items-center justify-between gap-3 text-xs">
-                        {/* Step Badge & Label */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="px-2 py-0.5 rounded-md bg-[#E8F3FF] text-[#3182F6] font-extrabold text-xs shrink-0">
-                            Step {node.stepIndex}
-                          </span>
-                          <span className="font-bold text-[#191F28] text-xs sm:text-sm truncate">
-                            {node.label}
-                          </span>
+                      return (
+                        <div key={`vc_${node.stepId}`} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs font-medium text-[#333D4B]">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-md bg-[#E8F3FF] text-[#3182F6] font-bold text-[11px] flex items-center justify-center shrink-0">
+                                {node.stepIndex}
+                              </span>
+                              <span className="font-bold text-[#191F28]">{node.label}</span>
+                            </div>
+                            <div className="flex items-center gap-3 tabular-nums text-xs">
+                              <span className="font-bold text-[#191F28]">
+                                {formatNum(curVal)} {metricMode === "users" ? "명" : "회"}
+                              </span>
+                              <span className="font-bold text-[#3182F6]">
+                                {index === 0 ? "100.0%" : formatPct(node.cumConversionRate)}
+                              </span>
+                              {hasDrop && (
+                                <span className="text-[#E8344E] font-bold text-[11px]">
+                                  (-{formatNum(dropVal)}명)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="w-full bg-[#EBF0F5] h-6 rounded-xl overflow-hidden relative flex items-center">
+                            <div
+                              className="h-full rounded-xl bg-gradient-to-r from-[#3182F6] to-[#4A5568] transition-all duration-300 relative flex items-center justify-end pr-2.5"
+                              style={{ width: `${Math.max(2, barRatio)}%` }}
+                            >
+                              {barRatio > 10 && (
+                                <span className="text-[11px] font-bold text-white drop-shadow-xs">
+                                  {barRatio.toFixed(1)}%
+                                </span>
+                              )}
+                            </div>
+                            {barRatio <= 10 && (
+                              <span className="text-[11px] font-semibold text-[#6B7684] pl-2">
+                                {barRatio.toFixed(1)}%
+                              </span>
+                            )}
+                          </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-                        {/* Metrics */}
-                        <div className="flex items-center gap-3 shrink-0 tabular-nums">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-[#191F28] text-xs sm:text-sm">
-                              {formatNum(curVal)} {metricMode === "users" ? "명" : "회"}
+              {/* ── MODE B: SOFT CARDS VIEW ── */}
+              {viewMode === "soft_cards" && (
+                <div className="space-y-2">
+                  {journeyNodes.map((node, index) => {
+                    const curVal = metricMode === "users" ? node.userCount : node.sessionCount;
+                    const barRatio = maxBarValue > 0 ? (curVal / maxBarValue) * 100 : 0;
+                    const dropVal = metricMode === "users" ? node.dropUserCount : node.dropSessionCount;
+                    const hasDrop = index < journeyNodes.length - 1 && dropVal > 0;
+
+                    return (
+                      <div
+                        key={node.stepId}
+                        className="bg-white border border-[#E5E8EB] rounded-xl px-4 py-2.5 space-y-2 shadow-2xs hover:border-[#3182F6]/50 transition-all"
+                      >
+                        <div className="flex items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="px-2 py-0.5 rounded-md bg-[#E8F3FF] text-[#3182F6] font-extrabold text-xs shrink-0">
+                              Step {node.stepIndex}
                             </span>
-                            <span className="font-extrabold text-xs text-[#3182F6] bg-[#E8F3FF] px-2 py-0.5 rounded-md">
-                              {index === 0 ? "100.0%" : formatPct(node.cumConversionRate)}
+                            <span className="font-bold text-[#191F28] text-xs sm:text-sm truncate">
+                              {node.label}
                             </span>
                           </div>
 
-                          {hasDrop ? (
-                            <div className="flex items-center gap-1 bg-[#FFF2F2] border border-[#FFE0E0] px-2 py-0.5 rounded-md text-[#E8344E] font-bold text-xs">
-                              <span>-{formatNum(dropVal)} 명</span>
-                              <span className="text-[11px]">(-{(100 - node.conversionRate).toFixed(1)}%)</span>
+                          <div className="flex items-center gap-3 shrink-0 tabular-nums">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-[#191F28] text-xs sm:text-sm">
+                                {formatNum(curVal)} {metricMode === "users" ? "명" : "회"}
+                              </span>
+                              <span className="font-extrabold text-xs text-[#3182F6] bg-[#E8F3FF] px-2 py-0.5 rounded-md">
+                                {index === 0 ? "100.0%" : formatPct(node.cumConversionRate)}
+                              </span>
                             </div>
-                          ) : index === journeyNodes.length - 1 ? (
-                            <span className="font-bold text-xs text-[#00C980] bg-[#E6F9F2] px-2 py-0.5 rounded-md">
-                              최종 완료
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
 
-                      {/* Prominent, Thick Progress Bar with Inner Text/Gradient */}
-                      <div className="w-full bg-[#F2F4F6] h-5 rounded-lg overflow-hidden relative flex items-center">
-                        <div
-                          className="h-full rounded-lg bg-gradient-to-r from-[#3182F6] to-[#1D6CE5] transition-all duration-300 relative flex items-center justify-end pr-2"
-                          style={{ width: `${Math.max(2, barRatio)}%` }}
-                        >
-                          {barRatio > 12 && (
-                            <span className="text-[11px] font-extrabold text-white drop-shadow-xs">
+                            {hasDrop ? (
+                              <div className="flex items-center gap-1 bg-[#FFF2F2] border border-[#FFE0E0] px-2 py-0.5 rounded-md text-[#E8344E] font-bold text-xs">
+                                <span>-{formatNum(dropVal)} 명</span>
+                                <span className="text-[11px]">(-{(100 - node.conversionRate).toFixed(1)}%)</span>
+                              </div>
+                            ) : index === journeyNodes.length - 1 ? (
+                              <span className="font-bold text-xs text-[#00C980] bg-[#E6F9F2] px-2 py-0.5 rounded-md">
+                                최종 완료
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="w-full bg-[#F2F4F6] h-5 rounded-lg overflow-hidden relative flex items-center">
+                          <div
+                            className="h-full rounded-lg bg-gradient-to-r from-[#3182F6] to-[#1D6CE5] transition-all duration-300 relative flex items-center justify-end pr-2"
+                            style={{ width: `${Math.max(2, barRatio)}%` }}
+                          >
+                            {barRatio > 12 && (
+                              <span className="text-[11px] font-extrabold text-white drop-shadow-xs">
+                                {barRatio.toFixed(1)}%
+                              </span>
+                            )}
+                          </div>
+                          {barRatio <= 12 && (
+                            <span className="text-[11px] font-bold text-[#8B95A1] pl-2">
                               {barRatio.toFixed(1)}%
                             </span>
                           )}
                         </div>
-                        {barRatio <= 12 && (
-                          <span className="text-[11px] font-bold text-[#8B95A1] pl-2">
-                            {barRatio.toFixed(1)}%
-                          </span>
-                        )}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* ── MODE C: CLEAN MINIMAL TABLE VIEW (Zero Eye Strain) ── */}
+              {viewMode === "clean_table" && (
+                <div className="border border-[#E5E8EB] rounded-2xl overflow-hidden bg-white shadow-2xs">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-[#FAFBFD] font-bold text-[#4E5968] border-b border-[#E5E8EB]">
+                        <th className="py-3 px-4">단계</th>
+                        <th className="py-3 px-4">이벤트 라벨</th>
+                        <th className="py-3 px-4 text-right">도달 수</th>
+                        <th className="py-3 px-4 text-right">누적 전환율</th>
+                        <th className="py-3 px-4 text-right">구간 전환율</th>
+                        <th className="py-3 px-4 text-right">구간 이탈 수</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#F2F4F6] text-[#333D4B]">
+                      {journeyNodes.map((node) => {
+                        const val = metricMode === "users" ? node.userCount : node.sessionCount;
+                        const dropVal = metricMode === "users" ? node.dropUserCount : node.dropSessionCount;
+
+                        return (
+                          <tr key={`ct_${node.stepId}`} className="hover:bg-[#FAFBFD]">
+                            <td className="py-3 px-4 font-extrabold text-[#3182F6]">Step {node.stepIndex}</td>
+                            <td className="py-3 px-4 font-bold text-[#191F28]">{node.label}</td>
+                            <td className="py-3 px-4 text-right font-bold text-[#191F28] tabular-nums">{formatNum(val)} {metricMode === "users" ? "명" : "회"}</td>
+                            <td className="py-3 px-4 text-right font-extrabold text-[#3182F6] tabular-nums">{node.stepIndex === 1 ? "100.0%" : formatPct(node.cumConversionRate)}</td>
+                            <td className="py-3 px-4 text-right font-semibold text-[#4E5968] tabular-nums">{node.stepIndex === 1 ? "100.0%" : formatPct(node.conversionRate)}</td>
+                            <td className="py-3 px-4 text-right font-bold text-[#E8344E] tabular-nums">{dropVal > 0 ? `-${formatNum(dropVal)} 명` : "-"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
           {/* DETAILED DATA TABLE */}
-          <div className="space-y-3 pt-2">
-            <h4 className="text-xs font-bold text-[#191F28]">상세 수치</h4>
-            <div className="overflow-x-auto border border-[#E5E8EB] rounded-2xl">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-[#FAFBFD] font-medium text-[#8B95A1] border-b border-[#E5E8EB]">
-                    <th className="py-3 px-4">단계</th>
-                    <th className="py-3 px-4">이벤트명</th>
-                    <th className="py-3 px-4 text-right">도달 수</th>
-                    <th className="py-3 px-4 text-right">1단계 대비 (누적)</th>
-                    <th className="py-3 px-4 text-right">이전 단계 대비 (구간)</th>
-                    <th className="py-3 px-4 text-right">이탈 유저 수</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#F2F4F6] text-[#333D4B]">
-                  {journeyNodes.map((node) => {
-                    const val = metricMode === "users" ? node.userCount : node.sessionCount;
-                    const dropVal = metricMode === "users" ? node.dropUserCount : node.dropSessionCount;
+          {viewMode !== "clean_table" && (
+            <div className="space-y-3 pt-2">
+              <h4 className="text-xs font-bold text-[#191F28]">상세 수치</h4>
+              <div className="overflow-x-auto border border-[#E5E8EB] rounded-2xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[#FAFBFD] font-medium text-[#8B95A1] border-b border-[#E5E8EB]">
+                      <th className="py-3 px-4">단계</th>
+                      <th className="py-3 px-4">이벤트명</th>
+                      <th className="py-3 px-4 text-right">도달 수</th>
+                      <th className="py-3 px-4 text-right">1단계 대비 (누적)</th>
+                      <th className="py-3 px-4 text-right">이전 단계 대비 (구간)</th>
+                      <th className="py-3 px-4 text-right">이탈 유저 수</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#F2F4F6] text-[#333D4B]">
+                    {journeyNodes.map((node) => {
+                      const val = metricMode === "users" ? node.userCount : node.sessionCount;
+                      const dropVal = metricMode === "users" ? node.dropUserCount : node.dropSessionCount;
 
-                    return (
-                      <tr key={`tbl_${node.stepId}`} className="hover:bg-[#FAFBFD]">
-                        <td className="py-3 px-4 font-bold text-[#3182F6]">Step {node.stepIndex}</td>
-                        <td className="py-3 px-4 font-medium">{node.label}</td>
-                        <td className="py-3 px-4 text-right font-bold text-[#191F28] tabular-nums">{formatNum(val)}</td>
-                        <td className="py-3 px-4 text-right font-bold text-[#3182F6] tabular-nums">{node.stepIndex === 1 ? "100.0%" : formatPct(node.cumConversionRate)}</td>
-                        <td className="py-3 px-4 text-right font-medium text-[#4E5968] tabular-nums">{node.stepIndex === 1 ? "100.0%" : formatPct(node.conversionRate)}</td>
-                        <td className="py-3 px-4 text-right font-bold text-[#E8344E] tabular-nums">{dropVal > 0 ? `-${formatNum(dropVal)}` : "-"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      return (
+                        <tr key={`tbl_${node.stepId}`} className="hover:bg-[#FAFBFD]">
+                          <td className="py-3 px-4 font-bold text-[#3182F6]">Step {node.stepIndex}</td>
+                          <td className="py-3 px-4 font-medium">{node.label}</td>
+                          <td className="py-3 px-4 text-right font-bold text-[#191F28] tabular-nums">{formatNum(val)}</td>
+                          <td className="py-3 px-4 text-right font-bold text-[#3182F6] tabular-nums">{node.stepIndex === 1 ? "100.0%" : formatPct(node.cumConversionRate)}</td>
+                          <td className="py-3 px-4 text-right font-medium text-[#4E5968] tabular-nums">{node.stepIndex === 1 ? "100.0%" : formatPct(node.conversionRate)}</td>
+                          <td className="py-3 px-4 text-right font-bold text-[#E8344E] tabular-nums">{dropVal > 0 ? `-${formatNum(dropVal)}` : "-"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
