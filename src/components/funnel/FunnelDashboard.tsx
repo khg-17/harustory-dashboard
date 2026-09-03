@@ -385,11 +385,8 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
         userCount = Number(dbMatch.reachedUserCount) || 0;
         sessionCount = Number(dbMatch.reachedSessionCount) || 0;
       } else {
-        let matched = eventCatalog.find((e) => e.label === step.label);
-        if (!matched && step.label)
-          matched = eventCatalog.find((e) => e.label.includes(step.label) || step.label.includes(e.label));
-        userCount = Number(matched?.totalEventCount) || 0;
-        sessionCount = Math.round(userCount * 1.25);
+        userCount = 0;
+        sessionCount = 0;
       }
 
       let finalUserCount = userCount,

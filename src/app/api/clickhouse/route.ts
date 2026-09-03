@@ -501,6 +501,7 @@ export async function GET(request: NextRequest) {
             ) ARRAY JOIN range(1, ${stepList.length + 1}) AS level_step 
             GROUP BY level_step 
             ORDER BY level_step ASC
+            SETTINGS max_partitions_to_read = 300, max_rows_to_read = 2000000000, max_bytes_to_read = 20000000000, max_threads = 4
           `;
         } else {
           // All-user funnel (existing behavior)
@@ -522,6 +523,7 @@ export async function GET(request: NextRequest) {
             ) ARRAY JOIN range(1, ${stepList.length + 1}) AS level_step 
             GROUP BY level_step 
             ORDER BY level_step ASC
+            SETTINGS max_partitions_to_read = 300, max_rows_to_read = 2000000000, max_bytes_to_read = 20000000000, max_threads = 4
           `;
         }
       } else {
@@ -563,6 +565,7 @@ export async function GET(request: NextRequest) {
           ) ARRAY JOIN range(1, ${stepList.length + 1}) AS level_step 
           GROUP BY dt, level_step 
           ORDER BY dt ASC, level_step ASC
+          SETTINGS max_partitions_to_read = 300, max_rows_to_read = 2000000000, max_bytes_to_read = 20000000000, max_threads = 4
         `;
       } else {
         sql = `SELECT '2026-09-01' AS dt, 1 AS step, 0 AS reachedSessionCount, 0 AS reachedUserCount`;
