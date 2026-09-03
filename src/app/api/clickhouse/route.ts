@@ -474,6 +474,8 @@ export async function GET(request: NextRequest) {
           return `ual.label = '${s.replace(/'/g, "''")}'`;
         }).join(', ');
 
+        const labelInList = stepList.map(s => `'${s.replace(/'/g, "''")}'`).join(', ');
+
         if (newUserOnly) {
           // New-user-only funnel: JOIN with watermark + UserFirstSeen to restrict to new users
           sql = `
@@ -492,6 +494,7 @@ export async function GET(request: NextRequest) {
                 ON ual.appID = wm.appID
               WHERE ual.env = 'prod' 
                 AND ${appCond} 
+                AND ual.label IN (${labelInList})
                 AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= '${from}' 
                 AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) <= '${to}' 
                 AND toInt64OrZero(ual.accountSN) > ifNull(wm.watermark, 0)
@@ -517,6 +520,7 @@ export async function GET(request: NextRequest) {
               FROM Log.UserActionLog AS ual
               WHERE ual.env = 'prod' 
                 AND ${appCond} 
+                AND ual.label IN (${labelInList})
                 AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= '${from}' 
                 AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) <= '${to}' 
               GROUP BY ual.appID, ual.accountSN, if(ual.parentSessionID != '', ual.parentSessionID, ual.sessionID)
@@ -545,6 +549,8 @@ export async function GET(request: NextRequest) {
           return `ual.label = '${s.replace(/'/g, "''")}'`;
         }).join(', ');
 
+        const labelInList = stepList.map(s => `'${s.replace(/'/g, "''")}'`).join(', ');
+
         sql = `
           SELECT 
             dt,
@@ -559,6 +565,7 @@ export async function GET(request: NextRequest) {
             FROM Log.UserActionLog AS ual
             WHERE ual.env = 'prod' 
               AND ${appCond} 
+              AND ual.label IN (${labelInList})
               AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= '${from}' 
               AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) <= '${to}' 
             GROUP BY dt, ual.appID, ual.accountSN, if(ual.parentSessionID != '', ual.parentSessionID, ual.sessionID)

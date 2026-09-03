@@ -375,24 +375,32 @@ export const NewUserFunnelDashboard: React.FC<NewUserFunnelDashboardProps> = ({
             </button>
           </div>
 
-          {/* If Top Paths is active, show preset dropdown selector */}
-          {subTabMode === "top_paths" && (
-            <div className="relative">
-              <select
-                value={selectedFunnelId}
-                onChange={(e) => loadPresetTemplate(e.target.value)}
-                className="bg-white border border-[#D1D6DB] text-[13px] font-semibold text-[#191F28] rounded-xl px-3.5 py-1.5 pr-8 focus:ring-2 focus:ring-[#3182F6] focus:outline-none appearance-none cursor-pointer"
-              >
-                {Object.entries(presetTemplatesMap).map(([key, template]) => (
-                  <option key={key} value={key}>
-                    {template.name} ({template.steps.length}단계)
-                  </option>
-                ))}
-                {selectedFunnelId === "custom" && <option value="custom">커스텀 편집 경로</option>}
-              </select>
-              <ChevronDown className="w-4 h-4 text-[#8B95A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          )}
+          {/* Preset dropdown selector */}
+          <div className="relative">
+            <select
+              value={selectedFunnelId}
+              onChange={(e) => {
+                const key = e.target.value;
+                setSelectedFunnelId(key);
+                setDynamicCustomFunnelSteps([]);
+                if (presetTemplatesMap[key]) {
+                  setCustomSteps(presetTemplatesMap[key].steps);
+                } else if (key === "defaultFunnel") {
+                  setCustomSteps(defaultStepsForApp);
+                }
+              }}
+              className="bg-white border border-[#D1D6DB] text-[13px] font-semibold text-[#191F28] rounded-xl px-3.5 py-1.5 pr-8 focus:ring-2 focus:ring-[#3182F6] focus:outline-none appearance-none cursor-pointer"
+            >
+              <option value="defaultFunnel">기본 온보딩 퍼널 (4단계)</option>
+              {Object.entries(presetTemplatesMap).map(([key, template]) => (
+                <option key={key} value={key}>
+                  {template.name} ({template.steps.length}단계)
+                </option>
+              ))}
+              {selectedFunnelId === "custom" && <option value="custom">커스텀 편집 경로</option>}
+            </select>
+            <ChevronDown className="w-4 h-4 text-[#8B95A1] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
 
         {/* Right: View Mode Toggle + Metric Toggle + Step Edit Toggle */}
