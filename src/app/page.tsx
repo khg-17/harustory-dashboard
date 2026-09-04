@@ -1047,6 +1047,7 @@ export default function Dashboard() {
     let totalAdRevenue = 0;
     let rewardAdRevenue = 0;
     let totalExchangedPoints = 0;
+    let totalMissionReward = 0;
 
     const isPhApp = selectedApp.toLowerCase().includes("ph-");
     const { prevFromStr, prevToStr } = getPreviousMonthDateRange(fromDate, toDate);
@@ -1203,14 +1204,15 @@ export default function Dashboard() {
     const paidCoinGrowth = prevPaidCoinSum > 0 ? ((paidCoinSum - prevPaidCoinSum) / prevPaidCoinSum) * 100 : 0;
     const adTicketGrowth = prevAdTicketSum > 0 ? ((adTicketSum - prevAdTicketSum) / prevAdTicketSum) * 100 : 0;
 
-    let totalMissionReward = 0;
-    missionTotalRaw.forEach((row) => {
-      const dtStr = extractDtStr(row.dt);
-      if (dtStr >= fromDate && dtStr <= toDate) {
-        const val = parseRewardAmount(row);
-        totalMissionReward += val;
-      }
-    });
+    if (!hasActiveSettlement) {
+      missionTotalRaw.forEach((row) => {
+        const dtStr = extractDtStr(row.dt);
+        if (dtStr >= fromDate && dtStr <= toDate) {
+          const val = parseRewardAmount(row);
+          totalMissionReward += val;
+        }
+      });
+    }
 
     const totalRewardCost = totalExchangedPoints;
     // Business Rule: Net Operating Margin (순 영업 마진) = Total Ad Revenue (총 광고 매출) - Exchanged Points Cost (포인트 환전액)
