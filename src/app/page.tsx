@@ -421,19 +421,31 @@ export default function Dashboard() {
         setVisitRetentionRaw(visitJson.success ? visitJson.data || [] : []);
         setEarningRetentionRaw(earningActJson.success ? earningActJson.data || [] : []);
       } else if (activeTab === "revenue") {
-        const { prevFromStr } = getPreviousMonthDateRange(fromDate, toDate);
-        const fetchFrom = prevFromStr || fromDate;
-
-        const settlementRes = await fetch(`/api/settlement?from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null);
-        if (settlementRes) {
-          const settlementJson = await settlementRes.json().catch(() => null);
-          if (settlementJson && settlementJson.success && Array.isArray(settlementJson.data)) {
-            setSettlementRaw(settlementJson.data);
-          } else {
-            setSettlementRaw([]);
+        const currentRes = await fetch(`/api/settlement?from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null);
+        let currentItems: SettlementDailyItem[] = [];
+        if (currentRes) {
+          const json = await currentRes.json().catch(() => null);
+          if (json && json.success && Array.isArray(json.data)) {
+            currentItems = json.data;
           }
-        } else {
-          setSettlementRaw([]);
+        }
+        setSettlementRaw(currentItems);
+
+        const { prevFromStr, prevToStr } = getPreviousMonthDateRange(fromDate, toDate);
+        if (prevFromStr && prevToStr) {
+          fetch(`/api/settlement?from=${prevFromStr}&to=${prevToStr}&_t=${timestamp}`, fetchOpts)
+            .then((res) => res.json())
+            .then((json) => {
+              if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+                setSettlementRaw((prev) => {
+                  const map = new Map<string, SettlementDailyItem>();
+                  prev.forEach((item) => { if (item?.date) map.set(item.date, item); });
+                  json.data.forEach((item: SettlementDailyItem) => { if (item?.date) map.set(item.date, item); });
+                  return Array.from(map.values()).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+                });
+              }
+            })
+            .catch(() => {});
         }
       } else if (activeTab === "funnel") {
         setFunnelsRaw([]);
