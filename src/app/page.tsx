@@ -164,9 +164,21 @@ export default function Dashboard() {
              Number(adFreeObj.adsense || 0);
     };
 
+    const calcMissionRewardP = (receivedReward: any, appNameOrSelectedApp: string) => {
+      if (!receivedReward) return 0;
+      const isPh = (appNameOrSelectedApp || "").toLowerCase().startsWith("ph-") ||
+                   (appNameOrSelectedApp || "").toLowerCase().includes("포인트홈");
+      const field = isPh ? "direct" : "earning";
+
+      const m = Number(receivedReward.mission?.[field] || 0);
+      const b = Number(receivedReward.buzzvil?.[field] || 0);
+      const r = Number(receivedReward.rc?.[field] || 0);
+      return m + b + r;
+    };
+
     if (selectedApp === "tc") {
       if (Array.isArray(item.apps) && item.apps.length > 0) {
-        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0, adFree = 0;
+        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0, adFree = 0, missionRewardP = 0;
         let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0;
 
         item.apps.forEach((app) => {
@@ -176,6 +188,7 @@ export default function Dashboard() {
           usedReward += Number(app.usedReward || 0);
           contentRevenue += Number(app.contentRevenue || 0);
           adFree += calcAdFree(app.adFree);
+          missionRewardP += calcMissionRewardP(app.receivedReward, app.appName || "");
 
           const ad: Partial<SettlementAdData> = app.ad || {};
           b += Number(ad.buzzvil || 0);
@@ -194,10 +207,12 @@ export default function Dashboard() {
           usedReward,
           contentRevenue,
           adFree,
+          missionRewardP,
           ad: { b, pop, forus, sense, cash, rc, toss },
         };
       } else {
         const ad: Partial<SettlementAdData> = item.ad || {};
+        const missionRewardP = calcMissionRewardP(item.receivedReward, "tc");
         return {
           paidCoin: Number(item.payingCoin?.paidCoin ?? item.content?.payingCoin?.paidCoin ?? 0),
           freeCoin: Number(item.payingCoin?.freeCoin ?? item.content?.payingCoin?.freeCoin ?? 0),
@@ -205,6 +220,7 @@ export default function Dashboard() {
           usedReward: Number(item.usedReward || 0),
           contentRevenue: Number(item.contentRevenue || 0),
           adFree: calcAdFree(item.adFree),
+          missionRewardP,
           ad: {
             b: Number(ad.buzzvil || 0),
             pop: Number(ad.apWebCPC ?? ad.adpopcorn ?? 0),
@@ -263,7 +279,7 @@ export default function Dashboard() {
       });
 
       if (matchedApps.length > 0) {
-        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0, adFree = 0;
+        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0, adFree = 0, missionRewardP = 0;
         let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0;
 
         matchedApps.forEach((app) => {
@@ -273,6 +289,7 @@ export default function Dashboard() {
           usedReward += Number(app.usedReward || 0);
           contentRevenue += Number(app.contentRevenue || 0);
           adFree += calcAdFree(app.adFree);
+          missionRewardP += calcMissionRewardP(app.receivedReward, app.appName || selectedApp);
 
           const ad: Partial<SettlementAdData> = app.ad || {};
           b += Number(ad.buzzvil || 0);
@@ -291,6 +308,7 @@ export default function Dashboard() {
           usedReward,
           contentRevenue,
           adFree,
+          missionRewardP,
           ad: { b, pop, forus, sense, cash, rc, toss },
         };
       }
@@ -406,57 +424,17 @@ export default function Dashboard() {
         const { prevFromStr } = getPreviousMonthDateRange(fromDate, toDate);
         const fetchFrom = prevFromStr || fromDate;
 
-        const [
-          serviceRevRes,
-          adRevRes,
-          contentRevRes,
-          contentPurchaseRes,
-          earningPointsRes,
-          missionTotalRes,
-          settlementRes,
-        ] = await Promise.all([
-          fetch(`/api/clickhouse?type=service_total_revenue&app=${selectedApp}&from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=ad_revenue&app=${selectedApp}&from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=content_revenue&app=${selectedApp}&from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=content_purchase&app=${selectedApp}&from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=earning&app=${selectedApp}&from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=mission_total&app=${selectedApp}&from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/settlement?from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
-        ]);
-
-        const [
-          serviceRevJson,
-          adRevJson,
-          contentRevJson,
-          contentPurchaseJson,
-          earningPointsJson,
-          missionTotalJson,
-          settlementJson,
-        ] = await Promise.all([
-          serviceRevRes.json(),
-          adRevRes.json(),
-          contentRevRes.json(),
-          contentPurchaseRes.json(),
-          earningPointsRes.json(),
-          missionTotalRes.json(),
-          settlementRes ? settlementRes.json().catch(() => null) : Promise.resolve(null),
-        ]);
-
-        if (serviceRevJson.success && Array.isArray(serviceRevJson.data)) setServiceRevenueRaw(serviceRevJson.data);
-        if (adRevJson.success && Array.isArray(adRevJson.data)) setAdRevenueRaw(adRevJson.data);
-        if (contentRevJson.success && Array.isArray(contentRevJson.data)) setContentRevenueRaw(contentRevJson.data);
-        if (contentPurchaseJson.success && Array.isArray(contentPurchaseJson.data)) setContentPurchaseRaw(contentPurchaseJson.data);
-        if (earningPointsJson.success && Array.isArray(earningPointsJson.data)) setEarningRaw(earningPointsJson.data);
-        if (missionTotalJson.success && Array.isArray(missionTotalJson.data)) {
-          setMissionTotalRaw(missionTotalJson.data);
-        }
-
-        if (settlementJson && settlementJson.success && Array.isArray(settlementJson.data)) {
-          setSettlementRaw(settlementJson.data);
+        const settlementRes = await fetch(`/api/settlement?from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null);
+        if (settlementRes) {
+          const settlementJson = await settlementRes.json().catch(() => null);
+          if (settlementJson && settlementJson.success && Array.isArray(settlementJson.data)) {
+            setSettlementRaw(settlementJson.data);
+          } else {
+            setSettlementRaw([]);
+          }
         } else {
           setSettlementRaw([]);
         }
-
       } else if (activeTab === "funnel") {
         setFunnelsRaw([]);
         setFunnelStepsRaw([]);
@@ -1093,7 +1071,7 @@ export default function Dashboard() {
         const sData = getSettlementDataForApp(item, selectedApp);
         if (!sData) return;
 
-        const { paidCoin, chargeCoin, usedReward, contentRevenue, adFree, ad } = sData;
+        const { paidCoin, chargeCoin, usedReward, contentRevenue, adFree, missionRewardP, ad } = sData;
         const { b, pop, forus, sense, cash, rc, toss } = ad;
 
         const dayTotalAd = b + pop + forus + sense + cash + rc + toss;
@@ -1107,6 +1085,7 @@ export default function Dashboard() {
           totalAdRevenue += dayTotalAd;
           rewardAdRevenue += isPhApp ? (cash + rc) : (pop + forus + rc);
           totalExchangedPoints += usedReward;
+          totalMissionReward += (missionRewardP || 0);
 
           const netMap: Record<string, number> = {
             "Buzzvil": b,
@@ -1296,14 +1275,7 @@ export default function Dashboard() {
         dailyMap[dtStr].adRev = dayTotalAd;
         dailyMap[dtStr].rewardAdRev = isPhApp ? (cash + rc) : (pop + forus + rc);
         dailyMap[dtStr].eCost = usedReward;
-      });
-
-      // Populate mCost (적립 알바비 P) from missionTotalRaw even when active settlement is used for revenue
-      missionTotalRaw.forEach((row) => {
-        const dtStr = extractDtStr(row.dt);
-        if (!dtStr || !dailyMap[dtStr]) return;
-        const mRev = parseRewardAmount(row);
-        dailyMap[dtStr].mCost += mRev;
+        dailyMap[dtStr].mCost = sData.missionRewardP || 0;
       });
     } else {
       serviceRevenueRaw.forEach((row) => {
