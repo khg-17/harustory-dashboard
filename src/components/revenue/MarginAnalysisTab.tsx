@@ -100,11 +100,11 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
             <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
               isLoss ? "bg-[#e8f3ff] text-[#3182f6]" : "bg-[#fff0f1] text-[#f04452]"
             }`}>
-              {marginRate.toFixed(1)}%
+              {marginRate > 0 ? `+${marginRate.toFixed(1)}` : marginRate.toFixed(1)}%
             </span>
           </div>
           <div className={`text-[26px] font-bold tracking-[-0.04em] ${isLoss ? "text-[#3182f6]" : "text-[#f04452]"}`}>
-            {Math.round(netProfit).toLocaleString()}
+            {netProfit > 0 ? `+${Math.round(netProfit).toLocaleString()}` : Math.round(netProfit).toLocaleString()}
             <span className="text-[16px] font-medium text-[#4e5968] ml-0.5">원</span>
           </div>
         </div>
@@ -171,14 +171,14 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
                       <span className={`px-2.5 py-1 rounded-md text-xs inline-block ${
                         isRowLoss ? "bg-[#e8f3ff] text-[#3182f6]" : "bg-[#fff0f1] text-[#f04452]"
                       }`}>
-                        {Math.round(row.margin).toLocaleString()}원
+                        {row.margin > 0 ? `+${Math.round(row.margin).toLocaleString()}` : Math.round(row.margin).toLocaleString()}원
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right font-bold">
                       <span className={`px-2.5 py-1 rounded-md text-xs inline-block ${
                         isRowLoss ? "bg-[#e8f3ff] text-[#3182f6]" : "bg-[#fff0f1] text-[#f04452]"
                       }`}>
-                        {row.marginRate}%
+                        {row.marginRate > 0 ? `+${row.marginRate}` : row.marginRate}%
                       </span>
                     </td>
                   </tr>
