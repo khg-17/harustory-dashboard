@@ -140,8 +140,8 @@ export default function Dashboard() {
 
   const formatDateStr = (d: Date): string => {
     const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0.0");
-    const day = String(d.getDate()).padStart(2, "0.0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
@@ -593,9 +593,9 @@ export default function Dashboard() {
         const day = dateObj.getDay();
         const diffToMonday = dateObj.getDate() - day + (day === 0 ? -6 : 1);
         const monday = new Date(dateObj.setDate(diffToMonday));
-        key = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0.0")}-${String(monday.getDate()).padStart(2, "0.0")} 주`;
+        key = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")} 주`;
       } else {
-        key = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0.0")}월`;
+        key = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}월`;
       }
 
       if (!groups[key]) {

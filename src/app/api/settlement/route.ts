@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
     const apiUrl = process.env.SETTLEMENT_API_URL || 'https://admin.treasurecomics.com/api/internal/v1/settlements/daily';
     const authHeader = `Basic ${Buffer.from(`${channelId}:${channelSecret}`).toString('base64')}`;
 
-    const chunks = getDateChunks(minMissingYyyyMmDd, maxMissingYyyyMmDd, 4);
+    const chunks = getDateChunks(minMissingYyyyMmDd, maxMissingYyyyMmDd, 3);
 
     const chunkFetchPromises = chunks.map(async (chunk) => {
       let targetUrl = `${apiUrl}?startDate=${chunk.startDate}&endDate=${chunk.endDate}`;
@@ -152,7 +152,7 @@ export async function GET(req: NextRequest) {
             'Authorization': authHeader,
           },
           cache: 'no-store',
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(45000),
         });
 
         if (!response.ok) {
