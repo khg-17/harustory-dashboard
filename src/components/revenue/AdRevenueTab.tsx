@@ -208,7 +208,7 @@ export const AdRevenueTab: React.FC<AdRevenueTabProps> = ({ revenueSummary, reve
                     <tr key={cat} className="hover:bg-[#f8f9fa] transition-colors">
                       <td className="py-3 px-4 font-semibold text-[#191f28]">{catName}</td>
                       <td className="py-3 px-4 text-right font-medium text-[#4e5968]">
-                        {val.impression.toLocaleString()}회
+                        {val.impression > 0 ? `${val.impression.toLocaleString()}회` : "-"}
                       </td>
                       <td className="py-3 px-4 text-right font-medium text-[#4e5968]">
                         {Math.round(val.revenue).toLocaleString()}원
@@ -248,7 +248,7 @@ export const AdRevenueTab: React.FC<AdRevenueTabProps> = ({ revenueSummary, reve
                     <tr key={net} className="hover:bg-[#f8f9fa] transition-colors">
                       <td className="py-3 px-4 font-semibold text-[#191f28]">{net}</td>
                       <td className="py-3 px-4 text-right font-medium text-[#4e5968]">
-                        {val.impression.toLocaleString()}회
+                        {val.impression > 0 ? `${val.impression.toLocaleString()}회` : "-"}
                       </td>
                       <td className="py-3 px-4 text-right font-medium text-[#4e5968]">
                         {Math.round(val.revenue).toLocaleString()}원

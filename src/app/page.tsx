@@ -1111,18 +1111,23 @@ export default function Dashboard() {
           if (sense > 0) netMap["AdSense"] = sense;
 
           Object.entries(netMap).forEach(([netName, rev]) => {
-            if (!networkMap[netName]) networkMap[netName] = { revenue: 0, impression: 0 };
-            networkMap[netName].revenue += rev;
+            if (rev > 0) {
+              if (!networkMap[netName]) networkMap[netName] = { revenue: 0, impression: 0 };
+              networkMap[netName].revenue += rev;
+            }
           });
 
           const catMap: Record<string, number> = {
             "reward": b,
             "display": pop + forus + sense + cash + toss,
             "rc": rc,
+            "adTicket": adFree || 0,
           };
           Object.entries(catMap).forEach(([catName, rev]) => {
-            if (!adCategoryMap[catName]) adCategoryMap[catName] = { revenue: 0, impression: 0 };
-            adCategoryMap[catName].revenue += rev;
+            if (rev > 0) {
+              if (!adCategoryMap[catName]) adCategoryMap[catName] = { revenue: 0, impression: 0 };
+              adCategoryMap[catName].revenue += rev;
+            }
           });
         }
 
@@ -1505,16 +1510,22 @@ export default function Dashboard() {
     let networkDailyTrend = { dates: [] as string[], networks: {} as Record<string, number[]> };
 
     if (hasActiveSettlement) {
-      const sortedSettlement = [...settlementRaw].sort((a, b) => a.date.localeCompare(b.date));
-      const dates = sortedSettlement.map((s) => s.date.slice(5).replace("-", "/"));
+      const filteredSettlement = settlementRaw
+        .filter((s) => {
+          const dtStr = extractDtStr(s.date);
+          return dtStr >= fromDate && dtStr <= toDate;
+        })
+        .sort((a, b) => a.date.localeCompare(b.date));
 
-      const metricsList = sortedSettlement.map((s) => {
+      const dates = filteredSettlement.map((s) => s.date.slice(5).replace("-", "/"));
+
+      const metricsList = filteredSettlement.map((s) => {
         const sData = getSettlementDataForApp(s, selectedApp);
         if (sData) return { ...sData.ad, adFree: sData.adFree || 0 };
         return { b: 0, pop: 0, forus: 0, sense: 0, cash: 0, rc: 0, toss: 0, adFree: 0 };
       });
 
-      const netDaily: Record<string, number[]> = {
+      const netDailyCandidate: Record<string, number[]> = {
         "Buzzvil": metricsList.map((m) => m.b),
         "apWebCPC": metricsList.map((m) => m.pop),
         "Adforus": metricsList.map((m) => m.forus),
@@ -1523,15 +1534,29 @@ export default function Dashboard() {
         "Toss Mini": metricsList.map((m) => m.toss),
       };
       if (metricsList.some((m) => m.sense > 0)) {
-        netDaily["AdSense"] = metricsList.map((m) => m.sense);
+        netDailyCandidate["AdSense"] = metricsList.map((m) => m.sense);
       }
 
-      const catDaily: Record<string, number[]> = {
+      const netDaily: Record<string, number[]> = {};
+      Object.entries(netDailyCandidate).forEach(([netName, arr]) => {
+        if (arr.some((v) => v > 0)) {
+          netDaily[netName] = arr;
+        }
+      });
+
+      const catDailyCandidate: Record<string, number[]> = {
         reward: metricsList.map((m) => m.b),
         display: metricsList.map((m) => m.pop + m.forus + m.sense + m.cash + m.toss),
         rc: metricsList.map((m) => m.rc),
         adTicket: metricsList.map((m) => m.adFree),
       };
+
+      const catDaily: Record<string, number[]> = {};
+      Object.entries(catDailyCandidate).forEach(([catName, arr]) => {
+        if (arr.some((v) => v > 0)) {
+          catDaily[catName] = arr;
+        }
+      });
 
       adCategoryDailyTrend = { dates, categories: catDaily };
       networkDailyTrend = { dates, networks: netDaily };

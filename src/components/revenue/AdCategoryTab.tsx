@@ -33,74 +33,37 @@ interface AdCategoryTabProps {
 export const AdCategoryTab: React.FC<AdCategoryTabProps> = ({ revenueSummary }) => {
   const { dates, categories } = revenueSummary.adCategoryDailyTrend || { dates: [], categories: {} };
 
+  const categoryConfig = [
+    { key: "reward", label: "보상형 광고", color: "#a98eff" },
+    { key: "display", label: "노출형 광고", color: "#3182f6" },
+    { key: "rc", label: "⭐ RC (알바비/게임)", color: "#00c980" },
+    { key: "adTicket", label: "광고티켓", color: "#f59e0b" },
+  ];
+
+  const activeCategories = categoryConfig.filter(
+    (cfg) => (categories[cfg.key] || []).some((v) => v > 0)
+  );
+
+  const displayCategories = activeCategories.length > 0 ? activeCategories : categoryConfig;
+
   const adCategoryLineChartData: ChartData<"line"> = {
     labels: dates,
-    datasets: [
-      {
-        label: "보상형 광고(버즈빌)",
-        data: categories.reward || [],
-        borderColor: "#a98eff",
-        backgroundColor: "transparent",
-        borderWidth: 2.5,
-        pointBackgroundColor: "#fff",
-        pointBorderColor: "#a98eff",
-        pointBorderWidth: 2,
-        pointRadius: dates.length > 30 ? 0 : 2.5,
-        pointHoverRadius: 6,
-        pointHoverBorderWidth: 3,
-        pointHoverBackgroundColor: "#fff",
-        pointHoverBorderColor: "#a98eff",
-        tension: 0.4,
-      },
-      {
-        label: "노출형 광고",
-        data: categories.display || [],
-        borderColor: "#3182f6",
-        backgroundColor: "transparent",
-        borderWidth: 2.5,
-        pointBackgroundColor: "#fff",
-        pointBorderColor: "#3182f6",
-        pointBorderWidth: 2,
-        pointRadius: dates.length > 30 ? 0 : 2.5,
-        pointHoverRadius: 6,
-        pointHoverBorderWidth: 3,
-        pointHoverBackgroundColor: "#fff",
-        pointHoverBorderColor: "#3182f6",
-        tension: 0.4,
-      },
-      {
-        label: "RC",
-        data: categories.rc || [],
-        borderColor: "#00c980",
-        backgroundColor: "transparent",
-        borderWidth: 2.5,
-        pointBackgroundColor: "#fff",
-        pointBorderColor: "#00c980",
-        pointBorderWidth: 2,
-        pointRadius: dates.length > 30 ? 0 : 2.5,
-        pointHoverRadius: 6,
-        pointHoverBorderWidth: 3,
-        pointHoverBackgroundColor: "#fff",
-        pointHoverBorderColor: "#00c980",
-        tension: 0.4,
-      },
-      {
-        label: "광고무",
-        data: categories.adTicket || [],
-        borderColor: "#f59e0b",
-        backgroundColor: "transparent",
-        borderWidth: 2.5,
-        pointBackgroundColor: "#fff",
-        pointBorderColor: "#f59e0b",
-        pointBorderWidth: 2,
-        pointRadius: dates.length > 30 ? 0 : 2.5,
-        pointHoverRadius: 6,
-        pointHoverBorderWidth: 3,
-        pointHoverBackgroundColor: "#fff",
-        pointHoverBorderColor: "#f59e0b",
-        tension: 0.4,
-      },
-    ],
+    datasets: displayCategories.map((cfg) => ({
+      label: cfg.label,
+      data: categories[cfg.key] || [],
+      borderColor: cfg.color,
+      backgroundColor: "transparent",
+      borderWidth: 2.5,
+      pointBackgroundColor: "#fff",
+      pointBorderColor: cfg.color,
+      pointBorderWidth: 2,
+      pointRadius: dates.length > 30 ? 0 : 2.5,
+      pointHoverRadius: 6,
+      pointHoverBorderWidth: 3,
+      pointHoverBackgroundColor: "#fff",
+      pointHoverBorderColor: cfg.color,
+      tension: 0.4,
+    })),
   };
 
   const lineOptions = {
@@ -194,38 +157,31 @@ export const AdCategoryTab: React.FC<AdCategoryTabProps> = ({ revenueSummary }) 
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-[#f8f9fa] font-bold text-[#4e5968] border-b border-[#e5e8eb]">
-                <th className="py-3.5 px-4">날짜 (dt)</th>
-                <th className="py-3.5 px-4 text-right">보상형 광고(버즈빌)</th>
-                <th className="py-3.5 px-4 text-right">노출형 광고</th>
-                <th className="py-3.5 px-4 text-right">RC</th>
-                <th className="py-3.5 px-4 text-right">광고무</th>
-                <th className="py-3.5 px-4 text-right">일별 합계 (원)</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">날짜 (dt)</th>
+                {displayCategories.map((cfg) => (
+                  <th key={cfg.key} className="py-3.5 px-4 text-right whitespace-nowrap">
+                    {cfg.label} (원)
+                  </th>
+                ))}
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">일별 합계 (원)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#f2f4f6] font-medium text-[#4e5968]">
               {dates.map((dt, idx) => {
-                const rewardVal = categories.reward?.[idx] || 0;
-                const displayVal = categories.display?.[idx] || 0;
-                const rcVal = categories.rc?.[idx] || 0;
-                const adTicketVal = categories.adTicket?.[idx] || 0;
-                const daySum = rewardVal + displayVal + rcVal + adTicketVal;
-
+                let daySum = 0;
                 return (
                   <tr key={dt} className="hover:bg-[#f8f9fa] transition-colors">
-                    <td className="py-3.5 px-4 font-semibold text-[#191f28]">{dt}</td>
-                    <td className="py-3.5 px-4 text-right font-medium text-[#4e5968]">
-                      {Math.round(rewardVal).toLocaleString()}원
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-medium text-[#4e5968]">
-                      {Math.round(displayVal).toLocaleString()}원
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-medium text-[#4e5968]">
-                      {Math.round(rcVal).toLocaleString()}원
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-medium text-[#4e5968]">
-                      {Math.round(adTicketVal).toLocaleString()}원
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-bold text-[#191f28]">
+                    <td className="py-3.5 px-4 font-semibold text-[#191f28] whitespace-nowrap">{dt}</td>
+                    {displayCategories.map((cfg) => {
+                      const val = categories[cfg.key]?.[idx] || 0;
+                      daySum += val;
+                      return (
+                        <td key={cfg.key} className="py-3.5 px-4 text-right font-medium text-[#4e5968] whitespace-nowrap">
+                          {Math.round(val).toLocaleString()}원
+                        </td>
+                      );
+                    })}
+                    <td className="py-3.5 px-4 text-right font-bold text-[#191f28] whitespace-nowrap">
                       {Math.round(daySum).toLocaleString()}원
                     </td>
                   </tr>
