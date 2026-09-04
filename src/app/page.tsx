@@ -421,7 +421,11 @@ export default function Dashboard() {
         setVisitRetentionRaw(visitJson.success ? visitJson.data || [] : []);
         setEarningRetentionRaw(earningActJson.success ? earningActJson.data || [] : []);
       } else if (activeTab === "revenue") {
-        const currentRes = await fetch(`/api/settlement?from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null);
+        const [currentRes, contentRevRes] = await Promise.all([
+          fetch(`/api/settlement?from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
+          fetch(`/api/clickhouse?type=content_revenue&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
+        ]);
+
         let currentItems: SettlementDailyItem[] = [];
         if (currentRes) {
           const json = await currentRes.json().catch(() => null);
@@ -430,6 +434,17 @@ export default function Dashboard() {
           }
         }
         setSettlementRaw(currentItems);
+
+        if (contentRevRes) {
+          const contentRevJson = await contentRevRes.json().catch(() => null);
+          if (contentRevJson && contentRevJson.success && Array.isArray(contentRevJson.data)) {
+            setContentRevenueRaw(contentRevJson.data);
+          } else {
+            setContentRevenueRaw([]);
+          }
+        } else {
+          setContentRevenueRaw([]);
+        }
 
         const { prevFromStr, prevToStr } = getPreviousMonthDateRange(fromDate, toDate);
         if (prevFromStr && prevToStr) {
