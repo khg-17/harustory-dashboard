@@ -36,7 +36,7 @@ export const AdCategoryTab: React.FC<AdCategoryTabProps> = ({ revenueSummary }) 
   const categoryConfig = [
     { key: "reward", label: "보상형 광고", color: "#a98eff" },
     { key: "display", label: "노출형 광고", color: "#3182f6" },
-    { key: "rc", label: "⭐ RC (알바비/게임)", color: "#00c980" },
+    { key: "rc", label: "RC", color: "#00c980" },
     { key: "adTicket", label: "광고티켓", color: "#f59e0b" },
   ];
 

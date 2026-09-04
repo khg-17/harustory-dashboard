@@ -62,7 +62,7 @@ export const AdRevenueTab: React.FC<AdRevenueTabProps> = ({ revenueSummary, reve
         tension: 0.35,
       },
       {
-        label: "⭐ RC (알바비/게임)",
+        label: "RC",
         data: categories.rc || [],
         borderColor: "#00c980",
         backgroundColor: "transparent",
@@ -196,7 +196,7 @@ export const AdRevenueTab: React.FC<AdRevenueTabProps> = ({ revenueSummary, reve
                       : cat === "display"
                       ? "노출형 광고"
                       : cat === "rc"
-                      ? "⭐ RC (알바비/게임)"
+                      ? "RC"
                       : cat === "adTicket"
                       ? "광고티켓"
                       : cat;
