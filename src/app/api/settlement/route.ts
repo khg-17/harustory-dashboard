@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 
 function getDateChunks(startStr: string, endStr: string, chunkSizeDays: number = 7) {
   const chunks: { startDate: string; endDate: string }[] = [];
@@ -39,13 +41,50 @@ function getDateChunks(startStr: string, endStr: string, chunkSizeDays: number =
   return chunks;
 }
 
-// Temporary in-memory cache with short TTL (5 minutes) - NEVER saved permanently to disk
 interface CacheEntry {
   timestamp: number;
   data: any;
 }
+
 const settlementDayStore = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 Minutes TTL to allow live API re-fetching of updated settlement figures
+const CACHE_DIR = path.join(process.cwd(), '.cache');
+const CACHE_FILE = path.join(CACHE_DIR, 'settlement_disk_store.json');
+
+function loadDiskStore() {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      const raw = fs.readFileSync(CACHE_FILE, 'utf-8');
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj === 'object') {
+        Object.entries(obj).forEach(([key, val]) => {
+          if (val && typeof val === 'object') {
+            settlementDayStore.set(key, val as CacheEntry);
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load settlement disk store:', e);
+  }
+}
+
+function saveDiskStore() {
+  try {
+    if (!fs.existsSync(CACHE_DIR)) {
+      fs.mkdirSync(CACHE_DIR, { recursive: true });
+    }
+    const obj: Record<string, CacheEntry> = {};
+    settlementDayStore.forEach((val, key) => {
+      obj[key] = val;
+    });
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(obj), 'utf-8');
+  } catch (e) {
+    console.error('Failed to save settlement disk store:', e);
+  }
+}
+
+// Load disk cache on boot
+loadDiskStore();
 
 export async function GET(req: NextRequest) {
   try {
@@ -65,6 +104,13 @@ export async function GET(req: NextRequest) {
     const mm = String(kstDate.getUTCMonth() + 1).padStart(2, '0');
     const dd = String(kstDate.getUTCDate()).padStart(2, '0');
     const maxKstYesterday = `${yyyy}${mm}${dd}`;
+
+    const twoDaysAgoDate = new Date(nowUtc.getTime() + kstOffsetMs);
+    twoDaysAgoDate.setUTCDate(twoDaysAgoDate.getUTCDate() - 3);
+    const yyyy2 = twoDaysAgoDate.getUTCFullYear();
+    const mm2 = String(twoDaysAgoDate.getUTCMonth() + 1).padStart(2, '0');
+    const dd2 = String(twoDaysAgoDate.getUTCDate()).padStart(2, '0');
+    const twoDaysAgoStr = `${yyyy2}-${mm2}-${dd2}`;
 
     // Format dates to yyyyMMdd
     let startDate = fromParam ? fromParam.replace(/-/g, '') : '20260101';
@@ -100,22 +146,26 @@ export async function GET(req: NextRequest) {
       curDateObj.setUTCDate(curDateObj.getUTCDate() + 1);
     }
 
-    // Check which dates are missing or expired in settlementDayStore
+    // Check which dates are missing or expired
     const now = Date.now();
     const missingDates = requiredDates.filter((d) => {
       if (forceRefresh) return true;
       const storeKey = `${d}_${appSNParam}`;
       const entry = settlementDayStore.get(storeKey);
-      if (!entry) return true;
-      if (now - entry.timestamp > CACHE_TTL_MS) return true; // Expired after 5 mins
+      if (!entry || !entry.data) return true;
+
+      const isPastDate = d < twoDaysAgoStr;
+      const ttl = isPastDate ? 7 * 24 * 60 * 60 * 1000 : 15 * 60 * 1000; // Past dates: 7 days, Recent dates: 15 mins
+      if (now - entry.timestamp > ttl) return true;
       return false;
     });
 
-    // IF ALL DATES ARE IN VALID UNEXPIRED MEMORY CACHE -> RETURN IMMEDIATELY
+    // IF ALL DATES ARE IN VALID MEMORY/DISK CACHE -> RETURN IMMEDIATELY
     if (missingDates.length === 0) {
       const cachedItems = requiredDates
         .map((d) => settlementDayStore.get(`${d}_${appSNParam}`)?.data)
-        .filter(Boolean);
+        .filter(Boolean)
+        .sort((a, b) => String(a?.date || '').localeCompare(String(b?.date || '')));
 
       return NextResponse.json({
         success: true,
@@ -174,16 +224,19 @@ export async function GET(req: NextRequest) {
     const results = await Promise.all(chunkFetchPromises);
     const newlyFetched = results.flat();
 
-    // Store newly fetched items into day store with current timestamp (5 min TTL)
-    newlyFetched.forEach((item) => {
-      if (item && item.date) {
-        const storeKey = `${item.date}_${appSNParam}`;
-        settlementDayStore.set(storeKey, {
-          timestamp: Date.now(),
-          data: item,
-        });
-      }
-    });
+    // Store newly fetched items into day store & save to disk
+    if (newlyFetched.length > 0) {
+      newlyFetched.forEach((item) => {
+        if (item && item.date) {
+          const storeKey = `${item.date}_${appSNParam}`;
+          settlementDayStore.set(storeKey, {
+            timestamp: Date.now(),
+            data: item,
+          });
+        }
+      });
+      saveDiskStore();
+    }
 
     // Assemble final response containing all required dates
     const finalItems = requiredDates
