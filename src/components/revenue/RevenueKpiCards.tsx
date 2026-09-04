@@ -46,7 +46,7 @@ export const RevenueKpiCards: React.FC<RevenueKpiCardsProps> = ({ revenueSummary
     const absVal = Math.abs(growth).toFixed(1);
     return (
       <span className={`inline-flex items-center gap-0.5 text-xs font-bold px-2.5 py-1 rounded-md ${
-        isUp ? "bg-[#e8f3ff] text-[#3182f6]" : "bg-[#fff0f1] text-[#f04452]"
+        isUp ? "bg-[#fff0f1] text-[#f04452]" : "bg-[#e8f3ff] text-[#3182f6]"
       }`}>
         {isUp ? `▲ +${absVal}%` : `▼ -${absVal}%`}
         <span className="text-[10px] font-normal text-[#8b95a1] ml-0.5">전월대비</span>

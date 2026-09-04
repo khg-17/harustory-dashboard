@@ -85,7 +85,7 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
           <div className="text-[13px] font-semibold text-[#8b95a1]">
             포인트 환전 지급액
           </div>
-          <div className="text-[26px] font-bold text-[#f04452] tracking-[-0.04em]">
+          <div className="text-[26px] font-bold text-[#191f28] tracking-[-0.04em]">
             {totalExchangedPoints.toLocaleString()}
             <span className="text-[16px] font-medium text-[#4e5968] ml-0.5">원</span>
           </div>
@@ -98,12 +98,12 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
               {isLoss ? "순 영업 마진 (역마진)" : "순 영업 마진"}
             </span>
             <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
-              isLoss ? "bg-[#fff0f1] text-[#f04452]" : "bg-[#e8f3ff] text-[#3182f6]"
+              isLoss ? "bg-[#e8f3ff] text-[#3182f6]" : "bg-[#fff0f1] text-[#f04452]"
             }`}>
               {marginRate.toFixed(1)}%
             </span>
           </div>
-          <div className={`text-[26px] font-bold tracking-[-0.04em] ${isLoss ? "text-[#f04452]" : "text-[#3182f6]"}`}>
+          <div className={`text-[26px] font-bold tracking-[-0.04em] ${isLoss ? "text-[#3182f6]" : "text-[#f04452]"}`}>
             {Math.round(netProfit).toLocaleString()}
             <span className="text-[16px] font-medium text-[#4e5968] ml-0.5">원</span>
           </div>
@@ -164,19 +164,19 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
                     <td className="py-3.5 px-4 text-right font-medium text-[#4e5968]">
                       {Math.round(row.mCost).toLocaleString()} P
                     </td>
-                    <td className="py-3.5 px-4 text-right font-medium text-[#f04452]">
+                    <td className="py-3.5 px-4 text-right font-medium text-[#191f28]">
                       {Math.round(row.eCost).toLocaleString()}원
                     </td>
                     <td className="py-3.5 px-4 text-right font-bold">
                       <span className={`px-2.5 py-1 rounded-md text-xs inline-block ${
-                        isRowLoss ? "bg-[#fff0f1] text-[#f04452]" : "bg-[#e8f3ff] text-[#3182f6]"
+                        isRowLoss ? "bg-[#e8f3ff] text-[#3182f6]" : "bg-[#fff0f1] text-[#f04452]"
                       }`}>
                         {Math.round(row.margin).toLocaleString()}원
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right font-bold">
                       <span className={`px-2.5 py-1 rounded-md text-xs inline-block ${
-                        isRowLoss ? "bg-[#fff0f1] text-[#f04452]" : "bg-[#e8f3ff] text-[#3182f6]"
+                        isRowLoss ? "bg-[#e8f3ff] text-[#3182f6]" : "bg-[#fff0f1] text-[#f04452]"
                       }`}>
                         {row.marginRate}%
                       </span>
