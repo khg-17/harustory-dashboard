@@ -258,6 +258,13 @@ export interface RevenueSummary {
   adCategoryDailyTrend: { dates: string[]; categories: Record<string, number[]> };
   networkDailyTrend: { dates: string[]; networks: Record<string, number[]> };
   purchaseTypeDailyTrend: { dates: string[]; types: Record<number, number[]> };
+  grossGrowth?: number;
+  contentGrowth?: number;
+  adGrowth?: number;
+  chargeGrowth?: number;
+  paidCoinGrowth?: number;
+  adTicketGrowth?: number;
+  prevPeriodRange?: { from: string; to: string };
 }
 
 export interface SettlementContentCoin {

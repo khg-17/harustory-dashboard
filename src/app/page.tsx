@@ -61,6 +61,42 @@ import {
   SettlementAdData,
 } from "@/types/dashboard";
 
+function getPreviousMonthDateRange(fromDateStr: string, toDateStr: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDateStr) || !/^\d{4}-\d{2}-\d{2}$/.test(toDateStr)) {
+    return { prevFromStr: fromDateStr, prevToStr: toDateStr, numDays: 0 };
+  }
+
+  const from = new Date(fromDateStr + "T00:00:00");
+  const to = new Date(toDateStr + "T00:00:00");
+
+  const diffTime = Math.abs(to.getTime() - from.getTime());
+  const numDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+  const prevFrom = new Date(from);
+  const originalDay = prevFrom.getDate();
+  prevFrom.setMonth(prevFrom.getMonth() - 1);
+
+  if (prevFrom.getDate() !== originalDay) {
+    prevFrom.setDate(0);
+  }
+
+  const prevTo = new Date(prevFrom);
+  prevTo.setDate(prevTo.getDate() + numDays - 1);
+
+  const format = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  return {
+    prevFromStr: format(prevFrom),
+    prevToStr: format(prevTo),
+    numDays,
+  };
+}
+
 // Register Chart.js Modules
 ChartJS.register(
   CategoryScale,
@@ -367,6 +403,9 @@ export default function Dashboard() {
         setVisitRetentionRaw(visitJson.success ? visitJson.data || [] : []);
         setEarningRetentionRaw(earningActJson.success ? earningActJson.data || [] : []);
       } else if (activeTab === "revenue") {
+        const { prevFromStr } = getPreviousMonthDateRange(fromDate, toDate);
+        const fetchFrom = prevFromStr || fromDate;
+
         const [
           serviceRevRes,
           adRevRes,
@@ -376,13 +415,13 @@ export default function Dashboard() {
           missionTotalRes,
           settlementRes,
         ] = await Promise.all([
-          fetch(`/api/clickhouse?type=service_total_revenue&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=ad_revenue&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=content_revenue&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=content_purchase&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=earning&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=mission_total&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/settlement?from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
+          fetch(`/api/clickhouse?type=service_total_revenue&app=${selectedApp}&from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts),
+          fetch(`/api/clickhouse?type=ad_revenue&app=${selectedApp}&from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts),
+          fetch(`/api/clickhouse?type=content_revenue&app=${selectedApp}&from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts),
+          fetch(`/api/clickhouse?type=content_purchase&app=${selectedApp}&from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts),
+          fetch(`/api/clickhouse?type=earning&app=${selectedApp}&from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts),
+          fetch(`/api/clickhouse?type=mission_total&app=${selectedApp}&from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts),
+          fetch(`/api/settlement?from=${fetchFrom}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
         ]);
 
         const [
@@ -1019,6 +1058,12 @@ export default function Dashboard() {
     let giftBoxSum = 0;
     let serviceTotalSum = 0;
 
+    let prevContentPaySum = 0;
+    let prevPaidCoinSum = 0;
+    let prevAdTicketSum = 0;
+    let prevTotalAdRevenue = 0;
+    let prevChargeWonSum = 0;
+
     const adCategoryMap: Record<string, { revenue: number; impression: number }> = {};
     const networkMap: Record<string, { revenue: number; impression: number }> = {};
     let totalAdRevenue = 0;
@@ -1026,104 +1071,7 @@ export default function Dashboard() {
     let totalExchangedPoints = 0;
 
     const isPhApp = selectedApp.toLowerCase().includes("ph-");
-
-    if (hasActiveSettlement) {
-      settlementRaw.forEach((item) => {
-        const sData = getSettlementDataForApp(item, selectedApp);
-        if (!sData) return;
-
-        const { paidCoin, chargeCoin, usedReward, contentRevenue, adFree, ad } = sData;
-        const { b, pop, forus, sense, cash, rc, toss } = ad;
-
-        const dayTotalAd = b + pop + forus + sense + cash + rc + toss;
-        const realContentRev = (contentRevenue && contentRevenue > 0) ? contentRevenue : paidCoin;
-
-        contentPaySum += realContentRev;
-        paidCoinSum += paidCoin;
-        adTicketSum += (adFree || 0);
-        serviceTotalSum += realContentRev;
-        totalAdRevenue += dayTotalAd;
-        rewardAdRevenue += isPhApp ? (cash + rc) : (pop + forus + rc);
-        totalExchangedPoints += usedReward;
-
-        const netMap: Record<string, number> = {
-          "Buzzvil": b,
-          "apWebCPC": pop,
-          "Adforus": forus,
-          "AdCash": cash,
-          "RC (비토스)": rc,
-          "Toss Mini": toss,
-        };
-        if (sense > 0) netMap["AdSense"] = sense;
-
-        Object.entries(netMap).forEach(([netName, rev]) => {
-          if (!networkMap[netName]) networkMap[netName] = { revenue: 0, impression: 0 };
-          networkMap[netName].revenue += rev;
-        });
-
-        const catMap: Record<string, number> = {
-          "reward": b,
-          "display": pop + forus + sense + cash + toss,
-          "rc": rc,
-        };
-        Object.entries(catMap).forEach(([catName, rev]) => {
-          if (!adCategoryMap[catName]) adCategoryMap[catName] = { revenue: 0, impression: 0 };
-          adCategoryMap[catName].revenue += rev;
-        });
-      });
-    } else {
-      serviceRevenueRaw.forEach((row) => {
-        contentPaySum += Number(row.contentPayRevenue || 0);
-        adTicketSum += Number(row.adTicketRevenue || 0);
-        giftBoxSum += Number(row.giftBoxRevenue || 0);
-        serviceTotalSum += Number(row.serviceTotalRevenue || 0);
-      });
-
-      adRevenueRaw.forEach((row) => {
-        const rev = Number(row.revenue || 0);
-        const imp = Number(row.impression || 0);
-        const cat = String(row.adCategory || "기타");
-        const net = String(row.network || "기타");
-
-        totalAdRevenue += rev;
-
-        const catLower = cat.toLowerCase();
-        const netLower = net.toLowerCase();
-        const isRewardAd = isPhApp
-          ? (catLower === "rc" || netLower === "adcash" || (catLower === "display" && netLower === "adcash"))
-          : (catLower === "rc" || (catLower === "display" && (netLower === "adpopcorn" || netLower === "adforus")));
-
-        if (isRewardAd) {
-          rewardAdRevenue += rev;
-        }
-
-        if (!adCategoryMap[cat]) adCategoryMap[cat] = { revenue: 0, impression: 0 };
-        adCategoryMap[cat].revenue += rev;
-        adCategoryMap[cat].impression += imp;
-
-        if (!networkMap[net]) networkMap[net] = { revenue: 0, impression: 0 };
-        networkMap[net].revenue += rev;
-        networkMap[net].impression += imp;
-      });
-
-      earningRaw.forEach((row) => {
-        const val = parseExchangedPoints(row);
-        totalExchangedPoints += val;
-      });
-    }
-
-    const grossRevenue = contentPaySum + totalAdRevenue;
-
-    let totalMissionReward = 0;
-    missionTotalRaw.forEach((row) => {
-      const val = parseRewardAmount(row);
-      totalMissionReward += val;
-    });
-
-    const totalRewardCost = totalExchangedPoints;
-    // Business Rule: Net Operating Margin (순 영업 마진) = Total Ad Revenue (총 광고 매출) - Exchanged Points Cost (포인트 환전액)
-    const netProfit = totalAdRevenue - totalRewardCost;
-    const marginRate = totalAdRevenue > 0 ? (netProfit / totalAdRevenue) * 100 : 0;
+    const { prevFromStr, prevToStr } = getPreviousMonthDateRange(fromDate, toDate);
 
     // Helper for robust date string extraction (YYYY-MM-DD)
     const extractDtStr = (rawDt: any): string => {
@@ -1133,6 +1081,162 @@ export default function Dashboard() {
       if (str.length >= 10) return str.slice(0, 10);
       return str;
     };
+
+    if (hasActiveSettlement) {
+      settlementRaw.forEach((item) => {
+        const dtStr = extractDtStr(item.date);
+        if (!dtStr) return;
+        const isCurrent = dtStr >= fromDate && dtStr <= toDate;
+        const isPrev = dtStr >= prevFromStr && dtStr <= prevToStr;
+        if (!isCurrent && !isPrev) return;
+
+        const sData = getSettlementDataForApp(item, selectedApp);
+        if (!sData) return;
+
+        const { paidCoin, chargeCoin, usedReward, contentRevenue, adFree, ad } = sData;
+        const { b, pop, forus, sense, cash, rc, toss } = ad;
+
+        const dayTotalAd = b + pop + forus + sense + cash + rc + toss;
+        const realContentRev = (contentRevenue && contentRevenue > 0) ? contentRevenue : paidCoin;
+
+        if (isCurrent) {
+          contentPaySum += realContentRev;
+          paidCoinSum += paidCoin;
+          adTicketSum += (adFree || 0);
+          serviceTotalSum += realContentRev;
+          totalAdRevenue += dayTotalAd;
+          rewardAdRevenue += isPhApp ? (cash + rc) : (pop + forus + rc);
+          totalExchangedPoints += usedReward;
+
+          const netMap: Record<string, number> = {
+            "Buzzvil": b,
+            "apWebCPC": pop,
+            "Adforus": forus,
+            "AdCash": cash,
+            "RC (비토스)": rc,
+            "Toss Mini": toss,
+          };
+          if (sense > 0) netMap["AdSense"] = sense;
+
+          Object.entries(netMap).forEach(([netName, rev]) => {
+            if (!networkMap[netName]) networkMap[netName] = { revenue: 0, impression: 0 };
+            networkMap[netName].revenue += rev;
+          });
+
+          const catMap: Record<string, number> = {
+            "reward": b,
+            "display": pop + forus + sense + cash + toss,
+            "rc": rc,
+          };
+          Object.entries(catMap).forEach(([catName, rev]) => {
+            if (!adCategoryMap[catName]) adCategoryMap[catName] = { revenue: 0, impression: 0 };
+            adCategoryMap[catName].revenue += rev;
+          });
+        }
+
+        if (isPrev) {
+          prevContentPaySum += realContentRev;
+          prevPaidCoinSum += paidCoin;
+          prevAdTicketSum += (adFree || 0);
+          prevTotalAdRevenue += dayTotalAd;
+          prevChargeWonSum += (chargeCoin || 0);
+        }
+      });
+    } else {
+      serviceRevenueRaw.forEach((row) => {
+        const dtStr = extractDtStr(row.dt);
+        if (!dtStr) return;
+        const isCurrent = dtStr >= fromDate && dtStr <= toDate;
+        const isPrev = dtStr >= prevFromStr && dtStr <= prevToStr;
+
+        const cPay = Number(row.contentPayRevenue || 0);
+        const aTick = Number(row.adTicketRevenue || 0);
+        const gBox = Number(row.giftBoxRevenue || 0);
+        const sTot = Number(row.serviceTotalRevenue || 0);
+
+        if (isCurrent) {
+          contentPaySum += cPay;
+          adTicketSum += aTick;
+          giftBoxSum += gBox;
+          serviceTotalSum += sTot;
+        }
+
+        if (isPrev) {
+          prevContentPaySum += cPay;
+          prevAdTicketSum += aTick;
+        }
+      });
+
+      adRevenueRaw.forEach((row) => {
+        const dtStr = extractDtStr(row.dt);
+        if (!dtStr) return;
+        const isCurrent = dtStr >= fromDate && dtStr <= toDate;
+        const isPrev = dtStr >= prevFromStr && dtStr <= prevToStr;
+
+        const rev = Number(row.revenue || 0);
+        const imp = Number(row.impression || 0);
+        const cat = String(row.adCategory || "기타");
+        const net = String(row.network || "기타");
+
+        if (isCurrent) {
+          totalAdRevenue += rev;
+
+          const catLower = cat.toLowerCase();
+          const netLower = net.toLowerCase();
+          const isRewardAd = isPhApp
+            ? (catLower === "rc" || netLower === "adcash" || (catLower === "display" && netLower === "adcash"))
+            : (catLower === "rc" || (catLower === "display" && (netLower === "adpopcorn" || netLower === "adforus")));
+
+          if (isRewardAd) {
+            rewardAdRevenue += rev;
+          }
+
+          if (!adCategoryMap[cat]) adCategoryMap[cat] = { revenue: 0, impression: 0 };
+          adCategoryMap[cat].revenue += rev;
+          adCategoryMap[cat].impression += imp;
+
+          if (!networkMap[net]) networkMap[net] = { revenue: 0, impression: 0 };
+          networkMap[net].revenue += rev;
+          networkMap[net].impression += imp;
+        }
+
+        if (isPrev) {
+          prevTotalAdRevenue += rev;
+        }
+      });
+
+      earningRaw.forEach((row) => {
+        const dtStr = extractDtStr(row.dt);
+        if (dtStr >= fromDate && dtStr <= toDate) {
+          const val = parseExchangedPoints(row);
+          totalExchangedPoints += val;
+        }
+      });
+    }
+
+    const grossRevenue = contentPaySum + totalAdRevenue;
+    const prevGrossRevenue = prevContentPaySum + prevTotalAdRevenue;
+
+    const grossGrowth = prevGrossRevenue > 0 ? ((grossRevenue - prevGrossRevenue) / prevGrossRevenue) * 100 : 0;
+    const contentGrowth = prevContentPaySum > 0 ? ((contentPaySum - prevContentPaySum) / prevContentPaySum) * 100 : 0;
+    const adGrowth = prevTotalAdRevenue > 0 ? ((totalAdRevenue - prevTotalAdRevenue) / prevTotalAdRevenue) * 100 : 0;
+    const chargeGrowth = prevChargeWonSum > 0 ? ((contentPaySum - prevChargeWonSum) / prevChargeWonSum) * 100 : 0;
+    const paidCoinGrowth = prevPaidCoinSum > 0 ? ((paidCoinSum - prevPaidCoinSum) / prevPaidCoinSum) * 100 : 0;
+    const adTicketGrowth = prevAdTicketSum > 0 ? ((adTicketSum - prevAdTicketSum) / prevAdTicketSum) * 100 : 0;
+
+    let totalMissionReward = 0;
+    missionTotalRaw.forEach((row) => {
+      const dtStr = extractDtStr(row.dt);
+      if (dtStr >= fromDate && dtStr <= toDate) {
+        const val = parseRewardAmount(row);
+        totalMissionReward += val;
+      }
+    });
+
+    const totalRewardCost = totalExchangedPoints;
+    // Business Rule: Net Operating Margin (순 영업 마진) = Total Ad Revenue (총 광고 매출) - Exchanged Points Cost (포인트 환전액)
+    const netProfit = totalAdRevenue - totalRewardCost;
+    const marginRate = totalAdRevenue > 0 ? (netProfit / totalAdRevenue) * 100 : 0;
 
     // Generate strict date array between fromDate and toDate
     const generateDateRange = (fromStr: string, toStr: string): string[] => {
@@ -1328,7 +1432,11 @@ export default function Dashboard() {
     let contentDailyList: DailyContentRevenueItem[] = [];
 
     if (hasActiveSettlement) {
-      const sortedSettlement = [...settlementRaw].sort((a, b) => a.date.localeCompare(b.date));
+      const filteredSettlement = settlementRaw.filter((s) => {
+        const dtStr = extractDtStr(s.date);
+        return dtStr >= fromDate && dtStr <= toDate;
+      });
+      const sortedSettlement = [...filteredSettlement].sort((a, b) => a.date.localeCompare(b.date));
       contentDailyList = sortedSettlement.map((item) => {
         const dtStr = extractDtStr(item.date);
         const sData = getSettlementDataForApp(item, selectedApp);
@@ -1528,8 +1636,15 @@ export default function Dashboard() {
       adCategoryDailyTrend,
       networkDailyTrend,
       purchaseTypeDailyTrend,
+      grossGrowth,
+      contentGrowth,
+      adGrowth,
+      chargeGrowth,
+      paidCoinGrowth,
+      adTicketGrowth,
+      prevPeriodRange: { from: prevFromStr, to: prevToStr },
     };
-  }, [serviceRevenueRaw, adRevenueRaw, missionTotalRaw, earningRaw, contentRevenueRaw, contentPurchaseRaw, settlementRaw, selectedApp, periodType]);
+  }, [serviceRevenueRaw, adRevenueRaw, missionTotalRaw, earningRaw, contentRevenueRaw, contentPurchaseRaw, settlementRaw, selectedApp, periodType, fromDate, toDate]);
 
   // Overall Revenue Line Chart Configuration
   const revenueChartData: ChartData<"line"> = {

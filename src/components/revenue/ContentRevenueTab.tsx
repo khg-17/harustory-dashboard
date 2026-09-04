@@ -424,40 +424,11 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
     );
   }
 
-  // Calculate Growth Rate vs Previous Period
-  const len = contentDailyList.length;
-  let prevTotalRev = 0, recentTotalRev = 0;
-  let prevPay = 0, recentPay = 0;
-  let prevCharge = 0, recentCharge = 0;
-  let prevPaidCoin = 0, recentPaidCoin = 0;
-  let prevAdTicket = 0, recentAdTicket = 0;
-
-  if (len >= 2) {
-    const mid = Math.floor(len / 2);
-    const prevPart = contentDailyList.slice(0, mid);
-    const recentPart = contentDailyList.slice(mid);
-
-    prevTotalRev = prevPart.reduce((sum, d) => sum + (d.totalContentRevenue ?? (d.paidCoinWon + (d.adTicketWon || 0))), 0);
-    recentTotalRev = recentPart.reduce((sum, d) => sum + (d.totalContentRevenue ?? (d.paidCoinWon + (d.adTicketWon || 0))), 0);
-
-    prevPay = prevPart.reduce((sum, d) => sum + (d.revenueWon || 0), 0);
-    recentPay = recentPart.reduce((sum, d) => sum + (d.revenueWon || 0), 0);
-
-    prevCharge = prevPart.reduce((sum, d) => sum + (d.chargeWon || 0), 0);
-    recentCharge = recentPart.reduce((sum, d) => sum + (d.chargeWon || 0), 0);
-
-    prevPaidCoin = prevPart.reduce((sum, d) => sum + (d.paidCoinWon || 0), 0);
-    recentPaidCoin = recentPart.reduce((sum, d) => sum + (d.paidCoinWon || 0), 0);
-
-    prevAdTicket = prevPart.reduce((sum, d) => sum + (d.adTicketWon || 0), 0);
-    recentAdTicket = recentPart.reduce((sum, d) => sum + (d.adTicketWon || 0), 0);
-  }
-
-  const totalRevGrowth = prevTotalRev > 0 ? ((recentTotalRev - prevTotalRev) / prevTotalRev) * 100 : 0;
-  const payGrowth = prevPay > 0 ? ((recentPay - prevPay) / prevPay) * 100 : 0;
-  const chargeGrowth = prevCharge > 0 ? ((recentCharge - prevCharge) / prevCharge) * 100 : 0;
-  const paidCoinGrowth = prevPaidCoin > 0 ? ((recentPaidCoin - prevPaidCoin) / prevPaidCoin) * 100 : 0;
-  const adTicketGrowth = prevAdTicket > 0 ? ((recentAdTicket - prevAdTicket) / prevAdTicket) * 100 : 0;
+  const totalRevGrowth = revenueSummary?.contentGrowth ?? 0;
+  const payGrowth = revenueSummary?.contentGrowth ?? 0;
+  const chargeGrowth = revenueSummary?.chargeGrowth ?? 0;
+  const paidCoinGrowth = revenueSummary?.paidCoinGrowth ?? 0;
+  const adTicketGrowth = revenueSummary?.adTicketGrowth ?? 0;
 
   const renderGrowthBadge = (growth: number) => {
     const isUp = growth >= 0;

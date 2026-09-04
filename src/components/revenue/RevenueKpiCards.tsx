@@ -16,30 +16,9 @@ export const RevenueKpiCards: React.FC<RevenueKpiCardsProps> = ({ revenueSummary
   const contentRatio = grossRevenue > 0 ? ((contentPaySum / grossRevenue) * 100).toFixed(1) : "0.0";
   const adRatio = grossRevenue > 0 ? ((totalAdRevenue / grossRevenue) * 100).toFixed(1) : "0.0";
 
-  // Calculate Growth Rate vs Previous Period (전기/전월 대비 증감률)
-  const len = dailyTrend.length;
-  let prevGross = 0, recentGross = 0;
-  let prevContent = 0, recentContent = 0;
-  let prevAd = 0, recentAd = 0;
-
-  if (len >= 2) {
-    const mid = Math.floor(len / 2);
-    const prevPart = dailyTrend.slice(0, mid);
-    const recentPart = dailyTrend.slice(mid);
-
-    prevGross = prevPart.reduce((sum, d) => sum + (d.grossTotal || 0), 0);
-    recentGross = recentPart.reduce((sum, d) => sum + (d.grossTotal || 0), 0);
-
-    prevContent = prevPart.reduce((sum, d) => sum + (d.serviceRev || 0), 0);
-    recentContent = recentPart.reduce((sum, d) => sum + (d.serviceRev || 0), 0);
-
-    prevAd = prevPart.reduce((sum, d) => sum + (d.adRev || 0), 0);
-    recentAd = recentPart.reduce((sum, d) => sum + (d.adRev || 0), 0);
-  }
-
-  const grossGrowth = prevGross > 0 ? ((recentGross - prevGross) / prevGross) * 100 : 0;
-  const contentGrowth = prevContent > 0 ? ((recentContent - prevContent) / prevContent) * 100 : 0;
-  const adGrowth = prevAd > 0 ? ((recentAd - prevAd) / prevAd) * 100 : 0;
+  const grossGrowth = revenueSummary?.grossGrowth ?? 0;
+  const contentGrowth = revenueSummary?.contentGrowth ?? 0;
+  const adGrowth = revenueSummary?.adGrowth ?? 0;
 
   const renderGrowthBadge = (growth: number) => {
     const isUp = growth >= 0;
