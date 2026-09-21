@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useMemo } from "react";
 import { RefreshCw, Menu } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -26,76 +26,16 @@ import { NewUserFunnelDashboard } from "@/components/funnel/NewUserFunnelDashboa
 import { MissionDashboard } from "@/components/mission/MissionDashboard";
 
 import {
-  ActiveTab,
-  RevenueCategoryTab,
-  FunnelCategoryTab,
-  PeriodType,
-  DatePreset,
-  ViewMode,
-  RetentionMode,
-  RetentionDayMax,
-  CustomTooltipState,
-  AppOption,
   ChartProcessedItem,
   CohortRow,
   CombinedCohortRow,
-  RevenueSummary,
-  DailyRevenueTrendItem,
-  DailyContentRevenueItem,
-  FunnelItem,
-  FunnelStepItem,
-  EventCatalogItem,
-  ContentItem,
-  GenreItem,
-  ContentViewItem,
-  MissionByTypeItem,
-  MissionDetailItem,
-  MissionDailyTrendItem,
-  AttendanceDailyItem,
-  EarningActivityItem,
-  AttendanceCompletionItem,
-  AttendanceStepItem,
-  UserSegment,
-  MissionSubTab,
-  SettlementDailyItem,
-  SettlementAdData,
 } from "@/types/dashboard";
 
-function getPreviousMonthDateRange(fromDateStr: string, toDateStr: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDateStr) || !/^\d{4}-\d{2}-\d{2}$/.test(toDateStr)) {
-    return { prevFromStr: fromDateStr, prevToStr: toDateStr, numDays: 0 };
-  }
-
-  const from = new Date(fromDateStr + "T00:00:00");
-  const to = new Date(toDateStr + "T00:00:00");
-
-  const diffTime = Math.abs(to.getTime() - from.getTime());
-  const numDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-  const prevFrom = new Date(from);
-  const originalDay = prevFrom.getDate();
-  prevFrom.setMonth(prevFrom.getMonth() - 1);
-
-  if (prevFrom.getDate() !== originalDay) {
-    prevFrom.setDate(0);
-  }
-
-  const prevTo = new Date(prevFrom);
-  prevTo.setDate(prevTo.getDate() + numDays - 1);
-
-  const format = (d: Date) => {
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
-  return {
-    prevFromStr: format(prevFrom),
-    prevToStr: format(prevTo),
-    numDays,
-  };
-}
+import { useDashboardFilters } from "@/hooks/useDashboardFilters";
+import { useDashboardData } from "@/hooks/useDashboardData";
+import { getSettlementDataForApp } from "@/utils/settlementHelpers";
+import { computeRevenueSummary } from "@/utils/revenueProcessors";
+import { processRawDataToMap, computeAvgDecay } from "@/utils/retentionProcessors";
 
 // Register Chart.js Modules
 ChartJS.register(
@@ -115,467 +55,75 @@ ChartJS.register(
 ChartJS.defaults.font.family = "Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif";
 
 export default function Dashboard() {
-  // Dynamic Real ClickHouse Apps List
-  const [realAppList, setRealAppList] = useState<AppOption[]>([
-    { label: "전체 (통합 서비스)", value: "tc" },
-    { label: "비트버니 (bitbunny)", value: "bitbunny" },
-    { label: "야핏무브 (yafit)", value: "yafit" },
-    { label: "하루스토리 (harustory)", value: "harustory" },
-    { label: "토스 (toss)", value: "toss" },
-    { label: "카카오페이 (kakaopay)", value: "kakaopay" },
-    { label: "포인트홈-하루날씨 (ph-hw)", value: "ph-hw" },
-  ]);
+  const {
+    realAppList,
+    activeTab,
+    setActiveTab,
+    revenueCategoryTab,
+    setRevenueCategoryTab,
+    funnelCategoryTab,
+    setFunnelCategoryTab,
+    selectedApp,
+    setSelectedApp,
+    periodType,
+    datePreset,
+    setDatePreset,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+    viewMode,
+    setViewMode,
+    revenueViewMode,
+    setRevenueViewMode,
+    retentionMode,
+    setRetentionMode,
+    retentionDayMax,
+    setRetentionDayMax,
+    isSidebarCollapsed,
+    setIsSidebarCollapsed,
+    isMobileOpen,
+    setIsMobileOpen,
+    heatmapTooltip,
+    setHeatmapTooltip,
+    userSegment,
+    setUserSegment,
+    missionSubTab,
+    setMissionSubTab,
+    handleDatePreset,
+    handlePeriodChange,
+  } = useDashboardFilters();
 
-  // Fetch Dynamic ClickHouse Apps List on Mount
-  useEffect(() => {
-    fetch("/api/clickhouse?type=app_list")
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setRealAppList(json.data);
-        }
-      })
-      .catch((err) => console.warn("App list fetch failed:", err));
-  }, []);
-
-  const formatDateStr = (d: Date): string => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const getYesterday = (daysBeforeYesterday: number = 0): Date => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1 - daysBeforeYesterday);
-    return d;
-  };
-
-  const getSettlementDataForApp = (item: SettlementDailyItem, selectedApp: string) => {
-    if (!item) return null;
-
-    const calcAdFree = (adFreeObj: any) => {
-      if (!adFreeObj) return 0;
-      return Number(adFreeObj.adcash || 0) +
-             Number(adFreeObj.adforus || 0) +
-             Number(adFreeObj.apWebCPC || 0) +
-             Number(adFreeObj.buzzvil || 0) +
-             Number(adFreeObj.tossMini || 0) +
-             Number(adFreeObj.adsense || 0);
-    };
-
-    const calcMissionRewardP = (receivedReward: any, appNameOrSelectedApp: string) => {
-      if (!receivedReward) return 0;
-      const isPh = (appNameOrSelectedApp || "").toLowerCase().startsWith("ph-") ||
-                   (appNameOrSelectedApp || "").toLowerCase().includes("포인트홈");
-      const field = isPh ? "direct" : "earning";
-
-      const m = Number(receivedReward.mission?.[field] || 0);
-      const b = Number(receivedReward.buzzvil?.[field] || 0);
-      const r = Number(receivedReward.rc?.[field] || 0);
-      return m + b + r;
-    };
-
-    if (selectedApp === "tc") {
-      if (Array.isArray(item.apps) && item.apps.length > 0) {
-        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0, adFree = 0, missionRewardP = 0;
-        let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0;
-
-        item.apps.forEach((app) => {
-          paidCoin += Number(app.payingCoin?.paidCoin ?? app.content?.payingCoin?.paidCoin ?? 0);
-          freeCoin += Number(app.payingCoin?.freeCoin ?? app.content?.payingCoin?.freeCoin ?? 0);
-          chargeCoin += Number(app.chargeCoin ?? app.content?.chargeCoin ?? 0);
-          usedReward += Number(app.usedReward || 0);
-          contentRevenue += Number(app.contentRevenue || 0);
-          adFree += calcAdFree(app.adFree);
-          missionRewardP += calcMissionRewardP(app.receivedReward, app.appName || "");
-
-          const ad: Partial<SettlementAdData> = app.ad || {};
-          b += Number(ad.buzzvil || 0);
-          pop += Number(ad.apWebCPC ?? ad.adpopcorn ?? 0);
-          forus += Number(ad.adforus || 0);
-          sense += Number(ad.adsense || 0);
-          cash += Number(ad.adcash || 0);
-          rc += Number(ad.rc || 0);
-          toss += Number(ad.tossMini || 0);
-        });
-
-        return {
-          paidCoin,
-          freeCoin,
-          chargeCoin,
-          usedReward,
-          contentRevenue,
-          adFree,
-          missionRewardP,
-          ad: { b, pop, forus, sense, cash, rc, toss },
-        };
-      } else {
-        const ad: Partial<SettlementAdData> = item.ad || {};
-        const missionRewardP = calcMissionRewardP(item.receivedReward, "tc");
-        return {
-          paidCoin: Number(item.payingCoin?.paidCoin ?? item.content?.payingCoin?.paidCoin ?? 0),
-          freeCoin: Number(item.payingCoin?.freeCoin ?? item.content?.payingCoin?.freeCoin ?? 0),
-          chargeCoin: Number(item.chargeCoin ?? item.content?.chargeCoin ?? 0),
-          usedReward: Number(item.usedReward || 0),
-          contentRevenue: Number(item.contentRevenue || 0),
-          adFree: calcAdFree(item.adFree),
-          missionRewardP,
-          ad: {
-            b: Number(ad.buzzvil || 0),
-            pop: Number(ad.apWebCPC ?? ad.adpopcorn ?? 0),
-            forus: Number(ad.adforus || 0),
-            sense: Number(ad.adsense || 0),
-            cash: Number(ad.adcash || 0),
-            rc: Number(ad.rc || 0),
-            toss: Number(ad.tossMini || 0),
-          },
-        };
-      }
-    }
-
-    if (Array.isArray(item.apps) && item.apps.length > 0) {
-      const selLower = selectedApp.toLowerCase();
-
-      const APP_ALIAS_MAP: Record<string, string[]> = {
-        bitbunny: ["bitbunny", "비트버니"],
-        yafit: ["yafit", "야핏", "야핏무브"],
-        harustory: ["harustory", "하루스토리"],
-        toss: ["toss", "토스"],
-        kakaopay: ["kakaopay", "카카오", "카카오페이"],
-        kbpay: ["kbpay", "kb pay", "kb페이"],
-        digiloca: ["digiloca", "디지로카"],
-        olock: ["olock", "오락"],
-        pass: ["pass"],
-        passbykt: ["passbykt", "pass by kt", "kt pass"],
-        okcashback: ["okcashback", "ok캐쉬백"],
-        benepia: ["benepia", "베네피아"],
-        benecafe: ["benecafe", "베네카페"],
-        happytoon: ["happytoon", "해피툰"],
-        haruweather: ["haruweather", "하루날씨"],
-        pocketcu: ["pocketcu", "포켓cu"],
-        rround: ["rround", "알라운드", "라운드"],
-        wabank: ["wabank", "와뱅", "광주와뱅크"],
-        zaritalk: ["zaritalk", "자리톡"],
-        zum: ["zum", "줌"],
-        "3o3": ["3o3", "삼쩜삼"],
-        bitwalk: ["bitwalk", "비트워크"],
-        bppay: ["bppay", "bp페이", "비플페이"],
-        memog: ["memog", "메모g"],
-        treasurer: ["treasurer", "트레저러"],
-        upluspage: ["upluspage", "유플러스페이지"],
-        "ph-hw": ["ph-hw", "하루날씨", "포인트홈", "point home", "포인트홈-하루날씨"],
-      };
-
-      const norm = (s: string) => s.toLowerCase().replace(/[\s\-_]/g, "");
-      const targetAliases = (APP_ALIAS_MAP[selLower] || [selLower]).map(norm);
-
-      const matchedApps = item.apps.filter((app) => {
-        if (!app.appName) return false;
-        const appNorm = norm(app.appName);
-        return targetAliases.some(
-          (alias) => appNorm.includes(alias) || alias.includes(appNorm)
-        );
-      });
-
-      if (matchedApps.length > 0) {
-        let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0, adFree = 0, missionRewardP = 0;
-        let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0;
-
-        matchedApps.forEach((app) => {
-          paidCoin += Number(app.payingCoin?.paidCoin ?? app.content?.payingCoin?.paidCoin ?? 0);
-          freeCoin += Number(app.payingCoin?.freeCoin ?? app.content?.payingCoin?.freeCoin ?? 0);
-          chargeCoin += Number(app.chargeCoin ?? app.content?.chargeCoin ?? 0);
-          usedReward += Number(app.usedReward || 0);
-          contentRevenue += Number(app.contentRevenue || 0);
-          adFree += calcAdFree(app.adFree);
-          missionRewardP += calcMissionRewardP(app.receivedReward, app.appName || selectedApp);
-
-          const ad: Partial<SettlementAdData> = app.ad || {};
-          b += Number(ad.buzzvil || 0);
-          pop += Number(ad.apWebCPC ?? ad.adpopcorn ?? 0);
-          forus += Number(ad.adforus || 0);
-          sense += Number(ad.adsense || 0);
-          cash += Number(ad.adcash || 0);
-          rc += Number(ad.rc || 0);
-          toss += Number(ad.tossMini || 0);
-        });
-
-        return {
-          paidCoin,
-          freeCoin,
-          chargeCoin,
-          usedReward,
-          contentRevenue,
-          adFree,
-          missionRewardP,
-          ad: { b, pop, forus, sense, cash, rc, toss },
-        };
-      }
-    }
-
-    return null;
-  };
-
-  // Navigation Sidebar Active Tab ("users" = 유저 현황, "revenue" = 매출 현황)
-  const [activeTab, setActiveTab] = useState<ActiveTab>("users");
-
-  // Revenue Sub-category Tab ("overall" | "ad" | "content" | "margin")
-  const [revenueCategoryTab, setRevenueCategoryTab] = useState<RevenueCategoryTab>("overall");
-
-  // Funnel Sub-category Tab ("detail" | "new_user")
-  const [funnelCategoryTab, setFunnelCategoryTab] = useState<FunnelCategoryTab>("detail");
-
-  const [selectedApp, setSelectedApp] = useState<string>("tc");
-  const [periodType, setPeriodType] = useState<PeriodType>("day");
-  const [datePreset, setDatePreset] = useState<DatePreset>("7d");
-
-  // Default date range: End date is always set to Yesterday (e.g. D-1), default: Recent 7 days (D-7 ~ D-1)
-  const [fromDate, setFromDate] = useState<string>(() => formatDateStr(getYesterday(6)));
-  const [toDate, setToDate] = useState<string>(() => formatDateStr(getYesterday(0)));
-
-  // View Mode Switch for DAU & Revenue Cards (차트 vs 테이블)
-  const [viewMode, setViewMode] = useState<ViewMode>("chart");
-  const [revenueViewMode, setRevenueViewMode] = useState<ViewMode>("chart");
-
-  // Retention Mode (combined | retention | earning_activation)
-  const [retentionMode, setRetentionMode] = useState<RetentionMode>("combined");
-
-  // Day Range Selector for Retention (D7 / D14 / D30)
-  const [retentionDayMax, setRetentionDayMax] = useState<RetentionDayMax>(30);
-
-  // Collapsible Sidebar State
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
-  const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
-
-  // Custom Heatmap Floating Tooltip State
-  const [heatmapTooltip, setHeatmapTooltip] = useState<CustomTooltipState | null>(null);
-
-  // Live Data States
-  const [loading, setLoading] = useState<boolean>(true);
-  const [overviewData, setOverviewData] = useState<any[]>([]);
-  const [visitRetentionRaw, setVisitRetentionRaw] = useState<any[]>([]);
-  const [earningRetentionRaw, setEarningRetentionRaw] = useState<any[]>([]);
-
-  // Revenue Live States
-  const [serviceRevenueRaw, setServiceRevenueRaw] = useState<any[]>([]);
-  const [adRevenueRaw, setAdRevenueRaw] = useState<any[]>([]);
-  const [contentRevenueRaw, setContentRevenueRaw] = useState<any[]>([]);
-  const [contentPurchaseRaw, setContentPurchaseRaw] = useState<any[]>([]);
-  const [earningRaw, setEarningRaw] = useState<any[]>([]);
-  const [missionTotalRaw, setMissionTotalRaw] = useState<any[]>([]);
-  const [settlementRaw, setSettlementRaw] = useState<SettlementDailyItem[]>([]);
-
-
-  // Funnel Live States
-  const [funnelsRaw, setFunnelsRaw] = useState<FunnelItem[]>([]);
-  const [funnelStepsRaw, setFunnelStepsRaw] = useState<FunnelStepItem[]>([]);
-  const [eventCatalogRaw, setEventCatalogRaw] = useState<EventCatalogItem[]>([]);
-
-  // Content / Works Live States
-  const [contentRaw, setContentRaw] = useState<ContentItem[]>([]);
-  const [genresRaw, setGenresRaw] = useState<GenreItem[]>([]);
-  const [contentViewRaw, setContentViewRaw] = useState<ContentViewItem[]>([]);
-
-  // Mission Live States
-  const [userSegment, setUserSegment] = useState<UserSegment>("all");
-  const [missionSubTab, setMissionSubTab] = useState<MissionSubTab>("general");
-  const [missionByTypeRaw, setMissionByTypeRaw] = useState<MissionByTypeItem[]>([]);
-  const [missionsDetailRaw, setMissionsDetailRaw] = useState<MissionDetailItem[]>([]);
-  const [missionDailyTrendRaw, setMissionDailyTrendRaw] = useState<MissionDailyTrendItem[]>([]);
-  const [attendanceDailyRaw, setAttendanceDailyRaw] = useState<AttendanceDailyItem[]>([]);
-  const [earningActivityRaw, setEarningActivityRaw] = useState<EarningActivityItem[]>([]);
-  const [attendanceCompletionRaw, setAttendanceCompletionRaw] = useState<AttendanceCompletionItem[]>([]);
-  const [attendanceStepsRaw, setAttendanceStepsRaw] = useState<AttendanceStepItem[]>([]);
-
-  // Fetch Live Datasets from ClickHouse strictly based on Active Tab
-  const fetchDashboardData = useCallback(async () => {
-    // Prevent firing requests if dates are incomplete while typing
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate)) {
-      return;
-    }
-
-    setLoading(true);
-    const timestamp = Date.now();
-    const fetchOpts = { cache: "no-store" as RequestCache };
-
-    try {
-      if (activeTab === "users") {
-        setOverviewData([]);
-        setVisitRetentionRaw([]);
-        setEarningRetentionRaw([]);
-
-        const [overviewRes, visitRes, earningActRes] = await Promise.all([
-          fetch(`/api/clickhouse?type=overview&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=retention&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=earning_activation&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-        ]);
-
-        const [overviewJson, visitJson, earningActJson] = await Promise.all([
-          overviewRes.json(),
-          visitRes.json(),
-          earningActRes.json(),
-        ]);
-
-        setOverviewData(overviewJson.success ? overviewJson.data || [] : []);
-        setVisitRetentionRaw(visitJson.success ? visitJson.data || [] : []);
-        setEarningRetentionRaw(earningActJson.success ? earningActJson.data || [] : []);
-      } else if (activeTab === "revenue") {
-        const [currentRes, contentRevRes] = await Promise.all([
-          fetch(`/api/settlement?from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
-          fetch(`/api/clickhouse?type=content_revenue&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
-        ]);
-
-        let currentItems: SettlementDailyItem[] = [];
-        if (currentRes) {
-          const json = await currentRes.json().catch(() => null);
-          if (json && json.success && Array.isArray(json.data)) {
-            currentItems = json.data;
-          }
-        }
-        setSettlementRaw(currentItems);
-
-        if (contentRevRes) {
-          const contentRevJson = await contentRevRes.json().catch(() => null);
-          if (contentRevJson && contentRevJson.success && Array.isArray(contentRevJson.data)) {
-            setContentRevenueRaw(contentRevJson.data);
-          } else {
-            setContentRevenueRaw([]);
-          }
-        } else {
-          setContentRevenueRaw([]);
-        }
-
-        const { prevFromStr, prevToStr } = getPreviousMonthDateRange(fromDate, toDate);
-        if (prevFromStr && prevToStr) {
-          fetch(`/api/settlement?from=${prevFromStr}&to=${prevToStr}&_t=${timestamp}`, fetchOpts)
-            .then((res) => res.json())
-            .then((json) => {
-              if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
-                setSettlementRaw((prev) => {
-                  const map = new Map<string, SettlementDailyItem>();
-                  prev.forEach((item) => { if (item?.date) map.set(item.date, item); });
-                  json.data.forEach((item: SettlementDailyItem) => { if (item?.date) map.set(item.date, item); });
-                  return Array.from(map.values()).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
-                });
-              }
-            })
-            .catch(() => {});
-        }
-      } else if (activeTab === "funnel") {
-        setFunnelsRaw([]);
-        setFunnelStepsRaw([]);
-        setEventCatalogRaw([]);
-        setOverviewData([]);
-
-        const [funnelsRes, funnelStepsRes, eventCatalogRes, overviewRes] = await Promise.all([
-          fetch(`/api/clickhouse?type=funnels&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=funnel_steps&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=event_catalog&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=overview&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-        ]);
-
-        const [funnelsJson, funnelStepsJson, eventCatalogJson, overviewJson] = await Promise.all([
-          funnelsRes.json(),
-          funnelStepsRes.json(),
-          eventCatalogRes.json(),
-          overviewRes.json(),
-        ]);
-
-        if (funnelsJson.success && Array.isArray(funnelsJson.data)) setFunnelsRaw(funnelsJson.data);
-        if (funnelStepsJson.success && Array.isArray(funnelStepsJson.data)) setFunnelStepsRaw(funnelStepsJson.data);
-        if (eventCatalogJson.success && Array.isArray(eventCatalogJson.data)) setEventCatalogRaw(eventCatalogJson.data);
-        if (overviewJson.success && Array.isArray(overviewJson.data)) setOverviewData(overviewJson.data);
-      } else if (activeTab === "mission") {
-        const segParam = `&userSegment=${userSegment}`;
-
-        const [
-          missionByTypeRes,
-          missionsDetailRes,
-          missionDailyTrendRes,
-          attendanceDailyRes,
-          earningActRes,
-          attendanceCompRes,
-          attendanceStepsRes,
-          missionTotalRes,
-          overviewRes,
-        ] = await Promise.all([
-          fetch(`/api/clickhouse?type=mission_by_type&app=${selectedApp}&from=${fromDate}&to=${toDate}${segParam}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=missions_detail&app=${selectedApp}&from=${fromDate}&to=${toDate}${segParam}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=mission_daily_trend&app=${selectedApp}&from=${fromDate}&to=${toDate}${segParam}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=attendance_daily&app=${selectedApp}&from=${fromDate}&to=${toDate}${segParam}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=earning_activity&app=${selectedApp}&from=${fromDate}&to=${toDate}${segParam}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=attendance_completion&app=${selectedApp}&from=${fromDate}&to=${toDate}${segParam}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=attendance_steps&app=${selectedApp}&from=${fromDate}&to=${toDate}${segParam}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=mission_total&app=${selectedApp}&from=${fromDate}&to=${toDate}${segParam}&_t=${timestamp}`, fetchOpts),
-          fetch(`/api/clickhouse?type=overview&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
-        ]);
-
-        const [
-          missionByTypeJson,
-          missionsDetailJson,
-          missionDailyTrendJson,
-          attendanceDailyJson,
-          earningActJson,
-          attendanceCompJson,
-          attendanceStepsJson,
-          missionTotalJson,
-          overviewJson,
-        ] = await Promise.all([
-          missionByTypeRes.json(),
-          missionsDetailRes.json(),
-          missionDailyTrendRes.json(),
-          attendanceDailyRes.json(),
-          earningActRes.json(),
-          attendanceCompRes.json(),
-          attendanceStepsRes.json(),
-          missionTotalRes.json(),
-          overviewRes.json(),
-        ]);
-
-        if (missionByTypeJson.success && Array.isArray(missionByTypeJson.data)) setMissionByTypeRaw(missionByTypeJson.data);
-        if (missionsDetailJson.success && Array.isArray(missionsDetailJson.data)) setMissionsDetailRaw(missionsDetailJson.data);
-        if (missionDailyTrendJson.success && Array.isArray(missionDailyTrendJson.data)) setMissionDailyTrendRaw(missionDailyTrendJson.data);
-        if (attendanceDailyJson.success && Array.isArray(attendanceDailyJson.data)) setAttendanceDailyRaw(attendanceDailyJson.data);
-        if (earningActJson.success && Array.isArray(earningActJson.data)) setEarningActivityRaw(earningActJson.data);
-        if (attendanceCompJson.success && Array.isArray(attendanceCompJson.data)) setAttendanceCompletionRaw(attendanceCompJson.data);
-        if (attendanceStepsJson.success && Array.isArray(attendanceStepsJson.data)) setAttendanceStepsRaw(attendanceStepsJson.data);
-        if (missionTotalJson.success && Array.isArray(missionTotalJson.data)) setMissionTotalRaw(missionTotalJson.data);
-        if (overviewJson.success && Array.isArray(overviewJson.data)) setOverviewData(overviewJson.data);
-      }
-    } catch (error) {
-      console.error("ClickHouse data fetch error:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedApp, fromDate, toDate, activeTab, userSegment]);
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
-
-  // Dynamic Date Preset Selection Handler
-  const handleDatePreset = (preset: "7d" | "30d" | "month") => {
-    setDatePreset(preset);
-    // Rule: End date for date presets must always be Yesterday (금일 07.27 -> 어제 07.26)
-    const end = getYesterday(0);
-    let start = new Date(end);
-
-    if (preset === "7d") {
-      start.setDate(end.getDate() - 6);
-    } else if (preset === "30d") {
-      start.setDate(end.getDate() - 29);
-    } else if (preset === "month") {
-      start = new Date(end.getFullYear(), end.getMonth(), 1);
-    }
-
-    setFromDate(formatDateStr(start));
-    setToDate(formatDateStr(end));
-  };
-
-  const handlePeriodChange = (type: PeriodType) => {
-    setPeriodType(type);
-  };
+  const {
+    loading,
+    overviewData,
+    visitRetentionRaw,
+    earningRetentionRaw,
+    serviceRevenueRaw,
+    adRevenueRaw,
+    contentRevenueRaw,
+    contentPurchaseRaw,
+    earningRaw,
+    missionTotalRaw,
+    settlementRaw,
+    funnelsRaw,
+    funnelStepsRaw,
+    eventCatalogRaw,
+    missionByTypeRaw,
+    missionsDetailRaw,
+    missionDailyTrendRaw,
+    attendanceDailyRaw,
+    earningActivityRaw,
+    attendanceCompletionRaw,
+    attendanceStepsRaw,
+    fetchDashboardData,
+  } = useDashboardData({
+    activeTab,
+    selectedApp,
+    fromDate,
+    toDate,
+    userSegment,
+  });
 
   // 1. Process Overview Data for DAU Charts & Tables
   const chartProcessedData = useMemo<ChartProcessedItem[]>(() => {
@@ -754,63 +302,9 @@ export default function Dashboard() {
     document.body.removeChild(link);
   };
 
-  // 2. Process Cohort Retention & Activation Datasets deterministically
-  const processRawDataToMap = useCallback((rawData: any[], isActivation: boolean = false) => {
-    if (!rawData || rawData.length === 0) return [];
-
-    const dateMap: Record<string, { newUserCount: number; daysMap: Record<number, { rate: number; count: number }> }> = {};
-
-    // Pass 1: Initialize all cohort dates and capture D0 new user counts
-    rawData.forEach((item) => {
-      const rawDateStr = item.cohortDate ? String(item.cohortDate).split("T")[0] : "";
-      if (!rawDateStr) return;
-
-      const dayN = Number(item.dayN || 0);
-      const userCount = Number(item.retainedUserCount ?? item.activatedUu ?? 0);
-
-      if (!dateMap[rawDateStr]) {
-        dateMap[rawDateStr] = { newUserCount: 0, daysMap: {} };
-      }
-
-      if (dayN === 0 && (!isActivation || dateMap[rawDateStr].newUserCount === 0)) {
-        dateMap[rawDateStr].newUserCount = userCount;
-      }
-    });
-
-    // Pass 2: Calculate retention and activation rates deterministically
-    rawData.forEach((item) => {
-      const rawDateStr = item.cohortDate ? String(item.cohortDate).split("T")[0] : "";
-      if (!rawDateStr || !dateMap[rawDateStr]) return;
-
-      const dayN = Number(item.dayN || 0);
-      const userCount = Number(item.retainedUserCount ?? item.activatedUu ?? 0);
-
-      let rate = 0;
-      if (item.activationRate !== undefined && item.activationRate !== null) {
-        rate = Number(Number(item.activationRate).toFixed(1));
-      } else if (item.retentionRate !== undefined && item.retentionRate !== null) {
-        rate = Number(Number(item.retentionRate).toFixed(1));
-      } else if (dayN === 0 && !isActivation) {
-        rate = 100;
-      } else {
-        const d0Count = dateMap[rawDateStr].newUserCount;
-        rate = d0Count > 0 ? Number(((userCount / d0Count) * 100).toFixed(1)) : 0;
-      }
-
-      dateMap[rawDateStr].daysMap[dayN] = { rate, count: userCount };
-    });
-
-    return Object.entries(dateMap)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([cohortDate, val]) => {
-        const dateObj = new Date(cohortDate + "T00:00:00");
-        const formattedDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()} (${["일", "월", "화", "수", "목", "금", "토"][dateObj.getDay()]})`;
-        return { cohortDate, formattedDate, newUserCount: val.newUserCount, daysMap: val.daysMap };
-      });
-  }, []);
-
-  const visitRows = useMemo<CohortRow[]>(() => processRawDataToMap(visitRetentionRaw, false), [visitRetentionRaw, processRawDataToMap]);
-  const earningRows = useMemo<CohortRow[]>(() => processRawDataToMap(earningRetentionRaw, true), [earningRetentionRaw, processRawDataToMap]);
+  // 2. Process Cohort Retention & Activation Datasets
+  const visitRows = useMemo<CohortRow[]>(() => processRawDataToMap(visitRetentionRaw, false), [visitRetentionRaw]);
+  const earningRows = useMemo<CohortRow[]>(() => processRawDataToMap(earningRetentionRaw, true), [earningRetentionRaw]);
 
   const activeDayColumns = useMemo(() => {
     const list: number[] = [];
@@ -837,51 +331,8 @@ export default function Dashboard() {
     return arr;
   }, [retentionDayMax]);
 
-  const avgVisitDecay = useMemo(() => {
-    if (visitRows.length === 0) return dayNList.map(() => null);
-
-    const maxDateStr = visitRows.reduce((max, r) => (r.cohortDate > max ? r.cohortDate : max), "");
-    const maxDate = maxDateStr ? new Date(maxDateStr + "T00:00:00") : new Date();
-
-    return dayNList.map((dayNum) => {
-      if (dayNum === 0) return 100;
-
-      const elapsedCohorts = visitRows.filter((r) => {
-        const cDate = new Date(r.cohortDate + "T00:00:00");
-        const ageInDays = Math.round((maxDate.getTime() - cDate.getTime()) / (1000 * 60 * 60 * 24));
-        return dayNum <= ageInDays;
-      });
-
-      if (elapsedCohorts.length === 0) return null;
-
-      const rates = elapsedCohorts.map((r) => r.daysMap[dayNum]?.rate ?? 0);
-      const avgRate = rates.reduce((a, b) => a + b, 0) / elapsedCohorts.length;
-      return Number(avgRate.toFixed(1));
-    });
-  }, [visitRows, dayNList]);
-
-  const avgEarningDecay = useMemo(() => {
-    if (earningRows.length === 0) return dayNList.map(() => null);
-
-    const maxDateStr = earningRows.reduce((max, r) => (r.cohortDate > max ? r.cohortDate : max), "");
-    const maxDate = maxDateStr ? new Date(maxDateStr + "T00:00:00") : new Date();
-
-    return dayNList.map((dayNum) => {
-      if (dayNum === 0) return 100;
-
-      const elapsedCohorts = earningRows.filter((r) => {
-        const cDate = new Date(r.cohortDate + "T00:00:00");
-        const ageInDays = Math.round((maxDate.getTime() - cDate.getTime()) / (1000 * 60 * 60 * 24));
-        return dayNum <= ageInDays;
-      });
-
-      if (elapsedCohorts.length === 0) return null;
-
-      const rates = elapsedCohorts.map((r) => r.daysMap[dayNum]?.rate ?? 0);
-      const avgRate = rates.reduce((a, b) => a + b, 0) / elapsedCohorts.length;
-      return Number(avgRate.toFixed(1));
-    });
-  }, [earningRows, dayNList]);
+  const avgVisitDecay = useMemo(() => computeAvgDecay(visitRows, dayNList), [visitRows, dayNList]);
+  const avgEarningDecay = useMemo(() => computeAvgDecay(earningRows, dayNList), [earningRows, dayNList]);
 
   const decayChartData = useMemo<ChartData<"line">>(() => {
     const visitDataset = {
@@ -997,56 +448,6 @@ export default function Dashboard() {
     },
   };
 
-  // Helper functions for ultra-robust field extraction across raw API datasets
-  const parseRewardAmount = (row: any): number => {
-    if (!row) return 0;
-    const raw =
-      row.totalRewardAmount ??
-      row.total_reward_amount ??
-      row.rewardAmount ??
-      row.reward_amount ??
-      row.reward ??
-      row.totalReward ??
-      row.total_reward ??
-      row.rewardCost ??
-      row.reward_cost ??
-      row.total_reward_cost ??
-      row.mCost ??
-      row.missionReward ??
-      row.totalMissionReward ??
-      row.rewardSum ??
-      row.total_reward_sum ??
-      0;
-    const num = Number(raw);
-    if (!isNaN(num) && num > 0) return num;
-
-    const keys = Object.keys(row);
-    for (const k of keys) {
-      const kLower = k.toLowerCase();
-      if (kLower.includes("reward") || kLower === "mcost" || kLower.includes("mission")) {
-        const val = Number(row[k]);
-        if (!isNaN(val) && val > 0) return val;
-      }
-    }
-    return !isNaN(num) ? num : 0;
-  };
-
-  const parseExchangedPoints = (row: any): number => {
-    if (!row) return 0;
-    const raw =
-      row.exchangedPoints ??
-      row.exchanged_points ??
-      row.exchanged ??
-      row.exchangedPoint ??
-      row.exchanged_point ??
-      row.eCost ??
-      row.exchangeAmount ??
-      row.exchange_amount ??
-      0;
-    const num = Number(raw);
-    return !isNaN(num) ? num : 0;
-  };
-
   const hasActiveSettlement = useMemo(() => {
     return (
       Array.isArray(settlementRaw) &&
@@ -1056,621 +457,22 @@ export default function Dashboard() {
   }, [settlementRaw, selectedApp]);
 
   // 3. Process Revenue Datasets
-  const revenueSummary = useMemo<RevenueSummary>(() => {
-    let contentPaySum = 0;
-    let paidCoinSum = 0;
-    let adTicketSum = 0;
-    let giftBoxSum = 0;
-    let serviceTotalSum = 0;
-
-    let prevContentPaySum = 0;
-    let prevPaidCoinSum = 0;
-    let prevAdTicketSum = 0;
-    let prevTotalAdRevenue = 0;
-    let prevChargeWonSum = 0;
-
-    const adCategoryMap: Record<string, { revenue: number; impression: number }> = {};
-    const networkMap: Record<string, { revenue: number; impression: number }> = {};
-    let totalAdRevenue = 0;
-    let rewardAdRevenue = 0;
-    let totalExchangedPoints = 0;
-    let totalMissionReward = 0;
-
-    const isPhApp = selectedApp.toLowerCase().includes("ph-");
-    const { prevFromStr, prevToStr } = getPreviousMonthDateRange(fromDate, toDate);
-
-    // Helper for robust date string extraction (YYYY-MM-DD)
-    const extractDtStr = (rawDt: any): string => {
-      if (!rawDt) return "";
-      const str = String(rawDt).trim();
-      if (str.includes("T")) return str.split("T")[0];
-      if (str.length >= 10) return str.slice(0, 10);
-      return str;
-    };
-
-    if (hasActiveSettlement) {
-      settlementRaw.forEach((item) => {
-        const dtStr = extractDtStr(item.date);
-        if (!dtStr) return;
-        const isCurrent = dtStr >= fromDate && dtStr <= toDate;
-        const isPrev = dtStr >= prevFromStr && dtStr <= prevToStr;
-        if (!isCurrent && !isPrev) return;
-
-        const sData = getSettlementDataForApp(item, selectedApp);
-        if (!sData) return;
-
-        const { paidCoin, chargeCoin, usedReward, contentRevenue, adFree, missionRewardP, ad } = sData;
-        const { b, pop, forus, sense, cash, rc, toss } = ad;
-
-        const dayTotalAd = b + pop + forus + sense + cash + rc + toss;
-        const realContentRev = (contentRevenue && contentRevenue > 0) ? contentRevenue : paidCoin;
-
-        if (isCurrent) {
-          contentPaySum += realContentRev;
-          paidCoinSum += paidCoin;
-          adTicketSum += (adFree || 0);
-          serviceTotalSum += realContentRev;
-          totalAdRevenue += dayTotalAd;
-          rewardAdRevenue += isPhApp ? (cash + rc) : (pop + forus + rc);
-          totalExchangedPoints += usedReward;
-          totalMissionReward += (missionRewardP || 0);
-
-          const netMap: Record<string, number> = {
-            "Buzzvil": b,
-            "apWebCPC": pop,
-            "Adforus": forus,
-            "AdCash": cash,
-            "RC (비토스)": rc,
-            "Toss Mini": toss,
-          };
-          if (sense > 0) netMap["AdSense"] = sense;
-
-          Object.entries(netMap).forEach(([netName, rev]) => {
-            if (rev > 0) {
-              if (!networkMap[netName]) networkMap[netName] = { revenue: 0, impression: 0 };
-              networkMap[netName].revenue += rev;
-            }
-          });
-
-          const catMap: Record<string, number> = {
-            "reward": b,
-            "display": pop + forus + sense + cash + toss,
-            "rc": rc,
-            "adTicket": adFree || 0,
-          };
-          Object.entries(catMap).forEach(([catName, rev]) => {
-            if (rev > 0) {
-              if (!adCategoryMap[catName]) adCategoryMap[catName] = { revenue: 0, impression: 0 };
-              adCategoryMap[catName].revenue += rev;
-            }
-          });
-        }
-
-        if (isPrev) {
-          prevContentPaySum += realContentRev;
-          prevPaidCoinSum += paidCoin;
-          prevAdTicketSum += (adFree || 0);
-          prevTotalAdRevenue += dayTotalAd;
-          prevChargeWonSum += (chargeCoin || 0);
-        }
-      });
-    } else {
-      serviceRevenueRaw.forEach((row) => {
-        const dtStr = extractDtStr(row.dt);
-        if (!dtStr) return;
-        const isCurrent = dtStr >= fromDate && dtStr <= toDate;
-        const isPrev = dtStr >= prevFromStr && dtStr <= prevToStr;
-
-        const cPay = Number(row.contentPayRevenue || 0);
-        const aTick = Number(row.adTicketRevenue || 0);
-        const gBox = Number(row.giftBoxRevenue || 0);
-        const sTot = Number(row.serviceTotalRevenue || 0);
-
-        if (isCurrent) {
-          contentPaySum += cPay;
-          adTicketSum += aTick;
-          giftBoxSum += gBox;
-          serviceTotalSum += sTot;
-        }
-
-        if (isPrev) {
-          prevContentPaySum += cPay;
-          prevAdTicketSum += aTick;
-        }
-      });
-
-      adRevenueRaw.forEach((row) => {
-        const dtStr = extractDtStr(row.dt);
-        if (!dtStr) return;
-        const isCurrent = dtStr >= fromDate && dtStr <= toDate;
-        const isPrev = dtStr >= prevFromStr && dtStr <= prevToStr;
-
-        const rev = Number(row.revenue || 0);
-        const imp = Number(row.impression || 0);
-        const cat = String(row.adCategory || "기타");
-        const net = String(row.network || "기타");
-
-        if (isCurrent) {
-          totalAdRevenue += rev;
-
-          const catLower = cat.toLowerCase();
-          const netLower = net.toLowerCase();
-          const isRewardAd = isPhApp
-            ? (catLower === "rc" || netLower === "adcash" || (catLower === "display" && netLower === "adcash"))
-            : (catLower === "rc" || (catLower === "display" && (netLower === "adpopcorn" || netLower === "adforus")));
-
-          if (isRewardAd) {
-            rewardAdRevenue += rev;
-          }
-
-          if (!adCategoryMap[cat]) adCategoryMap[cat] = { revenue: 0, impression: 0 };
-          adCategoryMap[cat].revenue += rev;
-          adCategoryMap[cat].impression += imp;
-
-          if (!networkMap[net]) networkMap[net] = { revenue: 0, impression: 0 };
-          networkMap[net].revenue += rev;
-          networkMap[net].impression += imp;
-        }
-
-        if (isPrev) {
-          prevTotalAdRevenue += rev;
-        }
-      });
-
-      earningRaw.forEach((row) => {
-        const dtStr = extractDtStr(row.dt);
-        if (dtStr >= fromDate && dtStr <= toDate) {
-          const val = parseExchangedPoints(row);
-          totalExchangedPoints += val;
-        }
-      });
-    }
-
-    const grossRevenue = contentPaySum + totalAdRevenue;
-    const prevGrossRevenue = prevContentPaySum + prevTotalAdRevenue;
-
-    const grossGrowth = prevGrossRevenue > 0 ? ((grossRevenue - prevGrossRevenue) / prevGrossRevenue) * 100 : 0;
-    const contentGrowth = prevContentPaySum > 0 ? ((contentPaySum - prevContentPaySum) / prevContentPaySum) * 100 : 0;
-    const adGrowth = prevTotalAdRevenue > 0 ? ((totalAdRevenue - prevTotalAdRevenue) / prevTotalAdRevenue) * 100 : 0;
-    const chargeGrowth = prevChargeWonSum > 0 ? ((contentPaySum - prevChargeWonSum) / prevChargeWonSum) * 100 : 0;
-    const paidCoinGrowth = prevPaidCoinSum > 0 ? ((paidCoinSum - prevPaidCoinSum) / prevPaidCoinSum) * 100 : 0;
-    const adTicketGrowth = prevAdTicketSum > 0 ? ((adTicketSum - prevAdTicketSum) / prevAdTicketSum) * 100 : 0;
-
-    if (!hasActiveSettlement) {
-      missionTotalRaw.forEach((row) => {
-        const dtStr = extractDtStr(row.dt);
-        if (dtStr >= fromDate && dtStr <= toDate) {
-          const val = parseRewardAmount(row);
-          totalMissionReward += val;
-        }
-      });
-    }
-
-    const totalRewardCost = totalExchangedPoints;
-    // Business Rule: Net Operating Margin (순 영업 마진) = Total Ad Revenue (총 광고 매출) - Exchanged Points Cost (포인트 환전액)
-    const netProfit = totalAdRevenue - totalRewardCost;
-    const marginRate = totalAdRevenue > 0 ? (netProfit / totalAdRevenue) * 100 : 0;
-
-    // Generate strict date array between fromDate and toDate
-    const generateDateRange = (fromStr: string, toStr: string): string[] => {
-      const dates: string[] = [];
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(fromStr) || !/^\d{4}-\d{2}-\d{2}$/.test(toStr)) return dates;
-      let curr = new Date(fromStr + "T00:00:00");
-      const end = new Date(toStr + "T00:00:00");
-      while (curr <= end) {
-        const y = curr.getFullYear();
-        const m = String(curr.getMonth() + 1).padStart(2, "0");
-        const d = String(curr.getDate()).padStart(2, "0");
-        dates.push(`${y}-${m}-${d}`);
-        curr.setDate(curr.getDate() + 1);
-      }
-      return dates;
-    };
-
-    // Gather all unique dates strictly within the selected range (fromDate ~ toDate)
-    const allRevenueDates = generateDateRange(fromDate, toDate);
-
-    const dailyMap: Record<string, DailyRevenueTrendItem> = {};
-    allRevenueDates.forEach((dtStr) => {
-      dailyMap[dtStr] = {
-        dt: dtStr,
-        formattedDt: dtStr.slice(5).replace("-", "/"),
-        serviceRev: 0,
-        adRev: 0,
-        rewardAdRev: 0,
-        grossTotal: 0,
-        contentPay: 0,
-        adTicket: 0,
-        giftBox: 0,
-        mCost: 0,
-        eCost: 0,
-        cost: 0,
-        margin: 0,
-        marginRate: 0,
-      };
+  const revenueSummary = useMemo(() => {
+    return computeRevenueSummary({
+      serviceRevenueRaw,
+      adRevenueRaw,
+      missionTotalRaw,
+      earningRaw,
+      contentRevenueRaw,
+      contentPurchaseRaw,
+      settlementRaw,
+      selectedApp,
+      periodType,
+      fromDate,
+      toDate,
+      hasActiveSettlement,
     });
-
-    if (hasActiveSettlement) {
-      settlementRaw.forEach((item) => {
-        const dtStr = extractDtStr(item.date);
-        if (!dtStr || !dailyMap[dtStr]) return;
-
-        const sData = getSettlementDataForApp(item, selectedApp);
-        if (!sData) return;
-
-        const { paidCoin, chargeCoin, usedReward, contentRevenue, ad } = sData;
-        const { b, pop, forus, sense, cash, rc, toss } = ad;
-
-        const dayTotalAd = b + pop + forus + sense + cash + rc + toss;
-        const realContentRev = (contentRevenue && contentRevenue > 0) ? contentRevenue : paidCoin;
-
-        dailyMap[dtStr].serviceRev = realContentRev;
-        dailyMap[dtStr].contentPay = realContentRev;
-        dailyMap[dtStr].adRev = dayTotalAd;
-        dailyMap[dtStr].rewardAdRev = isPhApp ? (cash + rc) : (pop + forus + rc);
-        dailyMap[dtStr].eCost = usedReward;
-        dailyMap[dtStr].mCost = sData.missionRewardP || 0;
-      });
-    } else {
-      serviceRevenueRaw.forEach((row) => {
-        const dtStr = extractDtStr(row.dt);
-        if (!dtStr || !dailyMap[dtStr]) return;
-        const cPay = Number(row.contentPayRevenue || 0);
-        const aTick = Number(row.adTicketRevenue || 0);
-        const gBox = Number(row.giftBoxRevenue || 0);
-        dailyMap[dtStr].serviceRev += cPay;
-        dailyMap[dtStr].contentPay += cPay;
-        dailyMap[dtStr].adTicket += aTick;
-        dailyMap[dtStr].giftBox += gBox;
-      });
-
-      adRevenueRaw.forEach((row) => {
-        const dtStr = extractDtStr(row.dt);
-        if (!dtStr || !dailyMap[dtStr]) return;
-        const rev = Number(row.revenue || 0);
-        dailyMap[dtStr].adRev += rev;
-
-        const catLower = String(row.adCategory || "").toLowerCase();
-        const netLower = String(row.network || "").toLowerCase();
-        const isRewardAd = isPhApp
-          ? (catLower === "rc" || netLower === "adcash" || (catLower === "display" && netLower === "adcash"))
-          : (catLower === "rc" || (catLower === "display" && (netLower === "adpopcorn" || netLower === "adforus")));
-
-        if (isRewardAd) {
-          dailyMap[dtStr].rewardAdRev += rev;
-        }
-      });
-
-      missionTotalRaw.forEach((row) => {
-        const dtStr = extractDtStr(row.dt);
-        if (!dtStr || !dailyMap[dtStr]) return;
-        const mRev = parseRewardAmount(row);
-        dailyMap[dtStr].mCost += mRev;
-      });
-
-      earningRaw.forEach((row) => {
-        const dtStr = extractDtStr(row.dt);
-        if (!dtStr || !dailyMap[dtStr]) return;
-        const ePoints = parseExchangedPoints(row);
-        dailyMap[dtStr].eCost += ePoints;
-      });
-    }
-
-    Object.values(dailyMap).forEach((d) => {
-      d.adRev = Math.round(d.adRev);
-      d.rewardAdRev = Math.round(d.rewardAdRev);
-      d.serviceRev = Math.round(d.serviceRev);
-      d.grossTotal = Math.round(d.serviceRev + d.adRev);
-      d.cost = Math.round(d.eCost);
-      d.margin = Math.round(d.adRev - d.cost);
-      d.marginRate = d.adRev > 0 ? Number(((d.margin / d.adRev) * 100).toFixed(1)) : 0;
-    });
-
-    const rawDailyTrend = Object.values(dailyMap).sort((a, b) => a.dt.localeCompare(b.dt));
-
-    // Support dynamic PeriodType grouping (일별 / 주별 / 월별) for immediate button feedback
-    let dailyTrend = rawDailyTrend;
-    if (periodType !== "day" && rawDailyTrend.length > 0) {
-      const groups: Record<string, DailyRevenueTrendItem & { count: number }> = {};
-      rawDailyTrend.forEach((item) => {
-        const dateObj = new Date(item.dt + "T00:00:00");
-        let key = "";
-        if (periodType === "week") {
-          const day = dateObj.getDay();
-          const diffToMonday = dateObj.getDate() - day + (day === 0 ? -6 : 1);
-          const monday = new Date(dateObj.setDate(diffToMonday));
-          const y = monday.getFullYear();
-          const m = String(monday.getMonth() + 1).padStart(2, "0");
-          const d = String(monday.getDate()).padStart(2, "0");
-          key = `${y}-${m}-${d} 주`;
-        } else {
-          const y = dateObj.getFullYear();
-          const m = String(dateObj.getMonth() + 1).padStart(2, "0");
-          key = `${y}-${m}월`;
-        }
-
-        if (!groups[key]) {
-          groups[key] = {
-            dt: key,
-            formattedDt: key,
-            serviceRev: 0,
-            adRev: 0,
-            rewardAdRev: 0,
-            grossTotal: 0,
-            contentPay: 0,
-            adTicket: 0,
-            giftBox: 0,
-            mCost: 0,
-            eCost: 0,
-            cost: 0,
-            margin: 0,
-            marginRate: 0,
-            count: 0,
-          };
-        }
-
-        groups[key].serviceRev += item.serviceRev;
-        groups[key].adRev += item.adRev;
-        groups[key].rewardAdRev += item.rewardAdRev;
-        groups[key].grossTotal += item.grossTotal;
-        groups[key].contentPay += item.contentPay;
-        groups[key].adTicket += item.adTicket;
-        groups[key].giftBox += item.giftBox;
-        groups[key].mCost += item.mCost;
-        groups[key].eCost += item.eCost;
-        groups[key].cost += item.cost;
-        groups[key].margin += item.margin;
-        groups[key].count += 1;
-      });
-
-      dailyTrend = Object.values(groups).map((g) => {
-        g.marginRate = g.adRev > 0 ? Number(((g.margin / g.adRev) * 100).toFixed(1)) : 0;
-        return g;
-      }).sort((a, b) => a.dt.localeCompare(b.dt));
-    }
-
-    let chargeWonSum = 0;
-    let chargeCoinSum = 0;
-    let totalPayerUu = 0;
-    let totalArppuWonSum = 0;
-    let contentDaysCount = 0;
-
-    let contentDailyList: DailyContentRevenueItem[] = [];
-
-    if (hasActiveSettlement) {
-      const filteredSettlement = settlementRaw.filter((s) => {
-        const dtStr = extractDtStr(s.date);
-        return dtStr >= fromDate && dtStr <= toDate;
-      });
-      const sortedSettlement = [...filteredSettlement].sort((a, b) => a.date.localeCompare(b.date));
-      contentDailyList = sortedSettlement.map((item) => {
-        const dtStr = extractDtStr(item.date);
-        const sData = getSettlementDataForApp(item, selectedApp);
-        const paidWon = sData ? sData.paidCoin : 0;
-        const chgWon = sData ? sData.chargeCoin : 0;
-        const adTickWon = sData ? (sData.adFree || 0) : 0;
-        const realContentRev = sData ? ((sData.contentRevenue && sData.contentRevenue > 0) ? sData.contentRevenue : paidWon) : 0;
-
-        const chRow = contentRevenueRaw.find((r) => extractDtStr(r?.dt) === dtStr);
-        const payer = chRow ? Number(chRow.payerUu || 0) : 0;
-        const arppu = payer > 0 ? Math.round(realContentRev / payer) : 0;
-
-        chargeWonSum += chgWon;
-        chargeCoinSum += chgWon;
-        totalPayerUu += payer;
-        totalArppuWonSum += arppu;
-        if (dtStr) contentDaysCount += 1;
-
-        const totalContentRevenue = realContentRev;
-
-        return {
-          dt: dtStr,
-          formattedDt: dtStr ? dtStr.slice(5).replace("-", "/") : "",
-          totalContentRevenue,
-          revenueWon: realContentRev,
-          paidCoinWon: paidWon,
-          chargeWon: chgWon,
-          adTicketWon: adTickWon,
-          payerUu: payer,
-          arppuWon: arppu,
-        };
-      });
-    } else {
-      contentDailyList = contentRevenueRaw.map((row) => {
-        const dtStr = row.dt ? String(row.dt).split("T")[0] : "";
-        const revWon = Number(row.chargeWon || row.revenueWon || 0);
-        const paidWon = Number(row.revenueWon || 0);
-        const chgWon = Number(row.chargeWon || 0);
-        const adTickWon = Number(row.adTicketRevenue || 0);
-        const payer = Number(row.payerUu || 0);
-        const arppu = Number(row.arppuWon || 0);
-        const totalContentRevenue = paidWon + adTickWon;
-
-        chargeWonSum += chgWon;
-        chargeCoinSum += chgWon;
-        totalPayerUu += payer;
-        totalArppuWonSum += arppu;
-        if (dtStr) contentDaysCount += 1;
-
-        return {
-          dt: dtStr,
-          formattedDt: dtStr ? dtStr.slice(5).replace("-", "/") : "",
-          totalContentRevenue,
-          revenueWon: revWon,
-          paidCoinWon: paidWon,
-          chargeWon: chgWon,
-          adTicketWon: adTickWon,
-          payerUu: payer,
-          arppuWon: arppu,
-        };
-      });
-    }
-
-    const avgPayerUu = contentDaysCount > 0 ? Math.round(totalPayerUu / contentDaysCount) : 0;
-    const avgArppuWon = contentDaysCount > 0 ? Math.round(totalArppuWonSum / contentDaysCount) : 0;
-
-    const purchaseTypeMap: Record<number, { cnt: number; uu: number }> = {};
-    contentPurchaseRaw.forEach((row) => {
-      const type = Number(row.purchaseType || 0);
-      const cnt = Number(row.cnt || 0);
-      const uu = Number(row.uu || 0);
-
-      if (!purchaseTypeMap[type]) purchaseTypeMap[type] = { cnt: 0, uu: 0 };
-      purchaseTypeMap[type].cnt += cnt;
-      purchaseTypeMap[type].uu += uu;
-    });
-
-    // Calculate Ad Category & Network Daily Trends
-    let adCategoryDailyTrend = { dates: [] as string[], categories: {} as Record<string, number[]> };
-    let networkDailyTrend = { dates: [] as string[], networks: {} as Record<string, number[]> };
-
-    if (hasActiveSettlement) {
-      const filteredSettlement = settlementRaw
-        .filter((s) => {
-          const dtStr = extractDtStr(s.date);
-          return dtStr >= fromDate && dtStr <= toDate;
-        })
-        .sort((a, b) => a.date.localeCompare(b.date));
-
-      const dates = filteredSettlement.map((s) => s.date.slice(5).replace("-", "/"));
-
-      const metricsList = filteredSettlement.map((s) => {
-        const sData = getSettlementDataForApp(s, selectedApp);
-        if (sData) return { ...sData.ad, adFree: sData.adFree || 0 };
-        return { b: 0, pop: 0, forus: 0, sense: 0, cash: 0, rc: 0, toss: 0, adFree: 0 };
-      });
-
-      const netDailyCandidate: Record<string, number[]> = {
-        "Buzzvil": metricsList.map((m) => m.b),
-        "apWebCPC": metricsList.map((m) => m.pop),
-        "Adforus": metricsList.map((m) => m.forus),
-        "AdCash": metricsList.map((m) => m.cash),
-        "RC (비토스)": metricsList.map((m) => m.rc),
-        "Toss Mini": metricsList.map((m) => m.toss),
-      };
-      if (metricsList.some((m) => m.sense > 0)) {
-        netDailyCandidate["AdSense"] = metricsList.map((m) => m.sense);
-      }
-
-      const netDaily: Record<string, number[]> = {};
-      Object.entries(netDailyCandidate).forEach(([netName, arr]) => {
-        if (arr.some((v) => v > 0)) {
-          netDaily[netName] = arr;
-        }
-      });
-
-      const catDailyCandidate: Record<string, number[]> = {
-        reward: metricsList.map((m) => m.b),
-        display: metricsList.map((m) => m.pop + m.forus + m.sense + m.cash + m.toss),
-        rc: metricsList.map((m) => m.rc),
-        adTicket: metricsList.map((m) => m.adFree),
-      };
-
-      const catDaily: Record<string, number[]> = {};
-      Object.entries(catDailyCandidate).forEach(([catName, arr]) => {
-        if (arr.some((v) => v > 0)) {
-          catDaily[catName] = arr;
-        }
-      });
-
-      adCategoryDailyTrend = { dates, categories: catDaily };
-      networkDailyTrend = { dates, networks: netDaily };
-    } else {
-      const allAdDates = generateDateRange(fromDate, toDate);
-
-      const adCategoryDailyMap: Record<string, number[]> = { reward: [], display: [], rc: [], adTicket: [] };
-      const networkDailyMap: Record<string, number[]> = {};
-
-      allAdDates.forEach((dt) => {
-        const dtRows = adRevenueRaw.filter((r) => r.dt && String(r.dt).split("T")[0] === dt);
-
-        ["reward", "display", "rc", "adTicket"].forEach((cat) => {
-          const catRev = dtRows
-            .filter((r) => String(r.adCategory) === cat)
-            .reduce((sum, r) => sum + Number(r.revenue || 0), 0);
-          adCategoryDailyMap[cat].push(Math.round(catRev));
-        });
-
-        dtRows.forEach((r) => {
-          const net = String(r.network || "기타");
-          if (!networkDailyMap[net]) networkDailyMap[net] = new Array(allAdDates.length).fill(0);
-        });
-
-        const dateIdx = allAdDates.indexOf(dt);
-        Object.keys(networkDailyMap).forEach((net) => {
-          const netRev = dtRows
-            .filter((r) => String(r.network) === net)
-            .reduce((sum, r) => sum + Number(r.revenue || 0), 0);
-          networkDailyMap[net][dateIdx] = Math.round(netRev);
-        });
-      });
-
-      adCategoryDailyTrend = {
-        dates: allAdDates.map((d) => d.slice(5).replace("-", "/")),
-        categories: adCategoryDailyMap,
-      };
-
-      networkDailyTrend = {
-        dates: allAdDates.map((d) => d.slice(5).replace("-", "/")),
-        networks: networkDailyMap,
-      };
-    }
-
-    // Calculate Purchase Type Daily Trend
-    const allPurchaseDates = generateDateRange(fromDate, toDate);
-
-    const purchaseTypeDailyMap: Record<number, number[]> = { 10: [], 20: [], 11: [], 12: [], 13: [] };
-
-    allPurchaseDates.forEach((dt) => {
-      const dtRows = contentPurchaseRaw.filter((r) => r.dt && String(r.dt).split("T")[0] === dt);
-      [10, 20, 11, 12, 13].forEach((t) => {
-        const cnt = dtRows
-          .filter((r) => Number(r.purchaseType) === t)
-          .reduce((sum, r) => sum + Number(r.cnt || 0), 0);
-        purchaseTypeDailyMap[t].push(cnt);
-      });
-    });
-
-    const purchaseTypeDailyTrend = {
-      dates: allPurchaseDates.map((d) => d.slice(5).replace("-", "/")),
-      types: purchaseTypeDailyMap,
-    };
-
-    return {
-      contentPaySum,
-      paidCoinSum,
-      adTicketSum,
-      giftBoxSum,
-      serviceTotalSum,
-      totalAdRevenue,
-      rewardAdRevenue,
-      grossRevenue,
-      totalMissionReward,
-      totalExchangedPoints,
-      totalRewardCost,
-      netProfit,
-      marginRate,
-      adCategoryMap,
-      networkMap,
-      dailyTrend,
-      chargeWonSum,
-      chargeCoinSum,
-      avgPayerUu,
-      avgArppuWon,
-      contentDailyList,
-      purchaseTypeMap,
-      adCategoryDailyTrend,
-      networkDailyTrend,
-      purchaseTypeDailyTrend,
-      grossGrowth,
-      contentGrowth,
-      adGrowth,
-      chargeGrowth,
-      paidCoinGrowth,
-      adTicketGrowth,
-      prevPeriodRange: { from: prevFromStr, to: prevToStr },
-    };
-  }, [serviceRevenueRaw, adRevenueRaw, missionTotalRaw, earningRaw, contentRevenueRaw, contentPurchaseRaw, settlementRaw, selectedApp, periodType, fromDate, toDate]);
+  }, [serviceRevenueRaw, adRevenueRaw, missionTotalRaw, earningRaw, contentRevenueRaw, contentPurchaseRaw, settlementRaw, selectedApp, periodType, fromDate, toDate, hasActiveSettlement]);
 
   // Overall Revenue Line Chart Configuration
   const revenueChartData: ChartData<"line"> = {
@@ -1879,6 +681,7 @@ export default function Dashboard() {
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-[#3182f6]" : ""}`} />
           </button>
         </div>
+
         {/* Title Row */}
         <div className="flex items-center justify-between">
           <h1 className="text-[26px] font-bold text-[#191f28] tracking-[-0.04em]">
@@ -1886,13 +689,13 @@ export default function Dashboard() {
               ? "유저 현황"
               : activeTab === "mission"
                 ? "미션 현황"
-                  : activeTab === "funnel"
-                    ? funnelCategoryTab === "new_user"
-                      ? "신규 유저 퍼널"
-                      : "퍼널 분석 상세"
-                    : revenueCategoryTab === "margin"
-                      ? "손익 마진율"
-                      : "매출 현황"}
+                : activeTab === "funnel"
+                  ? funnelCategoryTab === "new_user"
+                    ? "신규 유저 퍼널"
+                    : "퍼널 분석 상세"
+                  : revenueCategoryTab === "margin"
+                    ? "손익 마진율"
+                    : "매출 현황"}
           </h1>
           <button
             onClick={fetchDashboardData}

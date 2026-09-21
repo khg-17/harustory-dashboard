@@ -632,7 +632,7 @@ export async function GET(request: NextRequest) {
             FROM Performance.MissionDaily
             WHERE (appID = '${app}' OR '${app}' = 'tc')
               AND dt >= '${from}' AND dt <= '${to}'
-              AND rewardType = 'POINT'
+              AND rewardType IN ('POINT', 'DIRECT')
             GROUP BY dt
 
             UNION ALL
@@ -678,7 +678,7 @@ export async function GET(request: NextRequest) {
             WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
               AND ${appCond}
               AND mp.status = 'COMPLETED'
-              AND mp.rewardType = 'POINT'
+              AND mp.rewardType IN ('POINT', 'DIRECT')
               AND mp.missionSN > 0
               ${segCondMp}
             GROUP BY dt, itemSN, rewardP, accountSN
@@ -727,7 +727,7 @@ export async function GET(request: NextRequest) {
             FROM Performance.MissionDaily
             WHERE (appID = '${app}' OR '${app}' = 'tc')
               AND dt >= '${from}' AND dt <= '${to}'
-              AND rewardType = 'POINT'
+              AND rewardType IN ('POINT', 'DIRECT')
             GROUP BY missionType
 
             UNION ALL
@@ -795,7 +795,7 @@ export async function GET(request: NextRequest) {
             WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
               AND ${appCond}
               AND mp.status = 'COMPLETED'
-              AND mp.rewardType = 'POINT'
+              AND mp.rewardType IN ('POINT', 'DIRECT')
               AND mp.missionSN > 0
               ${segCondMp}
             GROUP BY dt, itemSN, label, rewardP, accountSN
@@ -866,7 +866,7 @@ export async function GET(request: NextRequest) {
             FROM Performance.MissionDaily
             WHERE (appID = '${app}' OR '${app}' = 'tc')
               AND dt >= '${from}' AND dt <= '${to}'
-              AND rewardType = 'POINT'
+              AND rewardType IN ('POINT', 'DIRECT')
             GROUP BY dt, missionType
 
             UNION ALL
@@ -927,7 +927,7 @@ export async function GET(request: NextRequest) {
             WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
               AND ${appCond}
               AND mp.status = 'COMPLETED'
-              AND mp.rewardType = 'POINT'
+              AND mp.rewardType IN ('POINT', 'DIRECT')
               AND mp.missionSN > 0
               ${segCondMp}
             GROUP BY dt, itemSN, label, rewardP, accountSN
@@ -990,7 +990,7 @@ export async function GET(request: NextRequest) {
             FROM Performance.MissionDaily
             WHERE (appID = '${app}' OR '${app}' = 'tc')
               AND dt >= '${from}' AND dt <= '${to}'
-              AND rewardType = 'POINT'
+              AND rewardType IN ('POINT', 'DIRECT')
             GROUP BY missionType
 
             UNION ALL
@@ -1038,7 +1038,7 @@ export async function GET(request: NextRequest) {
             WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
               AND ${appCond}
               AND mp.status = 'COMPLETED'
-              AND mp.rewardType = 'POINT'
+              AND mp.rewardType IN ('POINT', 'DIRECT')
               AND mp.missionSN > 0
               ${segCondMp}
             GROUP BY dt, itemSN, missionType, rewardP, accountSN

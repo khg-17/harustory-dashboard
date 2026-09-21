@@ -45,15 +45,10 @@ const TOSS_BLUE = "#3182F6";
 
 const DEFAULT_STEPS_BY_APP: Record<string, { label: string }[]> = {
   tc: [
-    { label: "reward_otter_click_book_1" },
-    { label: "reward_otter_click_book_2" },
-    { label: "reward_otter_click_book_3" },
-    { label: "reward_otter_click_book_4" },
-    { label: "reward_otter_click_book_5" },
-    { label: "reward_otter_click_book_6" },
-    { label: "reward_otter_click_book_7" },
-    { label: "reward_otter_click_book_8" },
-    { label: "reward_book_mission_complete_click" },
+    { label: "common_bridge_view" },
+    { label: "reward_attendance_sheet_view" },
+    { label: "reward_attendance_day_any" },
+    { label: "reward_mission_complete_any" },
   ],
   bitbunny: [
     { label: "app_open" },
@@ -73,6 +68,10 @@ const DEFAULT_STEPS_BY_APP: Record<string, { label: string }[]> = {
 };
 
 const VIRTUAL_EVENTS = [
+  { label: "common_bridge_view", displayName: "브릿지 뷰 노출" },
+  { label: "reward_attendance_sheet_view", displayName: "출석 시트 노출" },
+  { label: "reward_attendance_day_any", displayName: "출석 완료" },
+  { label: "reward_mission_complete_any", displayName: "미션 1회 이상 완료" },
   { label: "v_all_mission_complete", displayName: "미션 완료 전체" },
   { label: "v_all_ad_reward", displayName: "광고 시청 리워드 전체" },
   { label: "v_all_exchange_confirm", displayName: "재화/상품 교환 확정 전체" },
