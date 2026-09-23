@@ -484,7 +484,7 @@ export async function GET(request: NextRequest) {
 
       if (type === 'page_pv_uv') {
         sql = `
-          SELECT appID, label,
+          SELECT label,
                  count() AS PV,
                  uniqExact(accountSN) AS UV
           FROM Log.UserActionLog
@@ -494,14 +494,13 @@ export async function GET(request: NextRequest) {
             AND env = 'prod'
             AND toDate(toTimeZone(ts, 'Asia/Seoul')) >= '${from}'
             AND toDate(toTimeZone(ts, 'Asia/Seoul')) <= '${to}'
-          GROUP BY appID, label
-          ORDER BY appID, label
+          GROUP BY label
+          ORDER BY label
           SETTINGS max_partitions_to_read = 300, max_threads = 4
         `;
       } else {
         sql = `
-          SELECT appID,
-                 toDate(toTimeZone(ts, 'Asia/Seoul')) AS dt,
+          SELECT toDate(toTimeZone(ts, 'Asia/Seoul')) AS dt,
                  uniqExact(accountSN) AS DAU
           FROM Log.UserActionLog
           WHERE event = 'impression'
@@ -510,8 +509,8 @@ export async function GET(request: NextRequest) {
             AND env = 'prod'
             AND toDate(toTimeZone(ts, 'Asia/Seoul')) >= '${from}'
             AND toDate(toTimeZone(ts, 'Asia/Seoul')) <= '${to}'
-          GROUP BY appID, dt
-          ORDER BY appID, dt
+          GROUP BY dt
+          ORDER BY dt ASC
           SETTINGS max_partitions_to_read = 300, max_threads = 4
         `;
       }
