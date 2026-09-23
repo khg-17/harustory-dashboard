@@ -346,7 +346,6 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-[#191f28]">페이지별 PV & UV 현황</h3>
-            <span className="text-xs text-[#8b95a1]">리워드 &gt; 오늘뭐볼까 &gt; 무료작품 &gt; 내서재 &gt; 웹툰/웹소설</span>
           </div>
 
           {loading ? (
