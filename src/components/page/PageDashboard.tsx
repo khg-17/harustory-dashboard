@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { Bar, Line } from "react-chartjs-2";
-import { BarChart2, Table as TableIcon } from "lucide-react";
+import { BarChart2, Table as TableIcon, Sliders } from "lucide-react";
 import { PagePvUvItem, PageDauItem, ViewMode } from "@/types/dashboard";
 
 interface PageDashboardProps {
@@ -30,6 +30,35 @@ const TAB_ORDER = [
   "all_tab_view",
 ];
 
+// Custom Chart.js Plugin to draw exact values right above each bar
+const barValuePlugin = {
+  id: "barValuePlugin",
+  afterDatasetsDraw(chart: any) {
+    const { ctx } = chart;
+    chart.data.datasets.forEach((dataset: any, i: number) => {
+      const meta = chart.getDatasetMeta(i);
+      if (!meta || meta.hidden) return;
+
+      meta.data.forEach((bar: any, index: number) => {
+        const val = dataset.data[index];
+        if (val === undefined || val === null || isNaN(val)) return;
+
+        ctx.save();
+        ctx.font = "bold 11px Pretendard, sans-serif";
+        ctx.fillStyle = i === 0 ? "#1d4ed8" : "#047857";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+
+        let formattedText = val >= 10000 ? `${(val / 10000).toFixed(1)}만` : val.toLocaleString();
+        // Calculate Y position cleanly above bar
+        const yPos = Math.min(bar.y - 4, chart.chartArea.bottom - 10);
+        ctx.fillText(formattedText, bar.x, yPos);
+        ctx.restore();
+      });
+    });
+  },
+};
+
 export const PageDashboard: React.FC<PageDashboardProps> = ({
   loading,
   pagePvUvData,
@@ -39,6 +68,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
   toDate,
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>("chart");
+  const [scaleType, setScaleType] = useState<"linear" | "logarithmic">("linear");
 
   // Total PV
   const totalPV = useMemo(() => {
@@ -102,7 +132,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
       .map(([dt, DAU]) => ({ dt, DAU }));
   }, [pageDauData]);
 
-  // Chart Data: PV & UV by Page Label
+  // Chart Data: PV & UV by Page Label (With minBarLength = 12 for guaranteed bar visibility)
   const pvUvChartData = useMemo(() => {
     const labels = orderedPvUvData.map((item) => TAB_LABEL_MAP[item.label] || item.label);
     const pvValues = orderedPvUvData.map((item) => item.PV);
@@ -118,6 +148,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
           borderColor: "#3182f6",
           borderWidth: 1,
           borderRadius: 6,
+          minBarLength: 12,
         },
         {
           label: "순 방문자 (UV)",
@@ -126,6 +157,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
           borderColor: "#00c980",
           borderWidth: 1,
           borderRadius: 6,
+          minBarLength: 12,
         },
       ],
     };
@@ -157,6 +189,10 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
   const barOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: "index" as const,
+      intersect: false, // Hovering ANYWHERE in the vertical column triggers tooltip!
+    },
     plugins: {
       legend: {
         position: "top" as const,
@@ -179,12 +215,15 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
         ticks: { font: { family: "Pretendard", size: 12, weight: "bold" as const } },
       },
       y: {
+        type: scaleType as any,
         beginAtZero: true,
         grid: { color: "#f2f4f6" },
         ticks: {
           font: { family: "Pretendard", size: 11 },
           callback: function (val: any) {
-            return Number(val).toLocaleString();
+            const num = Number(val);
+            if (num >= 10000) return `${(num / 10000).toFixed(0)}만`;
+            return num.toLocaleString();
           },
         },
       },
@@ -194,6 +233,10 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
   const lineOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: "index" as const,
+      intersect: false,
+    },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -218,7 +261,9 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
         ticks: {
           font: { family: "Pretendard", size: 11 },
           callback: function (val: any) {
-            return Number(val).toLocaleString();
+            const num = Number(val);
+            if (num >= 10000) return `${(num / 10000).toFixed(0)}만`;
+            return num.toLocaleString();
           },
         },
       },
@@ -242,30 +287,60 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
             </p>
           </div>
 
-          {/* View Mode Toggle */}
-          <div className="flex items-center gap-1 bg-[#f2f4f6] p-1 rounded-xl shrink-0">
-            <button
-              onClick={() => setViewMode("chart")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                viewMode === "chart"
-                  ? "bg-white text-[#191f28] shadow-2xs"
-                  : "text-[#8b95a1] hover:text-[#4e5968]"
-              }`}
-            >
-              <BarChart2 className="w-3.5 h-3.5" />
-              <span>차트 보기</span>
-            </button>
-            <button
-              onClick={() => setViewMode("table")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                viewMode === "table"
-                  ? "bg-white text-[#191f28] shadow-2xs"
-                  : "text-[#8b95a1] hover:text-[#4e5968]"
-              }`}
-            >
-              <TableIcon className="w-3.5 h-3.5" />
-              <span>표 보기</span>
-            </button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Scale Type Toggle (Linear vs Logarithmic) */}
+            {viewMode === "chart" && (
+              <div className="flex items-center gap-1 bg-[#f2f4f6] p-1 rounded-xl">
+                <button
+                  onClick={() => setScaleType("linear")}
+                  className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    scaleType === "linear"
+                      ? "bg-white text-[#191f28] shadow-2xs font-bold"
+                      : "text-[#8b95a1] hover:text-[#4e5968]"
+                  }`}
+                  title="일반 선형 스케일"
+                >
+                  선형 축
+                </button>
+                <button
+                  onClick={() => setScaleType("logarithmic")}
+                  className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    scaleType === "logarithmic"
+                      ? "bg-[#3182f6] text-white shadow-2xs font-bold"
+                      : "text-[#8b95a1] hover:text-[#4e5968]"
+                  }`}
+                  title="작은 수치와 큰 수치를 한눈에 보기 쉬운 로그 스케일"
+                >
+                  로그 축
+                </button>
+              </div>
+            )}
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 bg-[#f2f4f6] p-1 rounded-xl">
+              <button
+                onClick={() => setViewMode("chart")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  viewMode === "chart"
+                    ? "bg-white text-[#191f28] shadow-2xs"
+                    : "text-[#8b95a1] hover:text-[#4e5968]"
+                }`}
+              >
+                <BarChart2 className="w-3.5 h-3.5" />
+                <span>차트 보기</span>
+              </button>
+              <button
+                onClick={() => setViewMode("table")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  viewMode === "table"
+                    ? "bg-white text-[#191f28] shadow-2xs"
+                    : "text-[#8b95a1] hover:text-[#4e5968]"
+                }`}
+              >
+                <TableIcon className="w-3.5 h-3.5" />
+                <span>표 보기</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -314,8 +389,8 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
               데이터를 불러오는 중입니다...
             </div>
           ) : viewMode === "chart" ? (
-            <div className="h-72 w-full pt-2">
-              <Bar data={pvUvChartData} options={barOptions} />
+            <div className="h-80 w-full pt-4">
+              <Bar data={pvUvChartData} options={barOptions} plugins={[barValuePlugin]} />
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-[#e5e8eb]">
