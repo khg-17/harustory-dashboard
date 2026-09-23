@@ -2,15 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { Bar, Line } from "react-chartjs-2";
-import {
-  Eye,
-  Users,
-  TrendingUp,
-  Calendar,
-  BarChart2,
-  Table as TableIcon,
-  Layers,
-} from "lucide-react";
+import { BarChart2, Table as TableIcon } from "lucide-react";
 import { PagePvUvItem, PageDauItem, ViewMode } from "@/types/dashboard";
 
 interface PageDashboardProps {
@@ -23,12 +15,20 @@ interface PageDashboardProps {
 }
 
 const TAB_LABEL_MAP: Record<string, string> = {
-  all_tab_view: "전체 탭",
-  today_tab_view: "투데이 탭",
-  library_tab_view: "보관함 탭",
-  free_tab_view: "무료 탭",
-  reward_tab_view: "리워드 탭",
+  reward_tab_view: "리워드",
+  today_tab_view: "오늘뭐볼까",
+  free_tab_view: "무료작품",
+  library_tab_view: "내서재",
+  all_tab_view: "웹툰/웹소설",
 };
+
+const TAB_ORDER = [
+  "reward_tab_view",
+  "today_tab_view",
+  "free_tab_view",
+  "library_tab_view",
+  "all_tab_view",
+];
 
 export const PageDashboard: React.FC<PageDashboardProps> = ({
   loading,
@@ -60,7 +60,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
     return { avgDAU: avg, peakDAU: peak };
   }, [pageDauData]);
 
-  // Clean Ordered Labels Data (Guarantees exactly 5 unique tab bars/rows)
+  // Clean Ordered Labels Data (Ordered strictly: 리워드 > 오늘뭐볼까 > 무료작품 > 내서재 > 웹툰/웹소설)
   const orderedPvUvData = useMemo(() => {
     const map: Record<string, { label: string; PV: number; UV: number }> = {};
     pagePvUvData.forEach((item) => {
@@ -72,17 +72,16 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
       map[l].UV += Number(item.UV) || 0;
     });
 
-    const orderedKeys = ["all_tab_view", "today_tab_view", "library_tab_view", "free_tab_view", "reward_tab_view"];
     const list: { label: string; PV: number; UV: number }[] = [];
 
-    orderedKeys.forEach((key) => {
+    TAB_ORDER.forEach((key) => {
       if (map[key]) {
         list.push(map[key]);
       }
     });
 
     Object.keys(map).forEach((key) => {
-      if (!orderedKeys.includes(key)) {
+      if (!TAB_ORDER.includes(key)) {
         list.push(map[key]);
       }
     });
@@ -96,7 +95,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
     return orderedPvUvData.filter((item) => item.label === selectedLabel);
   }, [orderedPvUvData, selectedLabel]);
 
-  // Clean DAU Data Sorted Chronologically (Guarantees each date appears EXACTLY ONCE)
+  // Clean DAU Data Sorted Chronologically
   const sortedDauData = useMemo(() => {
     const map: Record<string, number> = {};
     pageDauData.forEach((item) => {
@@ -139,7 +138,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
     };
   }, [filteredPvUvData]);
 
-  // Chart Data: DAU Daily Trend (Distinct Dates)
+  // Chart Data: DAU Daily Trend
   const dauChartData = useMemo(() => {
     const labels = sortedDauData.map((item) => item.dt);
     const values = sortedDauData.map((item) => item.DAU);
@@ -184,7 +183,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
     scales: {
       x: {
         grid: { display: false },
-        ticks: { font: { family: "Pretendard", size: 11 } },
+        ticks: { font: { family: "Pretendard", size: 12, weight: "bold" as const } },
       },
       y: {
         beginAtZero: true,
@@ -235,22 +234,22 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
 
   return (
     <div className="bg-white rounded-2xl border border-[#e5e8eb] shadow-2xs overflow-hidden">
-      {/* 1. Integrated Header Bar */}
+      {/* 1. Header & Minimal KPI Banner */}
       <div className="p-6 border-b border-[#e5e8eb]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h2 className="text-xl font-bold text-[#191f28]">페이지 현황</h2>
               <span className="px-2.5 py-0.5 text-[11px] font-bold bg-[#e8f3ff] text-[#3182f6] rounded-md">
-                {selectedApp === "tc" ? "전체 통합 서비스" : selectedApp}
+                {selectedApp === "tc" ? "전체 서비스" : selectedApp}
               </span>
             </div>
             <p className="text-xs text-[#8b95a1]">
-              앱 내 주요 탭별 페이지 뷰(PV), 순 방문자 수(UV) 및 통합 일간 활성 유저(DAU) 현황을 확인합니다.
+              주요 탭별 페이지 뷰(PV), 순 방문자 수(UV) 및 일간 활성 유저(DAU) 현황입니다.
             </p>
           </div>
 
-          {/* View Mode Toggle Button */}
+          {/* View Mode Toggle */}
           <div className="flex items-center gap-1 bg-[#f2f4f6] p-1 rounded-xl shrink-0">
             <button
               onClick={() => setViewMode("chart")}
@@ -277,93 +276,77 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
           </div>
         </div>
 
-        {/* 2. Inline Sleek Metric Banner (Unified, non-fragmented layout) */}
+        {/* Minimal Clean Metric Banner (No Icon Box Clutter) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-[#f2f4f6]">
-          <div className="flex items-center gap-3.5 md:border-r border-[#f2f4f6] pr-4">
-            <div className="w-10 h-10 rounded-xl bg-[#e8f3ff] text-[#3182f6] flex items-center justify-center shrink-0">
-              <Eye className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-[11px] font-semibold text-[#8b95a1]">총 페이지 뷰 (PV)</div>
-              <div className="text-xl font-bold text-[#191f28] leading-tight">
-                {loading ? "-" : totalPV.toLocaleString()} <span className="text-xs font-normal text-[#8b95a1]">회</span>
-              </div>
+          <div className="md:border-r border-[#f2f4f6] pr-4">
+            <div className="text-[11px] font-semibold text-[#8b95a1]">총 페이지 뷰 (PV)</div>
+            <div className="text-xl font-bold text-[#191f28] mt-1">
+              {loading ? "-" : totalPV.toLocaleString()} <span className="text-xs font-normal text-[#8b95a1]">회</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 md:border-r border-[#f2f4f6] pr-4">
-            <div className="w-10 h-10 rounded-xl bg-[#e6f9f0] text-[#00c980] flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-[11px] font-semibold text-[#8b95a1]">총 순 방문자 (UV)</div>
-              <div className="text-xl font-bold text-[#191f28] leading-tight">
-                {loading ? "-" : totalUV.toLocaleString()} <span className="text-xs font-normal text-[#8b95a1]">명</span>
-              </div>
+          <div className="md:border-r border-[#f2f4f6] pr-4">
+            <div className="text-[11px] font-semibold text-[#8b95a1]">총 순 방문자 (UV)</div>
+            <div className="text-xl font-bold text-[#191f28] mt-1">
+              {loading ? "-" : totalUV.toLocaleString()} <span className="text-xs font-normal text-[#8b95a1]">명</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 md:border-r border-[#f2f4f6] pr-4">
-            <div className="w-10 h-10 rounded-xl bg-[#fff8e6] text-[#ff9500] flex items-center justify-center shrink-0">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-[11px] font-semibold text-[#8b95a1]">평균 DAU</div>
-              <div className="text-xl font-bold text-[#191f28] leading-tight">
-                {loading ? "-" : avgDAU.toLocaleString()} <span className="text-xs font-normal text-[#8b95a1]">명/일</span>
-              </div>
+          <div className="md:border-r border-[#f2f4f6] pr-4">
+            <div className="text-[11px] font-semibold text-[#8b95a1]">평균 DAU</div>
+            <div className="text-xl font-bold text-[#191f28] mt-1">
+              {loading ? "-" : avgDAU.toLocaleString()} <span className="text-xs font-normal text-[#8b95a1]">명/일</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 pl-2">
-            <div className="w-10 h-10 rounded-xl bg-[#f4e8ff] text-[#8e54e9] flex items-center justify-center shrink-0">
-              <Calendar className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-[11px] font-semibold text-[#8b95a1]">최고 DAU</div>
-              <div className="text-xl font-bold text-[#191f28] leading-tight">
-                {loading ? "-" : peakDAU.toLocaleString()} <span className="text-xs font-normal text-[#8b95a1]">명</span>
-              </div>
+          <div className="pl-2">
+            <div className="text-[11px] font-semibold text-[#8b95a1]">최고 DAU</div>
+            <div className="text-xl font-bold text-[#191f28] mt-1">
+              {loading ? "-" : peakDAU.toLocaleString()} <span className="text-xs font-normal text-[#8b95a1]">명</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3. Integrated Body Section */}
+      {/* 2. Main Content Body */}
       <div className="p-6 space-y-8">
-        {/* Filter Pills */}
+        {/* Filter Pills (Clean Tab Names Only - No Technical Label Strings) */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-[#f2f4f6]">
           <span className="text-xs font-semibold text-[#4e5968] shrink-0">탭 선택:</span>
           <button
             onClick={() => setSelectedLabel("all")}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer whitespace-nowrap ${
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer whitespace-nowrap ${
               selectedLabel === "all"
-                ? "bg-[#191f28] text-white"
+                ? "bg-[#191f28] text-white font-bold"
                 : "bg-[#f2f4f6] text-[#4e5968] hover:bg-[#e5e8eb]"
             }`}
           >
-            전체 (5개 탭)
+            전체
           </button>
-          {Object.entries(TAB_LABEL_MAP).map(([key, labelName]) => (
-            <button
-              key={key}
-              onClick={() => setSelectedLabel(key)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer whitespace-nowrap ${
-                selectedLabel === key
-                  ? "bg-[#3182f6] text-white"
-                  : "bg-[#f2f4f6] text-[#4e5968] hover:bg-[#e5e8eb]"
-              }`}
-            >
-              {labelName} ({key})
-            </button>
-          ))}
+          {TAB_ORDER.map((key) => {
+            const name = TAB_LABEL_MAP[key];
+            if (!name) return null;
+            return (
+              <button
+                key={key}
+                onClick={() => setSelectedLabel(key)}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer whitespace-nowrap ${
+                  selectedLabel === key
+                    ? "bg-[#3182f6] text-white font-bold"
+                    : "bg-[#f2f4f6] text-[#4e5968] hover:bg-[#e5e8eb]"
+                }`}
+              >
+                {name}
+              </button>
+            );
+          })}
         </div>
 
         {/* Section A: PV & UV */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-[#191f28]">페이지별 PV & UV 현황</h3>
-            <span className="text-xs text-[#8b95a1]">5개 탭 통합 집계</span>
+            <span className="text-xs text-[#8b95a1]">리워드 &gt; 오늘뭐볼까 &gt; 무료작품 &gt; 내서재 &gt; 웹툰/웹소설</span>
           </div>
 
           {loading ? (
@@ -379,10 +362,10 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
               <table className="w-full text-left text-xs text-[#333d4b]">
                 <thead className="bg-[#f9fafb] text-[#6b7684] font-semibold border-b border-[#e5e8eb]">
                   <tr>
-                    <th className="py-3 px-4">페이지 / 탭 라벨 (`label`)</th>
+                    <th className="py-3 px-4">탭 명칭</th>
                     <th className="py-3 px-4 text-right">페이지 뷰 (PV)</th>
                     <th className="py-3 px-4 text-right">순 방문자 (UV)</th>
-                    <th className="py-3 px-4 text-right">1인당 평균 PV (PV/UV)</th>
+                    <th className="py-3 px-4 text-right">1인당 평균 PV</th>
                     <th className="py-3 px-4 text-right">PV 점유율</th>
                   </tr>
                 </thead>
@@ -399,11 +382,12 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
                       const uv = item.UV;
                       const ratio = uv > 0 ? (pv / uv).toFixed(2) : "0";
                       const share = totalPV > 0 ? ((pv / totalPV) * 100).toFixed(1) : "0";
+                      const name = TAB_LABEL_MAP[item.label] || item.label;
 
                       return (
                         <tr key={idx} className="hover:bg-[#f9fafb] transition-colors">
-                          <td className="py-3 px-4 font-semibold text-[#3182f6]">
-                            {TAB_LABEL_MAP[item.label] || item.label} <span className="text-[11px] font-normal text-[#8b95a1]">({item.label})</span>
+                          <td className="py-3 px-4 font-bold text-[#3182f6]">
+                            {name}
                           </td>
                           <td className="py-3 px-4 text-right font-bold text-[#191f28]">
                             {pv.toLocaleString()} 회
@@ -430,8 +414,8 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
         {/* Section B: Daily DAU Trend */}
         <div className="space-y-3 pt-6 border-t border-[#f2f4f6]">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-[#191f28]">일자별 DAU 추이 (Daily Active Users)</h3>
-            <span className="text-xs text-[#8b95a1]">중복 없는 일자별 총 DAU</span>
+            <h3 className="text-base font-bold text-[#191f28]">일자별 DAU 추이</h3>
+            <span className="text-xs text-[#8b95a1]">일자별 통합 DAU</span>
           </div>
 
           {loading ? (
@@ -447,7 +431,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
               <table className="w-full text-left text-xs text-[#333d4b]">
                 <thead className="bg-[#f9fafb] text-[#6b7684] font-semibold border-b border-[#e5e8eb]">
                   <tr>
-                    <th className="py-3 px-4">날짜 (`dt`)</th>
+                    <th className="py-3 px-4">날짜</th>
                     <th className="py-3 px-4 text-right">일간 활성 유저 (DAU)</th>
                   </tr>
                 </thead>
