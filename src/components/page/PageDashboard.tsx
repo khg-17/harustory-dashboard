@@ -41,6 +41,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
   toDate,
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>("chart");
+  const [tableSubMode, setTableSubMode] = useState<"summary" | "detail">("summary");
   const [selectedLabel, setSelectedLabel] = useState<string>("all");
 
   // Calculate high-level summary KPIs
@@ -63,17 +64,51 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
     return Math.max(...pageDauData.map((d) => Number(d.DAU) || 0));
   }, [pageDauData]);
 
-  // Filtered PV/UV data by selected label filter
+  // Aggregated PV/UV data by unique label (prevents tab names from repeating on chart x-axis)
+  const labelAggregatedPvUvData = useMemo(() => {
+    const map: Record<string, { label: string; PV: number; UV: number }> = {};
+    pagePvUvData.forEach((item) => {
+      const l = item.label;
+      if (!map[l]) {
+        map[l] = { label: l, PV: 0, UV: 0 };
+      }
+      map[l].PV += Number(item.PV) || 0;
+      map[l].UV += Number(item.UV) || 0;
+    });
+
+    const orderedKeys = ["all_tab_view", "today_tab_view", "library_tab_view", "free_tab_view", "reward_tab_view"];
+    const list: { label: string; PV: number; UV: number }[] = [];
+
+    orderedKeys.forEach((key) => {
+      if (map[key]) {
+        list.push(map[key]);
+      }
+    });
+
+    Object.keys(map).forEach((key) => {
+      if (!orderedKeys.includes(key)) {
+        list.push(map[key]);
+      }
+    });
+
+    return list;
+  }, [pagePvUvData]);
+
+  // Filtered PV/UV raw data by selected label filter (for detail table)
   const filteredPvUvData = useMemo(() => {
     if (selectedLabel === "all") return pagePvUvData;
     return pagePvUvData.filter((item) => item.label === selectedLabel);
   }, [pagePvUvData, selectedLabel]);
 
-  // Chart Data: PV & UV by Page Label
+  // Chart Data: Clean 5-bar PV & UV by Page Label
   const pvUvChartData = useMemo(() => {
-    const labels = filteredPvUvData.map((item) => TAB_LABEL_MAP[item.label] || item.label);
-    const pvValues = filteredPvUvData.map((item) => Number(item.PV) || 0);
-    const uvValues = filteredPvUvData.map((item) => Number(item.UV) || 0);
+    const targetData = selectedLabel === "all"
+      ? labelAggregatedPvUvData
+      : labelAggregatedPvUvData.filter((item) => item.label === selectedLabel);
+
+    const labels = targetData.map((item) => TAB_LABEL_MAP[item.label] || item.label);
+    const pvValues = targetData.map((item) => item.PV);
+    const uvValues = targetData.map((item) => item.UV);
 
     return {
       labels,
@@ -96,7 +131,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
         },
       ],
     };
-  }, [filteredPvUvData]);
+  }, [labelAggregatedPvUvData, selectedLabel]);
 
   // Chart Data: DAU Daily Trend
   const dauChartData = useMemo(() => {
@@ -337,6 +372,31 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
               각 탭별 총 페이지 뷰(PV)와 순 방문자 수(UV), 그리고 1인당 평균 방문 횟수를 비교합니다.
             </p>
           </div>
+
+          {viewMode === "table" && (
+            <div className="flex items-center gap-1 bg-[#f2f4f6] p-1 rounded-lg text-xs font-semibold">
+              <button
+                onClick={() => setTableSubMode("summary")}
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                  tableSubMode === "summary"
+                    ? "bg-white text-[#191f28] shadow-2xs font-bold"
+                    : "text-[#8b95a1] hover:text-[#191f28]"
+                }`}
+              >
+                통합 탭 요약
+              </button>
+              <button
+                onClick={() => setTableSubMode("detail")}
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                  tableSubMode === "detail"
+                    ? "bg-white text-[#191f28] shadow-2xs font-bold"
+                    : "text-[#8b95a1] hover:text-[#191f28]"
+                }`}
+              >
+                앱별 상세 구분
+              </button>
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -347,12 +407,67 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
           <div className="h-72 w-full">
             <Bar data={pvUvChartData} options={barOptions} />
           </div>
-        ) : (
+        ) : tableSubMode === "summary" ? (
+          /* 1. 통합 탭 요약 테이블 (중복 없는 5개 탭) */
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-[#333d4b]">
               <thead className="bg-[#f9fafb] text-[#6b7684] font-semibold border-b border-[#e5e8eb]">
                 <tr>
-                  <th className="py-3 px-4">앱 ID</th>
+                  <th className="py-3 px-4">페이지 / 탭 라벨 (`label`)</th>
+                  <th className="py-3 px-4 text-right">총 페이지 뷰 (PV)</th>
+                  <th className="py-3 px-4 text-right">총 순 방문자 (UV)</th>
+                  <th className="py-3 px-4 text-right">1인당 평균 PV (PV/UV)</th>
+                  <th className="py-3 px-4 text-right">PV 점유율</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#f2f4f6]">
+                {labelAggregatedPvUvData.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-[#8b95a1]">
+                      조회된 페이지 뷰 데이터가 없습니다.
+                    </td>
+                  </tr>
+                ) : (
+                  (selectedLabel === "all"
+                    ? labelAggregatedPvUvData
+                    : labelAggregatedPvUvData.filter((item) => item.label === selectedLabel)
+                  ).map((item, idx) => {
+                    const pv = item.PV;
+                    const uv = item.UV;
+                    const ratio = uv > 0 ? (pv / uv).toFixed(2) : "0";
+                    const share = totalPV > 0 ? ((pv / totalPV) * 100).toFixed(1) : "0";
+
+                    return (
+                      <tr key={idx} className="hover:bg-[#f9fafb] transition-colors">
+                        <td className="py-3 px-4 font-semibold text-[#3182f6]">
+                          {TAB_LABEL_MAP[item.label] || item.label}
+                        </td>
+                        <td className="py-3 px-4 text-right font-bold text-[#191f28]">
+                          {pv.toLocaleString()} 회
+                        </td>
+                        <td className="py-3 px-4 text-right font-semibold text-[#00c980]">
+                          {uv.toLocaleString()} 명
+                        </td>
+                        <td className="py-3 px-4 text-right font-medium text-[#4e5968]">
+                          {ratio} 회/명
+                        </td>
+                        <td className="py-3 px-4 text-right font-medium text-[#8b95a1]">
+                          {share}%
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* 2. 앱별 상세 구분 테이블 */
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-[#333d4b]">
+              <thead className="bg-[#f9fafb] text-[#6b7684] font-semibold border-b border-[#e5e8eb]">
+                <tr>
+                  <th className="py-3 px-4">앱 ID (`appID`)</th>
                   <th className="py-3 px-4">페이지 / 탭 라벨 (`label`)</th>
                   <th className="py-3 px-4 text-right">페이지 뷰 (PV)</th>
                   <th className="py-3 px-4 text-right">순 방문자 (UV)</th>
