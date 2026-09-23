@@ -163,6 +163,14 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
       treasurer: ["treasurer", "트레저러"],
       upluspage: ["upluspage", "유플러스페이지"],
       "ph-hw": ["ph-hw", "하루날씨", "포인트홈", "point home", "포인트홈-하루날씨"],
+      "ph-mmg": ["ph-mmg", "메모g", "포인트홈-메모g"],
+      "ph-whatisthisnumber": ["ph-whatisthisnumber", "이번호뭐지", "포인트홈-이번호뭐지"],
+      "ph-schooltogether": ["ph-schooltogether", "학교가자", "포인트홈-학교가자"],
+      "ph-quizanswer": ["ph-quizanswer", "퀴즈정답", "포인트홈-퀴즈정답"],
+      "ph-walkingking": ["ph-walkingking", "걷기왕", "만보기왕", "포인트홈-걷기왕"],
+      "ph-specialchars": ["ph-specialchars", "특수문자", "포인트홈-특수문자"],
+      "ph-directblood": ["ph-directblood", "직혈", "포인트홈-직혈"],
+      "ph-raisehand": ["ph-raisehand", "손들기", "포인트홈-손들기"],
     };
 
     const norm = (s: string) => s.toLowerCase().replace(/[\s\-_]/g, "");

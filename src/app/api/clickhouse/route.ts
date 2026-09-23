@@ -247,6 +247,14 @@ export async function GET(request: NextRequest) {
         treasurer: "트레저러",
         upluspage: "유플러스페이지",
         "ph-hw": "포인트홈-하루날씨",
+        "ph-mmg": "포인트홈-메모G",
+        "ph-whatisthisnumber": "포인트홈-이번호뭐지",
+        "ph-schooltogether": "포인트홈-학교가자",
+        "ph-quizanswer": "포인트홈-퀴즈정답",
+        "ph-walkingking": "포인트홈-걷기왕",
+        "ph-specialchars": "포인트홈-특수문자",
+        "ph-directblood": "포인트홈-직혈",
+        "ph-raisehand": "포인트홈-손들기",
       };
 
       const coreApps = ["tc", "bitbunny", "yafit", "harustory"];
@@ -266,7 +274,7 @@ export async function GET(request: NextRequest) {
         if (val === "tc") {
           appList.push({ label: "전체 (통합 서비스)", value: "tc" });
         } else {
-          const name = appNameMap[val];
+          const name = appNameMap[val] || (val.startsWith("ph-") ? `포인트홈-${val.slice(3)}` : val);
           const labelText = name && name !== val ? `${name} (${val})` : val;
           appList.push({ label: labelText, value: val });
         }
@@ -283,6 +291,11 @@ export async function GET(request: NextRequest) {
         { label: "토스 (toss)", value: "toss" },
         { label: "카카오페이 (kakaopay)", value: "kakaopay" },
         { label: "포인트홈-하루날씨 (ph-hw)", value: "ph-hw" },
+        { label: "포인트홈-메모G (ph-mmg)", value: "ph-mmg" },
+        { label: "포인트홈-이번호뭐지 (ph-whatisthisnumber)", value: "ph-whatisthisnumber" },
+        { label: "포인트홈-학교가자 (ph-schooltogether)", value: "ph-schooltogether" },
+        { label: "포인트홈-퀴즈정답 (ph-quizanswer)", value: "ph-quizanswer" },
+        { label: "포인트홈-걷기왕 (ph-walkingking)", value: "ph-walkingking" },
       ];
       return NextResponse.json({ success: true, data: defaultAppList });
     }
