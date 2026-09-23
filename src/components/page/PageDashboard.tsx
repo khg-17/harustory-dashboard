@@ -39,7 +39,6 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
   toDate,
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>("chart");
-  const [selectedLabel, setSelectedLabel] = useState<string>("all");
 
   // Total PV
   const totalPV = useMemo(() => {
@@ -89,12 +88,6 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
     return list;
   }, [pagePvUvData]);
 
-  // Filtered PV/UV data by selected label filter
-  const filteredPvUvData = useMemo(() => {
-    if (selectedLabel === "all") return orderedPvUvData;
-    return orderedPvUvData.filter((item) => item.label === selectedLabel);
-  }, [orderedPvUvData, selectedLabel]);
-
   // Clean DAU Data Sorted Chronologically
   const sortedDauData = useMemo(() => {
     const map: Record<string, number> = {};
@@ -111,9 +104,9 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
 
   // Chart Data: PV & UV by Page Label
   const pvUvChartData = useMemo(() => {
-    const labels = filteredPvUvData.map((item) => TAB_LABEL_MAP[item.label] || item.label);
-    const pvValues = filteredPvUvData.map((item) => item.PV);
-    const uvValues = filteredPvUvData.map((item) => item.UV);
+    const labels = orderedPvUvData.map((item) => TAB_LABEL_MAP[item.label] || item.label);
+    const pvValues = orderedPvUvData.map((item) => item.PV);
+    const uvValues = orderedPvUvData.map((item) => item.UV);
 
     return {
       labels,
@@ -136,7 +129,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
         },
       ],
     };
-  }, [filteredPvUvData]);
+  }, [orderedPvUvData]);
 
   // Chart Data: DAU Daily Trend
   const dauChartData = useMemo(() => {
@@ -276,7 +269,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
           </div>
         </div>
 
-        {/* Minimal Clean Metric Banner (No Icon Box Clutter) */}
+        {/* Minimal Clean Metric Banner */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-[#f2f4f6]">
           <div className="md:border-r border-[#f2f4f6] pr-4">
             <div className="text-[11px] font-semibold text-[#8b95a1]">총 페이지 뷰 (PV)</div>
@@ -310,38 +303,6 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
 
       {/* 2. Main Content Body */}
       <div className="p-6 space-y-8">
-        {/* Filter Pills (Clean Tab Names Only - No Technical Label Strings) */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-[#f2f4f6]">
-          <span className="text-xs font-semibold text-[#4e5968] shrink-0">탭 선택:</span>
-          <button
-            onClick={() => setSelectedLabel("all")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer whitespace-nowrap ${
-              selectedLabel === "all"
-                ? "bg-[#191f28] text-white font-bold"
-                : "bg-[#f2f4f6] text-[#4e5968] hover:bg-[#e5e8eb]"
-            }`}
-          >
-            전체
-          </button>
-          {TAB_ORDER.map((key) => {
-            const name = TAB_LABEL_MAP[key];
-            if (!name) return null;
-            return (
-              <button
-                key={key}
-                onClick={() => setSelectedLabel(key)}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer whitespace-nowrap ${
-                  selectedLabel === key
-                    ? "bg-[#3182f6] text-white font-bold"
-                    : "bg-[#f2f4f6] text-[#4e5968] hover:bg-[#e5e8eb]"
-                }`}
-              >
-                {name}
-              </button>
-            );
-          })}
-        </div>
-
         {/* Section A: PV & UV */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -369,14 +330,14 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f2f4f6]">
-                  {filteredPvUvData.length === 0 ? (
+                  {orderedPvUvData.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-[#8b95a1]">
                         조회된 데이터가 없습니다.
                       </td>
                     </tr>
                   ) : (
-                    filteredPvUvData.map((item, idx) => {
+                    orderedPvUvData.map((item, idx) => {
                       const pv = item.PV;
                       const uv = item.UV;
                       const ratio = uv > 0 ? (pv / uv).toFixed(2) : "0";
@@ -414,7 +375,6 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
         <div className="space-y-3 pt-6 border-t border-[#f2f4f6]">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-[#191f28]">일자별 DAU 추이</h3>
-            <span className="text-xs text-[#8b95a1]">일자별 통합 DAU</span>
           </div>
 
           {loading ? (
