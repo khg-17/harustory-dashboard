@@ -15,11 +15,11 @@ interface PageDashboardProps {
 }
 
 const TAB_LABEL_MAP: Record<string, string> = {
-  reward_tab_view: "리워드",
-  today_tab_view: "오늘뭐볼까",
-  free_tab_view: "무료작품",
-  library_tab_view: "내서재",
-  all_tab_view: "웹툰/웹소설",
+  reward_tab_view: "리워드 탭",
+  today_tab_view: "오늘뭐볼까 탭",
+  free_tab_view: "무료작품 탭",
+  library_tab_view: "내서재 탭",
+  all_tab_view: "웹툰/웹소설 탭",
 };
 
 const TAB_ORDER = [
