@@ -115,6 +115,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {!isSidebarCollapsed && <span>유저 현황</span>}
         </button>
 
+        {/* 2. 페이지 현황 */}
+        <button 
+          onClick={() => setActiveTab("page")}
+          className={`flex items-center ${isSidebarCollapsed ? "justify-center" : "gap-2.5"} w-full px-3 py-2.5 text-[13px] font-semibold rounded-lg transition-all cursor-pointer ${
+            activeTab === "page"
+              ? "bg-[#e5e7eb] text-[#191f28] font-bold"
+              : "text-[#4e5968] hover:text-[#191f28] hover:bg-[#f2f4f6]"
+          }`}
+          title="페이지 현황"
+        >
+          <BookOpen className={`w-4 h-4 shrink-0 ${activeTab === "page" ? "text-[#191f28]" : "text-[#8b95a1]"}`} />
+          {!isSidebarCollapsed && <span>페이지 현황</span>}
+        </button>
+
 
 
         {/* 3. 미션 현황 (메인 그룹) */}

@@ -1,7 +1,20 @@
-export type ActiveTab = "users" | "revenue" | "funnel" | "mission";
+export type ActiveTab = "users" | "revenue" | "funnel" | "mission" | "page";
 export type RevenueCategoryTab = "overall" | "ad_category" | "ad_network" | "content" | "content_pay" | "content_usage" | "margin" | "ad";
 export type FunnelCategoryTab = "detail" | "new_user";
 export type MissionSubTab = "general" | "reward" | "attendance";
+
+export interface PagePvUvItem {
+  appID: string;
+  label: string;
+  PV: number;
+  UV: number;
+}
+
+export interface PageDauItem {
+  appID: string;
+  dt: string;
+  DAU: number;
+}
 export type UserSegment = "all" | "existing" | "new";
 export type PeriodType = "day" | "week" | "month";
 export type DatePreset = "7d" | "30d" | "month" | "custom";

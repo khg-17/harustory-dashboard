@@ -24,6 +24,7 @@ import { RevenueDashboard } from "@/components/revenue/RevenueDashboard";
 import { FunnelDashboard } from "@/components/funnel/FunnelDashboard";
 import { NewUserFunnelDashboard } from "@/components/funnel/NewUserFunnelDashboard";
 import { MissionDashboard } from "@/components/mission/MissionDashboard";
+import { PageDashboard } from "@/components/page/PageDashboard";
 
 import {
   ChartProcessedItem,
@@ -96,6 +97,8 @@ export default function Dashboard() {
 
   const {
     loading,
+    pagePvUvRaw,
+    pageDauRaw,
     overviewData,
     visitRetentionRaw,
     earningRetentionRaw,
@@ -815,6 +818,18 @@ export default function Dashboard() {
             attendanceCompletionRaw={attendanceCompletionRaw}
             attendanceStepsRaw={attendanceStepsRaw}
             overviewData={overviewData}
+          />
+        )}
+
+        {/* TAB 6: PAGE STATUS ("페이지 현황") */}
+        {activeTab === "page" && (
+          <PageDashboard
+            loading={loading}
+            pagePvUvData={pagePvUvRaw}
+            pageDauData={pageDauRaw}
+            selectedApp={selectedApp}
+            fromDate={fromDate}
+            toDate={toDate}
           />
         )}
       </div>

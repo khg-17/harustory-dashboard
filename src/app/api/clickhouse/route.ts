@@ -199,6 +199,21 @@ function sanitizeDataset(type: string, data: any[], userSegment?: string, newUse
     });
   }
 
+  if (type === 'page_pv_uv') {
+    return data.map((item: any) => ({
+      ...item,
+      PV: Number(item?.PV ?? item?.pv ?? 0) || 0,
+      UV: Number(item?.UV ?? item?.uv ?? 0) || 0,
+    }));
+  }
+
+  if (type === 'page_dau') {
+    return data.map((item: any) => ({
+      ...item,
+      DAU: Number(item?.DAU ?? item?.dau ?? 0) || 0,
+    }));
+  }
+
   return data;
 }
 
@@ -459,6 +474,47 @@ export async function GET(request: NextRequest) {
           to = '${to}'
         )
       `;
+    } else if (type === 'page_pv_uv' || type === 'page_dau') {
+      const appCond = app === 'tc' ? "appID != ''" : `appID = '${app}'`;
+      const rawLabels = searchParams.get('labels');
+      const labelList = rawLabels 
+        ? rawLabels.split(',').map(l => `'${l.trim().replace(/'/g, "")}'`).filter(Boolean)
+        : ["'all_tab_view'", "'today_tab_view'", "'library_tab_view'", "'free_tab_view'", "'reward_tab_view'"];
+      const labelInList = labelList.join(',');
+
+      if (type === 'page_pv_uv') {
+        sql = `
+          SELECT appID, label,
+                 count() AS PV,
+                 uniqExact(accountSN) AS UV
+          FROM Log.UserActionLog
+          WHERE event = 'impression'
+            AND label IN (${labelInList})
+            AND ${appCond}
+            AND env = 'prod'
+            AND toDate(toTimeZone(ts, 'Asia/Seoul')) >= '${from}'
+            AND toDate(toTimeZone(ts, 'Asia/Seoul')) <= '${to}'
+          GROUP BY appID, label
+          ORDER BY appID, label
+          SETTINGS max_partitions_to_read = 300, max_threads = 4
+        `;
+      } else {
+        sql = `
+          SELECT appID,
+                 toDate(toTimeZone(ts, 'Asia/Seoul')) AS dt,
+                 uniqExact(accountSN) AS DAU
+          FROM Log.UserActionLog
+          WHERE event = 'impression'
+            AND label IN (${labelInList})
+            AND ${appCond}
+            AND env = 'prod'
+            AND toDate(toTimeZone(ts, 'Asia/Seoul')) >= '${from}'
+            AND toDate(toTimeZone(ts, 'Asia/Seoul')) <= '${to}'
+          GROUP BY appID, dt
+          ORDER BY appID, dt
+          SETTINGS max_partitions_to_read = 300, max_threads = 4
+        `;
+      }
     } else if (type === 'custom_funnel') {
       const stepsParam = searchParams.get('steps') || '';
       const stepList = stepsParam.split(',').map(s => s.trim()).filter(Boolean);

@@ -16,6 +16,8 @@ import {
   AttendanceCompletionItem,
   AttendanceStepItem,
   UserSegment,
+  PagePvUvItem,
+  PageDauItem,
 } from "@/types/dashboard";
 import { getPreviousMonthDateRange } from "@/utils/settlementHelpers";
 
@@ -35,6 +37,10 @@ export function useDashboardData({
   userSegment,
 }: UseDashboardDataParams) {
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Page Status Live States
+  const [pagePvUvRaw, setPagePvUvRaw] = useState<PagePvUvItem[]>([]);
+  const [pageDauRaw, setPageDauRaw] = useState<PageDauItem[]>([]);
 
   // Users Live States
   const [overviewData, setOverviewData] = useState<any[]>([]);
@@ -221,6 +227,22 @@ export function useDashboardData({
         if (attendanceStepsJson.success && Array.isArray(attendanceStepsJson.data)) setAttendanceStepsRaw(attendanceStepsJson.data);
         if (missionTotalJson.success && Array.isArray(missionTotalJson.data)) setMissionTotalRaw(missionTotalJson.data);
         if (overviewJson.success && Array.isArray(overviewJson.data)) setOverviewData(overviewJson.data);
+      } else if (activeTab === "page") {
+        setPagePvUvRaw([]);
+        setPageDauRaw([]);
+
+        const [pvUvRes, dauRes] = await Promise.all([
+          fetch(`/api/clickhouse?type=page_pv_uv&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
+          fetch(`/api/clickhouse?type=page_dau&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts),
+        ]);
+
+        const [pvUvJson, dauJson] = await Promise.all([
+          pvUvRes.json(),
+          dauRes.json(),
+        ]);
+
+        if (pvUvJson.success && Array.isArray(pvUvJson.data)) setPagePvUvRaw(pvUvJson.data);
+        if (dauJson.success && Array.isArray(dauJson.data)) setPageDauRaw(dauJson.data);
       }
     } catch (error) {
       console.error("ClickHouse data fetch error:", error);
@@ -235,6 +257,8 @@ export function useDashboardData({
 
   return {
     loading,
+    pagePvUvRaw,
+    pageDauRaw,
     overviewData,
     visitRetentionRaw,
     earningRetentionRaw,
