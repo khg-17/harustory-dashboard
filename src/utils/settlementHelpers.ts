@@ -74,12 +74,19 @@ export function calcMissionRewardP(receivedReward: any, appNameOrSelectedApp: st
 export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: string) {
   if (!item) return null;
 
-  if (selectedApp === "tc") {
+  if (selectedApp === "tc" || selectedApp === "general_all" || selectedApp === "ph_all") {
     if (Array.isArray(item.apps) && item.apps.length > 0) {
       let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0, adFree = 0, missionRewardP = 0;
       let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0;
 
-      item.apps.forEach((app) => {
+      const targetApps = item.apps.filter((app) => {
+        if (selectedApp === "tc") return true;
+        const name = (app.appName || "").toLowerCase();
+        const isPh = name.startsWith("포인트홈") || name.startsWith("ph-");
+        return selectedApp === "ph_all" ? isPh : !isPh;
+      });
+
+      targetApps.forEach((app) => {
         paidCoin += Number(app.payingCoin?.paidCoin ?? app.content?.payingCoin?.paidCoin ?? 0);
         freeCoin += Number(app.payingCoin?.freeCoin ?? app.content?.payingCoin?.freeCoin ?? 0);
         chargeCoin += Number(app.chargeCoin ?? app.content?.chargeCoin ?? 0);
@@ -108,7 +115,7 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
         missionRewardP,
         ad: { b, pop, forus, sense, cash, rc, toss },
       };
-    } else {
+    } else if (selectedApp === "tc") {
       const ad: Partial<SettlementAdData> = item.ad || {};
       const missionRewardP = calcMissionRewardP(item.receivedReward, "tc");
       return {
@@ -162,15 +169,16 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
       memog: ["memog", "메모g"],
       treasurer: ["treasurer", "트레저러"],
       upluspage: ["upluspage", "유플러스페이지"],
-      "ph-hw": ["ph-hw", "하루날씨", "포인트홈", "point home", "포인트홈-하루날씨"],
-      "ph-mmg": ["ph-mmg", "메모g", "포인트홈-메모g"],
-      "ph-whatisthisnumber": ["ph-whatisthisnumber", "이번호뭐지", "포인트홈-이번호뭐지"],
-      "ph-schooltogether": ["ph-schooltogether", "학교가자", "포인트홈-학교가자"],
-      "ph-quizanswer": ["ph-quizanswer", "퀴즈정답", "포인트홈-퀴즈정답"],
-      "ph-walkingking": ["ph-walkingking", "걷기왕", "만보기왕", "포인트홈-걷기왕"],
-      "ph-specialchars": ["ph-specialchars", "특수문자", "포인트홈-특수문자"],
-      "ph-directblood": ["ph-directblood", "직혈", "포인트홈-직혈"],
-      "ph-raisehand": ["ph-raisehand", "손들기", "포인트홈-손들기"],
+      "ph-hw": ["ph-hw", "phhw", "포인트홈-하루날씨", "포인트홈하루날씨"],
+      "ph-mmg": ["ph-mmg", "phmmg", "포인트홈-메모지", "포인트홈메모지"],
+      "ph-whatisthisnumber": ["ph-whatisthisnumber", "phwhatisthisnumber", "포인트홈-뭐야이번호", "포인트홈뭐야이번호"],
+      "ph-schooltogether": ["ph-schooltogether", "phschooltogether", "포인트홈-스쿨투게더", "포인트홈스쿨투게더"],
+      "ph-quizanswer": ["ph-quizanswer", "phquizanswer", "포인트홈-퀴즈 정답 알리미", "포인트홈퀴즈정답알리미", "포인트홈-퀴즈정답", "포인트홈퀴즈정답"],
+      "ph-walkingking": ["ph-walkingking", "phwalkingking", "포인트홈-걸음왕", "포인트홈걸음왕"],
+      "ph-specialchars": ["ph-specialchars", "phspecialchars", "포인트홈-특수문자이모티콘", "포인트홈특수문자이모티콘", "포인트홈-특수문자", "포인트홈특수문자"],
+      "ph-directblood": ["ph-directblood", "phdirectblood", "포인트홈-지정헌혈", "포인트홈지정헌혈"],
+      "ph-raisehand": ["ph-raisehand", "phraisehand", "포인트홈-고발", "포인트홈고발"],
+      "ph-tvdalin": ["ph-tvdalin", "phtvdalin", "포인트홈-tv의달인", "포인트홈tv의달인"],
     };
 
     const norm = (s: string) => s.toLowerCase().replace(/[\s\-_]/g, "");

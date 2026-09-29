@@ -124,7 +124,7 @@ export function computeRevenueSummary({
   let totalExchangedPoints = 0;
   let totalMissionReward = 0;
 
-  const isPhApp = selectedApp.toLowerCase().includes("ph-");
+  const isPhApp = selectedApp.toLowerCase().includes("ph-") || selectedApp.toLowerCase() === "ph_all";
   const { prevFromStr, prevToStr } = getPreviousMonthDateRange(fromDate, toDate);
 
   if (hasActiveSettlement) {

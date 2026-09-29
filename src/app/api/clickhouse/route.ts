@@ -46,8 +46,9 @@ function updateGlobalStore(app: string, type: string, rows: any[], userSegment?:
 
 // Helper to slice data locally from global store by date range
 function sliceGlobalStore(app: string, type: string, from: string, to: string, userSegment?: string): any[] {
+  const targetApp = (app === 'general_all' || app === 'ph_all') ? 'tc' : app;
   const segSuffix = userSegment && userSegment !== 'all' ? `_${userSegment}` : '';
-  const storeKey = `${app}_${type}${segSuffix}`;
+  const storeKey = `${targetApp}_${type}${segSuffix}`;
   if (!appGlobalStore.has(storeKey)) return [];
   const map = appGlobalStore.get(storeKey)!;
   const sliced: any[] = [];
@@ -113,15 +114,56 @@ function extractExchangedPoints(item: any): number {
   return !isNaN(num) ? num : 0;
 }
 
+// Mapping map for Point Home sub-apps whose AppChannel_V appID is empty
+const APP_CODE_TO_SN_MAP: Record<string, number> = {
+  'ph-mmg': 137,
+  'ph-whatisthisnumber': 77,
+  'ph-quizanswer': 91,
+  'ph-schooltogether': 80,
+  'ph-walkingking': 70,
+  'ph-specialchars': 92,
+  'ph-directblood': 78,
+  'ph-raisehand': 93,
+};
+
+// Helper to construct exact app condition for ClickHouse queries handling virtual app codes and sub-app appSN mappings
+function getAppCond(app: string, column: string = 'appID'): string {
+  if (app === 'tc') {
+    return '(1 = 1)';
+  } else if (app === 'general_all') {
+    return `(${column} NOT LIKE 'ph-%' AND ${column} != '')`;
+  } else if (app === 'ph_all') {
+    return `(${column} LIKE 'ph-%')`;
+  } else {
+    return `${column} = '${app}'`;
+  }
+}
+
+function getAppCondWithSn(app: string, appIdCol: string = 'ac.appID', appSnCol: string = 'mp.appSN'): string {
+  if (app === 'tc') {
+    return '(1 = 1)';
+  } else if (app === 'general_all') {
+    return `(${appIdCol} NOT LIKE 'ph-%' AND ${appIdCol} != '' AND ${appSnCol} NOT IN (137, 77, 91, 80, 70, 92, 78, 93))`;
+  } else if (app === 'ph_all') {
+    return `(${appIdCol} LIKE 'ph-%' OR ${appSnCol} IN (137, 77, 91, 80, 70, 92, 78, 93))`;
+  } else {
+    const targetSN = APP_CODE_TO_SN_MAP[app];
+    if (targetSN) {
+      return `(${appIdCol} = '${app}' OR ${appSnCol} = ${targetSN})`;
+    }
+    return `${appIdCol} = '${app}'`;
+  }
+}
+
 async function getNewUserRatio(app: string, from: string, to: string): Promise<number> {
   try {
-    const appCond = app === 'tc' ? "app = 'tc'" : `app = '${app}'`;
+    const dbApp = (app === 'general_all' || app === 'ph_all') ? 'tc' : app;
     const overviewSql = `
       SELECT 
         sum(activeUserCount) AS totalActive,
         sum(newUserCount) AS totalNew
       FROM Report.Overview__app_from_to_PV(
-        app = '${app}',
+        app = '${dbApp}',
         from = '${from}',
         to = '${to}'
       )
@@ -235,6 +277,8 @@ export async function GET(request: NextRequest) {
       const rawApps = await queryClickHouse(sqlApps);
       const appNameMap: Record<string, string> = {
         tc: "전체",
+        general_all: "일반 (전체)",
+        ph_all: "포인트홈 (전체)",
         bitbunny: "비트버니",
         yafit: "야핏무브",
         harustory: "하루스토리",
@@ -260,8 +304,16 @@ export async function GET(request: NextRequest) {
         bppay: "BP페이",
         memog: "메모G",
         treasurer: "트레저러",
-        upluspage: "유플러스페이지",
         "ph-hw": "포인트홈-하루날씨",
+        "ph-mmg": "포인트홈-메모지",
+        "ph-whatisthisnumber": "포인트홈-뭐야이번호",
+        "ph-schooltogether": "포인트홈-스쿨투게더",
+        "ph-quizanswer": "포인트홈-퀴즈정답",
+        "ph-walkingking": "포인트홈-걸음왕",
+        "ph-specialchars": "포인트홈-특수문자",
+        "ph-directblood": "포인트홈-지정헌혈",
+        "ph-raisehand": "포인트홈-고발",
+        "ph-tvdalin": "포인트홈-TV의달인",
       };
 
       const coreApps = ["tc", "bitbunny", "yafit", "harustory"];
@@ -308,6 +360,9 @@ export async function GET(request: NextRequest) {
   let to = searchParams.get('to') || '2026-07-22';
   const label = searchParams.get('label') || '';
   const userSegment = searchParams.get('userSegment') || 'all';
+
+  // Map virtual aggregated app codes (general_all, ph_all) to 'tc' for ClickHouse parameterized view execution
+  const dbApp = (app === 'general_all' || app === 'ph_all') ? 'tc' : app;
 
   // 1. Sanitize & validate parameters to prevent invalid SQL execution
   if (!APP_CODE_REGEX.test(app)) app = 'tc';
@@ -387,22 +442,46 @@ export async function GET(request: NextRequest) {
     let sql = '';
 
     if (type === 'overview') {
+      const appCond = getAppCond(app, 'appID');
+      const ufsCond = getAppCond(app, 'fs.appID');
       sql = `
         SELECT 
-          eventDateKst,
-          activeUserCount,
-          newUserCount,
-          totalEventCount AS eventCount
-        FROM Report.Overview__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}'
-        )
+          d.eventDateKst AS eventDateKst,
+          d.activeUserCount AS activeUserCount,
+          ifNull(n.newUserCount, 0) AS newUserCount,
+          ifNull(e.totalEventCount, 0) AS eventCount
+        FROM
+        (
+          SELECT
+            eventDateKst,
+            uniqExactMerge(activeUserCount) AS activeUserCount
+          FROM Log.DailyActiveUsers
+          WHERE ${appCond} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}'
+          GROUP BY eventDateKst
+        ) AS d
+        LEFT JOIN
+        (
+          SELECT
+            fs.firstEventDateKst AS eventDateKst,
+            count() AS newUserCount
+          FROM Log.UserFirstSeen_V AS fs
+          LEFT JOIN Log.AppNewUserWatermark_V AS w ON w.appID = fs.appID
+          WHERE ${ufsCond} AND (toInt64OrZero(fs.accountSN) > ifNull(w.watermark, 0)) AND fs.firstEventDateKst >= '${from}' AND fs.firstEventDateKst <= '${to}'
+          GROUP BY eventDateKst
+        ) AS n ON n.eventDateKst = d.eventDateKst
+        LEFT JOIN
+        (
+          SELECT
+            eventDateKst,
+            sum(eventCount) AS totalEventCount
+          FROM Log.DailyEventCounts_V
+          WHERE ${appCond} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}'
+          GROUP BY eventDateKst
+        ) AS e ON e.eventDateKst = d.eventDateKst
         ORDER BY eventDateKst ASC
         SETTINGS max_threads = 2, max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296
       `;
     } else if (type === 'retention') {
-      // Extend the end date to include look‑ahead days (same logic as attendance queries)
       const addDaysStr = (dStr: string, days: number) => {
         const d = new Date(dStr);
         d.setDate(d.getDate() + days);
@@ -412,70 +491,197 @@ export async function GET(request: NextRequest) {
         return `${y}-${m}-${day}`;
       };
       const extendedTo = addDaysStr(to, 6);
+      const appCondUfs = getAppCond(app, 'ufs.appID');
+      const appCondUal = getAppCond(app, 'ual.appID');
       sql = `
-        SELECT 
-          cohortDateKst AS cohortDate,
-          dayN,
-          retainedUserCount,
-          retentionRate
-        FROM Report.Retention__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${extendedTo}'
+        WITH 
+        cohorts AS (
+          SELECT 
+            ufs.appID AS appID,
+            ufs.accountSN AS accountSN,
+            ufs.firstEventDateKst AS cohortDateKst
+          FROM Log.UserFirstSeen_V AS ufs
+          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ufs.appID = wm.appID
+          WHERE ${appCondUfs}
+            AND toInt64OrZero(ufs.accountSN) > ifNull(wm.watermark, 0)
+            AND ufs.firstEventDateKst >= '${from}'
+            AND ufs.firstEventDateKst <= '${to}'
+        ),
+        cohort_sizes AS (
+          SELECT 
+            cohortDateKst, 
+            uniqExact(accountSN) AS d0Count
+          FROM cohorts
+          GROUP BY cohortDateKst
+        ),
+        retention_raw AS (
+          SELECT 
+            c.cohortDateKst AS cohortDateKst,
+            dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) AS dayN,
+            uniqExact(c.accountSN) AS retainedUserCount
+          FROM cohorts AS c
+          INNER JOIN Log.UserActionLog AS ual 
+            ON ual.accountSN = c.accountSN 
+           AND ${appCondUal}
+          WHERE ual.env = 'prod'
+            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= '${from}'
+            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) <= '${extendedTo}'
+            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= c.cohortDateKst
+            AND dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) <= 30
+          GROUP BY cohortDateKst, dayN
         )
-        ORDER BY cohortDateKst ASC, dayN ASC
-        SETTINGS max_partitions_to_read = 100
+        SELECT 
+          r.cohortDateKst AS cohortDate,
+          r.dayN AS dayN,
+          r.retainedUserCount AS retainedUserCount,
+          if(b.d0Count > 0, round(r.retainedUserCount / b.d0Count * 100, 2), 0) AS retentionRate
+        FROM retention_raw AS r
+        INNER JOIN cohort_sizes AS b ON r.cohortDateKst = b.cohortDateKst
+        ORDER BY cohortDate ASC, dayN ASC
+        SETTINGS max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296, max_partitions_to_read = 1000, max_rows_to_read = 0
       `;
     } else if (type === 'earning_activation') {
+      const addDaysStr = (dStr: string, days: number) => {
+        const d = new Date(dStr);
+        d.setDate(d.getDate() + days);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+      const extendedTo = addDaysStr(to, 6);
+      const appCondUfs = getAppCond(app, 'ufs.appID');
+      const appCondUal = getAppCond(app, 'ual.appID');
       sql = `
-        SELECT 
-          cohortDateKst AS cohortDate,
-          dayN,
-          activatedUu,
-          activationRate
-        FROM Report.EarningActivationRate__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}'
+        WITH 
+        cohorts AS (
+          SELECT 
+            ufs.appID AS appID,
+            ufs.accountSN AS accountSN,
+            ufs.firstEventDateKst AS cohortDateKst
+          FROM Log.UserFirstSeen_V AS ufs
+          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ufs.appID = wm.appID
+          WHERE ${appCondUfs}
+            AND toInt64OrZero(ufs.accountSN) > ifNull(wm.watermark, 0)
+            AND ufs.firstEventDateKst >= '${from}'
+            AND ufs.firstEventDateKst <= '${to}'
+        ),
+        cohort_sizes AS (
+          SELECT 
+            cohortDateKst, 
+            uniqExact(accountSN) AS d0Count
+          FROM cohorts
+          GROUP BY cohortDateKst
+        ),
+        earning_raw AS (
+          SELECT 
+            c.cohortDateKst AS cohortDateKst,
+            dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) AS dayN,
+            uniqExact(c.accountSN) AS activatedUu
+          FROM cohorts AS c
+          INNER JOIN Log.UserActionLog AS ual 
+            ON ual.accountSN = c.accountSN 
+           AND ${appCondUal}
+          WHERE ual.env = 'prod'
+            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= '${from}'
+            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) <= '${extendedTo}'
+            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= c.cohortDateKst
+            AND dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) <= 30
+            AND (
+              ual.label LIKE 'reward_%' 
+              OR ual.label LIKE '%mission%' 
+              OR ual.label LIKE '%complete%' 
+              OR ual.label LIKE '%confirm%' 
+              OR ual.label LIKE '%claim%' 
+              OR ual.label LIKE '%earn%'
+            )
+          GROUP BY cohortDateKst, dayN
         )
-        ORDER BY cohortDateKst ASC, dayN ASC
-        SETTINGS max_partitions_to_read = 100
+        SELECT 
+          r.cohortDateKst AS cohortDate,
+          r.dayN AS dayN,
+          r.activatedUu AS activatedUu,
+          if(b.d0Count > 0, round(r.activatedUu / b.d0Count * 100, 2), 0) AS activationRate
+        FROM earning_raw AS r
+        INNER JOIN cohort_sizes AS b ON r.cohortDateKst = b.cohortDateKst
+        ORDER BY cohortDate ASC, dayN ASC
+        SETTINGS max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296, max_partitions_to_read = 1000, max_rows_to_read = 0
       `;
     } else if (type === 'attendance_activation') {
+      const appCondUfs = getAppCond(app, 'ufs.appID');
+      const appCondCr = getAppCond(app, 'ac.appID');
       sql = `
-        SELECT 
-          cohortDateKst AS cohortDate,
-          dayN,
-          activatedUu,
-          activationRate
-        FROM Report.AttendanceActivationRate__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}'
+        WITH 
+        cohorts AS (
+          SELECT 
+            ufs.appID AS appID,
+            ufs.accountSN AS accountSN,
+            ufs.firstEventDateKst AS cohortDateKst
+          FROM Log.UserFirstSeen_V AS ufs
+          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ufs.appID = wm.appID
+          WHERE ${appCondUfs}
+            AND toInt64OrZero(ufs.accountSN) > ifNull(wm.watermark, 0)
+            AND ufs.firstEventDateKst >= '${from}'
+            AND ufs.firstEventDateKst <= '${to}'
+        ),
+        cohort_sizes AS (
+          SELECT 
+            cohortDateKst, 
+            uniqExact(accountSN) AS d0Count
+          FROM cohorts
+          GROUP BY cohortDateKst
+        ),
+        attendance_raw AS (
+          SELECT 
+            c.cohortDateKst AS cohortDateKst,
+            dateDiff('day', c.cohortDateKst, toDate(cr.dt)) AS dayN,
+            uniqExact(toString(cr.accountSN)) AS activatedUu
+          FROM cohorts AS c
+          INNER JOIN Performance.CheckInRecord_Raw AS cr ON toString(cr.accountSN) = c.accountSN
+          LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = cr.appSN
+          WHERE ${appCondCr}
+            AND toDate(cr.dt) >= '${from}'
+            AND toDate(cr.dt) >= c.cohortDateKst
+            AND dateDiff('day', c.cohortDateKst, toDate(cr.dt)) <= 30
+          GROUP BY cohortDateKst, dayN
         )
-        ORDER BY cohortDateKst ASC, dayN ASC
-        SETTINGS max_partitions_to_read = 100
+        SELECT 
+          r.cohortDateKst AS cohortDate,
+          r.dayN AS dayN,
+          r.activatedUu AS activatedUu,
+          if(b.d0Count > 0, round(r.activatedUu / b.d0Count * 100, 2), 0) AS activationRate
+        FROM attendance_raw AS r
+        INNER JOIN cohort_sizes AS b ON r.cohortDateKst = b.cohortDateKst
+        ORDER BY cohortDate ASC, dayN ASC
       `;
     } else if (type === 'funnels') {
+      const appCond = getAppCond(app, 'appID');
       sql = `
-        SELECT *
-        FROM Report.Funnels__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}'
-        )
+        SELECT 
+          funnel,
+          step,
+          uniqExactMerge(reachedUserCount) AS reachedUserCount,
+          sumMerge(reachedSessionCount) AS reachedSessionCount
+        FROM Log.UserDailyFunnels
+        WHERE ${appCond} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}'
+        GROUP BY funnel, step
+        ORDER BY funnel ASC, step ASC
       `;
     } else if (type === 'funnel_steps') {
+      const appCond = getAppCond(app, 'appID');
       sql = `
-        SELECT *
-        FROM Report.FunnelSteps__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}'
-        )
+        SELECT 
+          funnel,
+          step,
+          uniqExactMerge(reachedUserCount) AS reachedUserCount,
+          sumMerge(reachedSessionCount) AS reachedSessionCount
+        FROM Log.UserDailyFunnels
+        WHERE ${appCond} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}'
+        GROUP BY funnel, step
+        ORDER BY funnel ASC, step ASC
       `;
     } else if (type === 'page_pv_uv' || type === 'page_dau') {
-      const appCond = app === 'tc' ? "appID != ''" : `appID = '${app}'`;
+      const appCond = getAppCond(app, 'appID');
       const rawLabels = searchParams.get('labels');
       const labelList = rawLabels 
         ? rawLabels.split(',').map(l => `'${l.trim().replace(/'/g, "")}'`).filter(Boolean)
@@ -520,7 +726,7 @@ export async function GET(request: NextRequest) {
       const newUserOnly = searchParams.get('newUserOnly') === '1';
 
       if (stepList.length >= 2) {
-        const appCond = app === 'tc' ? "(1 = 1)" : `ual.appID = '${app}'`;
+        const appCond = getAppCond(app, 'ual.appID');
         const stepConds = stepList.map(s => {
           if (s === 'reward_mission_complete_any' || s === 'any_mission_complete' || s === 'mission_complete_any') {
             return `(ual.label IN ('reward_book_mission_complete_click', 'reward_otter_click_book_8', 'reward_snack_ad_click', 'reward_snack_mission_complete_click', 'reward_drink_ad_click', 'reward_drink_mission_complete_click', 'reward_episode_mission_complete_click', 'reward_mission_complete_click', 'reward_scroll_mission_complete_click', 'reward_tip_ad_click', 'reward_tip_confirm_click'))`;
@@ -595,7 +801,7 @@ export async function GET(request: NextRequest) {
       const stepList = stepsParam.split(',').map(s => s.trim()).filter(Boolean);
 
       if (stepList.length >= 2) {
-        const appCond = app === 'tc' ? "(1 = 1)" : `ual.appID = '${app}'`;
+        const appCond = getAppCond(app, 'ual.appID');
         const stepConds = stepList.map(s => {
           if (s === 'reward_mission_complete_any' || s === 'any_mission_complete' || s === 'mission_complete_any') {
             return `(ual.label IN ('reward_book_mission_complete_click', 'reward_otter_click_book_8', 'reward_snack_ad_click', 'reward_snack_mission_complete_click', 'reward_drink_ad_click', 'reward_drink_mission_complete_click', 'reward_episode_mission_complete_click', 'reward_mission_complete_click', 'reward_scroll_mission_complete_click', 'reward_tip_ad_click', 'reward_tip_confirm_click'))`;
@@ -649,14 +855,14 @@ export async function GET(request: NextRequest) {
           )                                                          AS churnRate
         FROM (
           SELECT * FROM Report.Overview__app_from_to_PV(
-            app = '${app}',
+            app = '${dbApp}',
             from = '${from}',
             to = '${to}'
           )
         ) AS cur
         LEFT JOIN (
           SELECT * FROM Report.Overview__app_from_to_PV(
-            app = '${app}',
+            app = '${dbApp}',
             from = '${from}',
             to = '${to}'
           )
@@ -671,48 +877,61 @@ export async function GET(request: NextRequest) {
       sql = `
         SELECT *
         FROM Report.EventCatalog__app_PV(
-          app = '${app}'
+          app = '${dbApp}'
         )
         ORDER BY totalEventCount DESC
       `;
     } else if (type === 'mission_total') {
+      const appCondMp = getAppCondWithSn(app, 'ac.appID', 'mp.appSN');
+      const appCondRc = getAppCondWithSn(app, 'ac.appID', 'rc.appSN');
+
       if (userSegment === "all") {
         sql = `
-          WITH combined AS (
+          WITH distinct_mp AS (
             SELECT 
-              dt,
-              uniqExactMerge(completeCount) AS completeCount,
-              uniqExactMerge(uu) AS uu,
-              sumMerge(rewardAmount) AS rewardP
-            FROM Performance.MissionDaily
-            WHERE (appID = '${app}' OR '${app}' = 'tc')
-              AND dt >= '${from}' AND dt <= '${to}'
-              AND rewardType IN ('POINT', 'DIRECT')
-            GROUP BY dt
-
+              mp.dt AS dt,
+              mp.participationSN AS itemSN,
+              toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
+              mp.accountSN AS accountSN
+            FROM Performance.MissionParticipation_Raw AS mp
+            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
+            WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
+              AND ${appCondMp}
+              AND mp.status = 'COMPLETED'
+              AND mp.rewardType IN ('POINT', 'DIRECT')
+              AND mp.missionSN > 0
+            GROUP BY dt, itemSN, rewardP, accountSN
+          ),
+          distinct_rc AS (
+            SELECT 
+              rc.dt AS dt,
+              rc.seq AS itemSN,
+              toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
+              rc.accountSN AS accountSN
+            FROM Performance.RCPayload_Raw AS rc
+            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
+            WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
+              AND ${appCondRc}
+              AND rc.status = 2
+              AND rc.subType BETWEEN 101 AND 112
+            GROUP BY dt, itemSN, rewardP, accountSN
+          ),
+          combined AS (
+            SELECT * FROM distinct_mp
             UNION ALL
-
-            SELECT 
-              dt,
-              uniqExactMerge(cnt) AS completeCount,
-              uniqExactMerge(uu) AS uu,
-              sumMerge(rewardAmount) AS rewardP
-            FROM Performance.RCDaily
-            WHERE (appID = '${app}' OR '${app}' = 'tc')
-              AND dt >= '${from}' AND dt <= '${to}'
-            GROUP BY dt
+            SELECT * FROM distinct_rc
           )
           SELECT 
             dt,
-            sum(completeCount) AS totalCompleteCount,
-            sum(uu) AS totalParticipantUu,
+            count(itemSN) AS totalCompleteCount,
+            uniqExact(accountSN) AS totalParticipantUu,
             sum(rewardP) AS totalRewardAmount
           FROM combined
           GROUP BY dt
           ORDER BY dt ASC
+          SETTINGS max_partitions_to_read = 100
         `;
       } else {
-        const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
         const segCondMp = userSegment === "new"
           ? `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`
           : `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
@@ -731,7 +950,7 @@ export async function GET(request: NextRequest) {
             LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
             LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
             WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
-              AND ${appCond}
+              AND ${appCondMp}
               AND mp.status = 'COMPLETED'
               AND mp.rewardType IN ('POINT', 'DIRECT')
               AND mp.missionSN > 0
@@ -748,7 +967,7 @@ export async function GET(request: NextRequest) {
             LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
             LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
             WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
-              AND ${appCond}
+              AND ${appCondRc}
               AND rc.status = 2
               AND rc.subType BETWEEN 101 AND 112
               ${segCondRc}
@@ -771,368 +990,244 @@ export async function GET(request: NextRequest) {
         `;
       }
     } else if (type === 'missions_detail') {
-      if (userSegment === "all") {
-        sql = `
-          WITH combined AS (
-            SELECT 
-              upper(missionType) AS label,
-              uniqExactMerge(completeCount) AS completeCount,
-              uniqExactMerge(uu) AS uu,
-              sumMerge(rewardAmount) AS rewardP
-            FROM Performance.MissionDaily
-            WHERE (appID = '${app}' OR '${app}' = 'tc')
-              AND dt >= '${from}' AND dt <= '${to}'
-              AND rewardType IN ('POINT', 'DIRECT')
-            GROUP BY missionType
+      const appCondMp = getAppCondWithSn(app, 'ac.appID', 'mp.appSN');
+      const appCondRc = getAppCondWithSn(app, 'ac.appID', 'rc.appSN');
 
-            UNION ALL
+      const segCondMp = userSegment === "new"
+        ? `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`
+        : userSegment === "returning"
+        ? `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`
+        : ``;
 
-            SELECT 
-              'RC' AS label,
-              uniqExactMerge(cnt) AS completeCount,
-              uniqExactMerge(uu) AS uu,
-              sumMerge(rewardAmount) AS rewardP
-            FROM Performance.RCDaily
-            WHERE (appID = '${app}' OR '${app}' = 'tc')
-              AND dt >= '${from}' AND dt <= '${to}'
-            GROUP BY label
-          ),
-          summed AS (
-            SELECT 
-              label,
-              sum(completeCount) AS completeCount,
-              sum(uu) AS uu,
-              sum(rewardP) AS rewardAmount
-            FROM combined
-            GROUP BY label
-          )
+      const segCondRc = userSegment === "new"
+        ? `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`
+        : userSegment === "returning"
+        ? `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`
+        : ``;
+
+      sql = `
+        WITH distinct_mp AS (
+          SELECT 
+            mp.dt AS dt,
+            mp.participationSN AS itemSN,
+            upper(m.missionType) AS label,
+            toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
+            mp.accountSN AS accountSN
+          FROM Performance.MissionParticipation_Raw AS mp
+          INNER JOIN Performance.Mission_V AS m ON m.missionSN = mp.missionSN
+          LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
+          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
+          WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
+            AND ${appCondMp}
+            AND mp.status = 'COMPLETED'
+            AND mp.rewardType IN ('POINT', 'DIRECT')
+            AND mp.missionSN > 0
+            ${segCondMp}
+          GROUP BY dt, itemSN, label, rewardP, accountSN
+        ),
+        distinct_rc AS (
+          SELECT 
+            rc.dt AS dt,
+            rc.seq AS itemSN,
+            'RC' AS label,
+            toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
+            rc.accountSN AS accountSN
+          FROM Performance.RCPayload_Raw AS rc
+          LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
+          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
+          WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
+            AND ${appCondRc}
+            AND rc.status = 2
+            AND rc.subType BETWEEN 101 AND 112
+            ${segCondRc}
+          GROUP BY dt, itemSN, label, rewardP, accountSN
+        ),
+        combined AS (
+          SELECT * FROM distinct_mp
+          UNION ALL
+          SELECT * FROM distinct_rc
+        ),
+        summed AS (
           SELECT 
             label,
-            multiIf(
-              label = 'CLEANING', '책 정리',
-              label = 'SNACK', '간식',
-              label = 'DRINK', '음료',
-              label = 'RECOMMENDATION', '추천작',
-              label = 'TIP', '팁',
-              label = 'SCROLL', '스크롤',
-              label = 'RC', 'RC',
-              '기타'
-            ) AS missionName,
-            completeCount,
-            uu,
-            rewardAmount,
-            if(uu > 0, round(completeCount / uu, 1), 0) AS avgPerUser,
-            if(completeCount > 0, round(rewardAmount / completeCount, 1), 0) AS rewardPerComplete
-          FROM summed
-          ORDER BY completeCount DESC
-        `;
-      } else {
-        const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
-        const segCondMp = userSegment === "new"
-          ? `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`
-          : `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
-        const segCondRc = userSegment === "new"
-          ? `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`
-          : `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
-
-        sql = `
-          WITH distinct_mp AS (
-            SELECT 
-              mp.dt AS dt,
-              mp.participationSN AS itemSN,
-              upper(m.missionType) AS label,
-              toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
-              mp.accountSN AS accountSN
-            FROM Performance.MissionParticipation_Raw AS mp
-            INNER JOIN Performance.Mission_V AS m ON m.missionSN = mp.missionSN
-            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
-            LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-            WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
-              AND ${appCond}
-              AND mp.status = 'COMPLETED'
-              AND mp.rewardType IN ('POINT', 'DIRECT')
-              AND mp.missionSN > 0
-              ${segCondMp}
-            GROUP BY dt, itemSN, label, rewardP, accountSN
-          ),
-          distinct_rc AS (
-            SELECT 
-              rc.dt AS dt,
-              rc.seq AS itemSN,
-              'RC' AS label,
-              toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
-              rc.accountSN AS accountSN
-            FROM Performance.RCPayload_Raw AS rc
-            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
-            LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-            WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
-              AND ${appCond}
-              AND rc.status = 2
-              AND rc.subType BETWEEN 101 AND 112
-              ${segCondRc}
-            GROUP BY dt, itemSN, label, rewardP, accountSN
-          ),
-          combined AS (
-            SELECT * FROM distinct_mp
-            UNION ALL
-            SELECT * FROM distinct_rc
-          ),
-          summed AS (
-            SELECT 
-              label,
-              count(itemSN) AS completeCount,
-              uniqExact(accountSN) AS uu,
-              sum(rewardP) AS rewardAmount
-            FROM combined
-            GROUP BY label
-          )
-          SELECT 
-            label,
-            multiIf(
-              label = 'CLEANING', '책 정리',
-              label = 'SNACK', '간식',
-              label = 'DRINK', '음료',
-              label = 'RECOMMENDATION', '추천작',
-              label = 'TIP', '팁',
-              label = 'SCROLL', '스크롤',
-              label = 'RC', 'RC',
-              '기타'
-            ) AS missionName,
-            completeCount,
-            uu,
-            rewardAmount,
-            if(uu > 0, round(completeCount / uu, 1), 0) AS avgPerUser,
-            if(completeCount > 0, round(rewardAmount / completeCount, 1), 0) AS rewardPerComplete
-          FROM summed
-          ORDER BY completeCount DESC
-          SETTINGS max_partitions_to_read = 100
-        `;
-      }
+            count(itemSN) AS completeCount,
+            uniqExact(accountSN) AS uu,
+            sum(rewardP) AS rewardAmount
+          FROM combined
+          GROUP BY label
+        )
+        SELECT 
+          label,
+          multiIf(
+            label = 'CLEANING', '책 정리',
+            label = 'SNACK', '간식',
+            label = 'DRINK', '음료',
+            label = 'RECOMMENDATION', '추천작',
+            label = 'TIP', '팁',
+            label = 'SCROLL', '스크롤',
+            label = 'RC', 'RC',
+            '기타'
+          ) AS missionName,
+          completeCount,
+          uu,
+          rewardAmount,
+          if(uu > 0, round(completeCount / uu, 1), 0) AS avgPerUser,
+          if(completeCount > 0, round(rewardAmount / completeCount, 1), 0) AS rewardPerComplete
+        FROM summed
+        ORDER BY completeCount DESC
+        SETTINGS max_partitions_to_read = 100
+      `;
     } else if (type === 'mission_daily_trend') {
-      if (userSegment === "all") {
-        sql = `
-          WITH combined AS (
-            SELECT 
-              dt,
-              upper(missionType) AS label,
-              uniqExactMerge(completeCount) AS completeCount,
-              uniqExactMerge(uu) AS uu,
-              sumMerge(rewardAmount) AS rewardP
-            FROM Performance.MissionDaily
-            WHERE (appID = '${app}' OR '${app}' = 'tc')
-              AND dt >= '${from}' AND dt <= '${to}'
-              AND rewardType IN ('POINT', 'DIRECT')
-            GROUP BY dt, missionType
+      const appCondMp = getAppCondWithSn(app, 'ac.appID', 'mp.appSN');
+      const appCondRc = getAppCondWithSn(app, 'ac.appID', 'rc.appSN');
 
-            UNION ALL
+      const segCondMp = userSegment === "new"
+        ? `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`
+        : userSegment === "returning"
+        ? `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`
+        : ``;
 
-            SELECT 
-              dt,
-              'RC' AS label,
-              uniqExactMerge(cnt) AS completeCount,
-              uniqExactMerge(uu) AS uu,
-              sumMerge(rewardAmount) AS rewardP
-            FROM Performance.RCDaily
-            WHERE (appID = '${app}' OR '${app}' = 'tc')
-              AND dt >= '${from}' AND dt <= '${to}'
-            GROUP BY dt, label
-          )
+      const segCondRc = userSegment === "new"
+        ? `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`
+        : userSegment === "returning"
+        ? `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`
+        : ``;
+
+      sql = `
+        WITH distinct_mp AS (
           SELECT 
-            dt,
-            label,
-            multiIf(
-              label = 'CLEANING', '책 정리',
-              label = 'SNACK', '간식',
-              label = 'DRINK', '음료',
-              label = 'RECOMMENDATION', '추천작',
-              label = 'TIP', '팁',
-              label = 'SCROLL', '스크롤',
-              label = 'RC', 'RC',
-              '기타'
-            ) AS missionName,
-            completeCount,
-            uu,
-            rewardP AS rewardAmount,
-            if(uu > 0, round(completeCount / uu, 1), 0) AS avgPerUser,
-            if(completeCount > 0, round(rewardP / completeCount, 1), 0) AS rewardPerComplete
-          FROM combined
-          ORDER BY dt ASC, completeCount DESC
-        `;
-      } else {
-        const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
-        const segCondMp = userSegment === "new"
-          ? `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`
-          : `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
-        const segCondRc = userSegment === "new"
-          ? `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`
-          : `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
-
-        sql = `
-          WITH distinct_mp AS (
-            SELECT 
-              mp.dt AS dt,
-              mp.participationSN AS itemSN,
-              upper(m.missionType) AS label,
-              toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
-              mp.accountSN AS accountSN
-            FROM Performance.MissionParticipation_Raw AS mp
-            INNER JOIN Performance.Mission_V AS m ON m.missionSN = mp.missionSN
-            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
-            LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-            WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
-              AND ${appCond}
-              AND mp.status = 'COMPLETED'
-              AND mp.rewardType IN ('POINT', 'DIRECT')
-              AND mp.missionSN > 0
-              ${segCondMp}
-            GROUP BY dt, itemSN, label, rewardP, accountSN
-          ),
-          distinct_rc AS (
-            SELECT 
-              rc.dt AS dt,
-              rc.seq AS itemSN,
-              'RC' AS label,
-              toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
-              rc.accountSN AS accountSN
-            FROM Performance.RCPayload_Raw AS rc
-            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
-            LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-            WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
-              AND ${appCond}
-              AND rc.status = 2
-              AND rc.subType BETWEEN 101 AND 112
-              ${segCondRc}
-            GROUP BY dt, itemSN, label, rewardP, accountSN
-          ),
-          combined AS (
-            SELECT * FROM distinct_mp
-            UNION ALL
-            SELECT * FROM distinct_rc
-          )
+            mp.dt AS dt,
+            mp.participationSN AS itemSN,
+            upper(m.missionType) AS label,
+            toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
+            mp.accountSN AS accountSN
+          FROM Performance.MissionParticipation_Raw AS mp
+          INNER JOIN Performance.Mission_V AS m ON m.missionSN = mp.missionSN
+          LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
+          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
+          WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
+            AND ${appCondMp}
+            AND mp.status = 'COMPLETED'
+            AND mp.rewardType IN ('POINT', 'DIRECT')
+            AND mp.missionSN > 0
+            ${segCondMp}
+          GROUP BY dt, itemSN, label, rewardP, accountSN
+        ),
+        distinct_rc AS (
           SELECT 
-            dt,
-            label,
-            multiIf(
-              label = 'CLEANING', '책 정리',
-              label = 'SNACK', '간식',
-              label = 'DRINK', '음료',
-              label = 'RECOMMENDATION', '추천작',
-              label = 'TIP', '팁',
-              label = 'SCROLL', '스크롤',
-              label = 'RC', 'RC',
-              '기타'
-            ) AS missionName,
-            count(itemSN) AS completeCount,
-            uniqExact(accountSN) AS uu,
-            sum(rewardP) AS rewardAmount,
-            if(uu > 0, round(completeCount / uu, 1), 0) AS avgPerUser,
-            if(completeCount > 0, round(rewardP / completeCount, 1), 0) AS rewardPerComplete
-          FROM combined
-          GROUP BY dt, label, missionName
-          ORDER BY dt ASC, completeCount DESC
-          SETTINGS max_partitions_to_read = 100
-        `;
-      }
+            rc.dt AS dt,
+            rc.seq AS itemSN,
+            'RC' AS label,
+            toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
+            rc.accountSN AS accountSN
+          FROM Performance.RCPayload_Raw AS rc
+          LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
+          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
+          WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
+            AND ${appCondRc}
+            AND rc.status = 2
+            AND rc.subType BETWEEN 101 AND 112
+            ${segCondRc}
+          GROUP BY dt, itemSN, label, rewardP, accountSN
+        ),
+        combined AS (
+          SELECT * FROM distinct_mp
+          UNION ALL
+          SELECT * FROM distinct_rc
+        )
+        SELECT 
+          dt,
+          label,
+          multiIf(
+            label = 'CLEANING', '책 정리',
+            label = 'SNACK', '간식',
+            label = 'DRINK', '음료',
+            label = 'RECOMMENDATION', '추천작',
+            label = 'TIP', '팁',
+            label = 'SCROLL', '스크롤',
+            label = 'RC', 'RC',
+            '기타'
+          ) AS missionName,
+          count(itemSN) AS completeCount,
+          uniqExact(accountSN) AS uu,
+          sum(rewardP) AS rewardAmount,
+          if(uu > 0, round(completeCount / uu, 1), 0) AS avgPerUser,
+          if(completeCount > 0, round(rewardP / completeCount, 1), 0) AS rewardPerComplete
+        FROM combined
+        GROUP BY dt, label
+        ORDER BY dt ASC, completeCount DESC
+        SETTINGS max_partitions_to_read = 100
+      `;
     } else if (type === 'mission_by_type') {
-      if (userSegment === "all") {
-        sql = `
-          WITH combined AS (
-            SELECT 
-              upper(missionType) AS missionType,
-              uniqExactMerge(completeCount) AS completeCount,
-              uniqExactMerge(uu) AS uu,
-              sumMerge(rewardAmount) AS rewardP
-            FROM Performance.MissionDaily
-            WHERE (appID = '${app}' OR '${app}' = 'tc')
-              AND dt >= '${from}' AND dt <= '${to}'
-              AND rewardType IN ('POINT', 'DIRECT')
-            GROUP BY missionType
+      const appCondMp = getAppCondWithSn(app, 'ac.appID', 'mp.appSN');
+      const appCondRc = getAppCondWithSn(app, 'ac.appID', 'rc.appSN');
 
-            UNION ALL
+      const segCondMp = userSegment === "new"
+        ? `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`
+        : userSegment === "returning"
+        ? `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`
+        : ``;
 
-            SELECT 
-              'RC' AS missionType,
-              uniqExactMerge(cnt) AS completeCount,
-              uniqExactMerge(uu) AS uu,
-              sumMerge(rewardAmount) AS rewardP
-            FROM Performance.RCDaily
-            WHERE (appID = '${app}' OR '${app}' = 'tc')
-              AND dt >= '${from}' AND dt <= '${to}'
-            GROUP BY missionType
-          )
+      const segCondRc = userSegment === "new"
+        ? `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`
+        : userSegment === "returning"
+        ? `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`
+        : ``;
+
+      sql = `
+        WITH distinct_mp AS (
           SELECT 
-            missionType,
-            sum(completeCount) AS completeCount,
-            sum(uu) AS uu,
-            sum(rewardP) AS rewardAmount
-          FROM combined
-          GROUP BY missionType
-          ORDER BY completeCount DESC
-        `;
-      } else {
-        const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
-        const segCondMp = userSegment === "new"
-          ? `AND toInt64OrZero(toString(mp.accountSN)) > wm.watermark`
-          : `AND (toInt64OrZero(toString(mp.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
-        const segCondRc = userSegment === "new"
-          ? `AND toInt64OrZero(toString(rc.accountSN)) > wm.watermark`
-          : `AND (toInt64OrZero(toString(rc.accountSN)) <= wm.watermark OR wm.watermark IS NULL)`;
-
-        sql = `
-          WITH distinct_mp AS (
-            SELECT 
-              mp.dt AS dt,
-              mp.participationSN AS itemSN,
-              upper(m.missionType) AS missionType,
-              toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
-              mp.accountSN AS accountSN
-            FROM Performance.MissionParticipation_Raw AS mp
-            INNER JOIN Performance.Mission_V AS m ON m.missionSN = mp.missionSN
-            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
-            LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-            WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
-              AND ${appCond}
-              AND mp.status = 'COMPLETED'
-              AND mp.rewardType IN ('POINT', 'DIRECT')
-              AND mp.missionSN > 0
-              ${segCondMp}
-            GROUP BY dt, itemSN, missionType, rewardP, accountSN
-          ),
-          distinct_rc AS (
-            SELECT 
-              rc.dt AS dt,
-              rc.seq AS itemSN,
-              'RC' AS missionType,
-              toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
-              rc.accountSN AS accountSN
-            FROM Performance.RCPayload_Raw AS rc
-            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
-            LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
-            WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
-              AND ${appCond}
-              AND rc.status = 2
-              AND rc.subType BETWEEN 101 AND 112
-              ${segCondRc}
-            GROUP BY dt, itemSN, missionType, rewardP, accountSN
-          ),
-          combined AS (
-            SELECT * FROM distinct_mp
-            UNION ALL
-            SELECT * FROM distinct_rc
-          )
+            mp.dt AS dt,
+            mp.participationSN AS itemSN,
+            upper(m.missionType) AS missionType,
+            toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
+            mp.accountSN AS accountSN
+          FROM Performance.MissionParticipation_Raw AS mp
+          INNER JOIN Performance.Mission_V AS m ON m.missionSN = mp.missionSN
+          LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
+          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
+          WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
+            AND ${appCondMp}
+            AND mp.status = 'COMPLETED'
+            AND mp.rewardType IN ('POINT', 'DIRECT')
+            AND mp.missionSN > 0
+            ${segCondMp}
+          GROUP BY dt, itemSN, missionType, rewardP, accountSN
+        ),
+        distinct_rc AS (
           SELECT 
-            missionType,
-            count(itemSN) AS completeCount,
-            uniqExact(accountSN) AS uu,
-            sum(rewardP) AS rewardAmount
-          FROM combined
-          GROUP BY missionType
-          ORDER BY completeCount DESC
-          SETTINGS max_partitions_to_read = 100
-        `;
-      }
+            rc.dt AS dt,
+            rc.seq AS itemSN,
+            'RC' AS missionType,
+            toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
+            rc.accountSN AS accountSN
+          FROM Performance.RCPayload_Raw AS rc
+          LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
+          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
+          WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
+            AND ${appCondRc}
+            AND rc.status = 2
+            AND rc.subType BETWEEN 101 AND 112
+            ${segCondRc}
+          GROUP BY dt, itemSN, missionType, rewardP, accountSN
+        ),
+        combined AS (
+          SELECT * FROM distinct_mp
+          UNION ALL
+          SELECT * FROM distinct_rc
+        )
+        SELECT 
+          missionType,
+          count(itemSN) AS completeCount,
+          uniqExact(accountSN) AS uu,
+          sum(rewardP) AS rewardAmount
+        FROM combined
+        GROUP BY missionType
+        ORDER BY completeCount DESC
+        SETTINGS max_partitions_to_read = 100
+      `;
     } else if (type === 'attendance_daily') {
-      const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
+      const appCond = getAppCond(app, 'ac.appID');
       const addDaysStr = (dStr: string, days: number) => {
         const d = new Date(dStr);
         d.setDate(d.getDate() + days);
@@ -1173,7 +1268,7 @@ export async function GET(request: NextRequest) {
         ORDER BY dt DESC
       `;
     } else if (type === 'attendance_completion') {
-      const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
+      const appCond = getAppCond(app, 'ac.appID');
       const addDaysStr = (dStr: string, days: number) => {
         const d = new Date(dStr);
         d.setDate(d.getDate() + days);
@@ -1200,7 +1295,7 @@ export async function GET(request: NextRequest) {
           ${segCond}
       `;
     } else if (type === 'attendance_steps') {
-      const appCond = app === 'tc' ? "(1 = 1)" : `ac.appID = '${app}'`;
+      const appCond = getAppCond(app, 'ac.appID');
       const addDaysStr = (dStr: string, days: number) => {
         const d = new Date(dStr);
         d.setDate(d.getDate() + days);
@@ -1246,7 +1341,7 @@ export async function GET(request: NextRequest) {
         ORDER BY attendanceDayNo ASC
       `;
     } else if (type === 'earning_activity') {
-      const appCond = app === 'tc' ? "(1 = 1)" : `ual.appID = '${app}'`;
+      const appCond = getAppCond(app, 'ual.appID');
       let segCond = "";
       if (userSegment === "new") {
         segCond = `AND toInt64OrZero(ual.accountSN) > wm.watermark`;
@@ -1268,105 +1363,191 @@ export async function GET(request: NextRequest) {
         ORDER BY dt DESC
       `;
     } else if (type === 'ad_revenue') {
+      const appCond = getAppCond(app, 'appID');
       sql = `
-        SELECT *
-        FROM Report.AdRevenue__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}'
-        )
-        ORDER BY dt ASC
+        SELECT 
+          dt,
+          adCategory,
+          network,
+          round(sum(revenue), 2) AS revenue,
+          sum(impression) AS impression
+        FROM Performance.AdRevenueDaily_V
+        WHERE ${appCond} AND dt >= '${from}' AND dt <= '${to}'
+        GROUP BY dt, adCategory, network
+        ORDER BY dt ASC, revenue DESC
       `;
     } else if (type === 'content_revenue') {
+      const appCond = getAppCond(app, 'appID');
       sql = `
-        SELECT *
-        FROM Report.ContentRevenue__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}'
-        )
+        SELECT 
+          dt,
+          sumMerge(contentRevenueCoin) AS revenueCoin,
+          round(sumMerge(contentRevenueWon)) AS revenueWon,
+          uniqExactMerge(contentPayerUu) AS payerUu,
+          sumMerge(chargeCoin) AS chargeCoin,
+          round(sumMerge(chargeWon)) AS chargeWon,
+          round(revenueCoin / nullIf(payerUu, 0), 1) AS arppuCoin,
+          round(revenueWon / nullIf(payerUu, 0)) AS arppuWon
+        FROM Performance.CashDaily
+        WHERE ${appCond} AND dt >= '${from}' AND dt <= '${to}'
+        GROUP BY dt
         ORDER BY dt ASC
       `;
     } else if (type === 'content_view') {
+      const appCond = getAppCond(app, 'appID');
       sql = `
-        SELECT *
-        FROM Report.ContentView__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}'
-        )
+        SELECT 
+          v.eventDateKst AS dt,
+          v.readerUu,
+          v.episodeViewCount,
+          round(v.episodeViewCount / nullIf(v.readerUu, 0), 2) AS avgEpisodesPerReader,
+          v.nextEpisodeUu,
+          round((v.nextEpisodeUu / nullIf(v.readerUu, 0)) * 100, 2) AS nextEpisodeContinueRate,
+          p.waitfreeUu,
+          round((p.waitfreeUu / nullIf(v.readerUu, 0)) * 100, 2) AS waitfreeEpisodeRate
+        FROM
+        (
+          SELECT 
+            eventDateKst,
+            uniqExactMergeIf(uniqueUserCount, match(label, '^common_[a-z]+_episode[0-9]+_click$') OR match(label, '^common_[a-z]+_cta_click$') OR (label IN ('common_content_next_episode_click', 'common_content_prev_episode_click'))) AS readerUu,
+            uniqExactMergeIf(eventCount, match(label, '^common_[a-z]+_episode[0-9]+_click$') OR match(label, '^common_[a-z]+_cta_click$') OR (label IN ('common_content_next_episode_click', 'common_content_prev_episode_click'))) AS episodeViewCount,
+            uniqExactMergeIf(uniqueUserCount, label = 'common_content_next_episode_click') AS nextEpisodeUu
+          FROM Log.DailyContentEvents
+          WHERE ${appCond} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}'
+          GROUP BY eventDateKst
+        ) AS v
+        LEFT JOIN
+        (
+          SELECT 
+            dt,
+            uniqExactMerge(uu) AS waitfreeUu
+          FROM Performance.ContentPurchaseDaily
+          WHERE ${appCond} AND dt >= '${from}' AND dt <= '${to}' AND purchaseType = 11
+          GROUP BY dt
+        ) AS p ON p.dt = v.eventDateKst
         ORDER BY dt ASC
       `;
     } else if (type === 'content') {
+      const appCond = getAppCond(app, 'appID');
       sql = `
         SELECT 
           contentType,
           genre,
           content,
-          sum(impressionCount) as impressionCount,
-          sum(clickCount) as clickCount,
-          sum(clickUserCount) as clickUserCount
-        FROM Report.Content__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}'
-        )
-        WHERE content != ''
+          uniqExactMergeIf(eventCount, event = 'impression') AS impressionCount,
+          uniqExactMergeIf(eventCount, event = 'click') AS clickCount,
+          uniqExactMergeIf(uniqueUserCount, event = 'click') AS clickUserCount,
+          round((clickCount / nullIf(impressionCount, 0)) * 100, 2) AS clickRate
+        FROM Log.DailyContentEvents
+        WHERE ${appCond} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}' AND content != ''
         GROUP BY contentType, genre, content
         ORDER BY clickCount DESC
         LIMIT 2000
       `;
     } else if (type === 'genres') {
+      const appCond = getAppCond(app, 'appID');
       sql = `
-        SELECT *
-        FROM Report.Genres__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}'
-        )
+        SELECT 
+          genre,
+          uniqExactMergeIf(eventCount, event = 'impression') AS impressionCount,
+          uniqExactMergeIf(eventCount, event = 'click') AS clickCount,
+          uniqExactMergeIf(uniqueUserCount, event = 'click') AS clickUserCount,
+          round((clickCount / nullIf(impressionCount, 0)) * 100, 2) AS clickRate
+        FROM Log.DailyContentEvents
+        WHERE ${appCond} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}' AND genre != ''
+        GROUP BY genre
+        ORDER BY clickCount DESC
       `;
     } else if (type === 'content_purchase') {
+      const appCond = getAppCond(app, 'appID');
       sql = `
-        SELECT *
-        FROM Report.ContentPurchase__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}'
-        )
-        ORDER BY dt ASC
+        SELECT 
+          dt,
+          purchaseType,
+          uniqExactMerge(cnt) AS cnt,
+          uniqExactMerge(uu) AS uu
+        FROM Performance.ContentPurchaseDaily
+        WHERE ${appCond} AND dt >= '${from}' AND dt <= '${to}'
+        GROUP BY dt, purchaseType
+        ORDER BY dt ASC, purchaseType ASC
       `;
     } else if (type === 'service_total_revenue') {
+      const appCond = getAppCond(app, 'appID');
       sql = `
-        SELECT *
-        FROM Report.ServiceTotalRevenue__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}'
+        SELECT 
+          dt,
+          round(contentPayWon) AS contentPayRevenue,
+          round(adTicketRevenue) AS adTicketRevenue,
+          round(giftBoxRevenue) AS giftBoxRevenue,
+          round((contentPayWon + adTicketRevenue) + giftBoxRevenue) AS serviceTotalRevenue
+        FROM
+        (
+          SELECT 
+            c.dt AS dt,
+            sum(c.won) AS contentPayWon,
+            sum(ifNull(a.adt, 0)) AS adTicketRevenue,
+            sum(ifNull(g.gb, 0)) AS giftBoxRevenue
+          FROM
+          (
+            SELECT 
+              dt,
+              sumMerge(contentRevenueWon) AS won
+            FROM Performance.CashDaily
+            WHERE ${appCond} AND dt >= '${from}' AND dt <= '${to}'
+            GROUP BY dt
+          ) AS c
+          LEFT JOIN
+          (
+            SELECT 
+              dt,
+              sum(revenue) AS adt
+            FROM Performance.AdRevenueDaily_V
+            WHERE adCategory = 'adTicket' AND ${appCond} AND dt >= '${from}' AND dt <= '${to}'
+            GROUP BY dt
+          ) AS a ON a.dt = c.dt
+          LEFT JOIN
+          (
+            SELECT 
+              dt,
+              sum(revenue) AS gb
+            FROM Performance.AdRevenueDaily_V
+            WHERE placeName LIKE '%toon_cafe%' AND ${appCond} AND dt >= '${from}' AND dt <= '${to}'
+            GROUP BY dt
+          ) AS g ON g.dt = c.dt
+          GROUP BY c.dt
         )
         ORDER BY dt ASC
       `;
     } else if (type === 'earning') {
+      const appCond = getAppCond(app, 'appID');
       sql = `
-        SELECT *
-        FROM Report.Earning__app_from_to_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}'
-        )
+        SELECT 
+          dt,
+          sumMerge(exchangedPoints) AS exchangedPoints,
+          uniqExactMerge(exchangeUu) AS exchangeUu,
+          uniqExactMerge(maxBalanceReachUu) AS maxBalanceReachUu,
+          sumMerge(paidRewardAmount) AS paidRewardAmount
+        FROM Performance.EarningDaily
+        WHERE ${appCond} AND dt >= '${from}' AND dt <= '${to}'
+        GROUP BY dt
         ORDER BY dt ASC
       `;
     } else if (type === 'label_counts') {
       if (!label) {
         return NextResponse.json({ success: false, error: 'label parameter is required' }, { status: 400 });
       }
+      const appCond = getAppCond(app, 'appID');
       sql = `
-        SELECT *
-        FROM Report.LabelCounts__app_from_to_label_PV(
-          app = '${app}',
-          from = '${from}',
-          to = '${to}',
-          label = '${label}'
-        )
+        SELECT 
+          eventDateKst,
+          event,
+          label,
+          uniqExactMerge(eventCount) AS eventCount,
+          uniqExactMerge(uniqueUserCount) AS uniqueUserCount
+        FROM Log.DailyEventCounts
+        WHERE ${appCond} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}' AND label LIKE '${label}'
+        GROUP BY eventDateKst, event, label
+        ORDER BY eventCount DESC
       `;
     } else {
       return NextResponse.json({ success: false, error: 'Invalid type parameter' }, { status: 400 });
@@ -1386,7 +1567,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      const appCondUal = app === 'tc' ? "(1 = 1)" : `appID = '${app}'`;
+      const appCondUal = getAppCond(app, 'appID');
       const rawDauSql = `
         SELECT 
           toDate(toTimeZone(ts, 'Asia/Seoul')) AS dt,
@@ -1399,7 +1580,7 @@ export async function GET(request: NextRequest) {
         GROUP BY dt
       `;
 
-      const appCondUfs = app === 'tc' ? "(1 = 1)" : `ufs.appID = '${app}'`;
+      const appCondUfs = getAppCond(app, 'ufs.appID');
       const rawNewUserSql = `
         SELECT 
           ufs.firstEventDateKst AS dt,
@@ -1493,8 +1674,8 @@ export async function GET(request: NextRequest) {
         return `${y}-${m}-${day}`;
       };
       const extendedTo = addDaysStr(to, 6);
-      const appCondUfs = app === 'tc' ? "(1 = 1)" : `ufs.appID = '${app}'`;
-      const appCondUal = app === 'tc' ? "(1 = 1)" : `ual.appID = '${app}'`;
+      const appCondUfs = getAppCond(app, 'ufs.appID');
+      const appCondUal = getAppCond(app, 'ual.appID');
       const rawRetentionSql = `
         WITH 
         cohorts AS (
@@ -1564,8 +1745,8 @@ export async function GET(request: NextRequest) {
         return `${y}-${m}-${day}`;
       };
       const extendedTo = addDaysStr(to, 6);
-      const appCondUfs = app === 'tc' ? "(1 = 1)" : `ufs.appID = '${app}'`;
-      const appCondUal = app === 'tc' ? "(1 = 1)" : `ual.appID = '${app}'`;
+      const appCondUfs = getAppCond(app, 'ufs.appID');
+      const appCondUal = getAppCond(app, 'ual.appID');
       const rawEarningSql = `
         WITH 
         cohorts AS (
@@ -1643,7 +1824,7 @@ export async function GET(request: NextRequest) {
         return `${y}-${m}-${day}`;
       };
       const extendedTo = addDaysStr(to, 6);
-      const appCondUal = app === 'tc' ? "(1 = 1)" : `appID = '${app}'`;
+      const appCondUal = getAppCond(app, 'appID');
       const fallbackSql = `
         WITH attendance_events AS (
           SELECT 
@@ -1698,7 +1879,7 @@ export async function GET(request: NextRequest) {
         return `${y}-${m}-${day}`;
       };
       const extendedTo = addDaysStr(to, 6);
-      const appCondUal = app === 'tc' ? "(1 = 1)" : `appID = '${app}'`;
+      const appCondUal = getAppCond(app, 'appID');
       const fallbackSql = `
         WITH attendance_events AS (
           SELECT 
@@ -1737,7 +1918,7 @@ export async function GET(request: NextRequest) {
         return `${y}-${m}-${day}`;
       };
       const extendedTo = addDaysStr(to, 6);
-      const appCondUal = app === 'tc' ? "(1 = 1)" : `appID = '${app}'`;
+      const appCondUal = getAppCond(app, 'appID');
       const fallbackSql = `
         WITH attendance_events AS (
           SELECT 
