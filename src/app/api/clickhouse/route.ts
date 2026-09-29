@@ -1151,8 +1151,8 @@ export async function GET(request: NextRequest) {
           count(itemSN) AS completeCount,
           uniqExact(accountSN) AS uu,
           sum(rewardP) AS rewardAmount,
-          if(uu > 0, round(completeCount / uu, 1), 0) AS avgPerUser,
-          if(completeCount > 0, round(rewardP / completeCount, 1), 0) AS rewardPerComplete
+          if(uniqExact(accountSN) > 0, round(count(itemSN) / uniqExact(accountSN), 1), 0) AS avgPerUser,
+          if(count(itemSN) > 0, round(sum(rewardP) / count(itemSN), 1), 0) AS rewardPerComplete
         FROM combined
         GROUP BY dt, label
         ORDER BY dt ASC, completeCount DESC

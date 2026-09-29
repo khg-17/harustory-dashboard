@@ -1261,7 +1261,11 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
       dateMissionMap[dt][mKey] = { completeCount: cCount, uu: uuVal, avgPerUser: avgVal };
 
       if (!dateOverallMap[dt]) {
-        dateOverallMap[dt] = { totalCompleteCount: cCount, totalUu: uuVal };
+        dateOverallMap[dt] = { totalCompleteCount: 0, totalUu: 0 };
+      }
+      if (!missionTotalRaw || missionTotalRaw.length === 0) {
+        dateOverallMap[dt].totalCompleteCount += cCount;
+        dateOverallMap[dt].totalUu = Math.max(dateOverallMap[dt].totalUu, uuVal);
       }
     });
 
