@@ -129,11 +129,14 @@ export function useDashboardData({
           const contentRevJson = await contentRevRes.json().catch(() => null);
           if (contentRevJson && contentRevJson.success && Array.isArray(contentRevJson.data)) {
             setContentRevenueRaw(contentRevJson.data);
+            setServiceRevenueRaw(contentRevJson.data);
           } else {
             setContentRevenueRaw([]);
+            setServiceRevenueRaw([]);
           }
         } else {
           setContentRevenueRaw([]);
+          setServiceRevenueRaw([]);
         }
 
         if (contentPurchaseRes) {

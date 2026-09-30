@@ -234,10 +234,10 @@ export function computeRevenueSummary({
       const isCurrent = dtStr >= fromDate && dtStr <= toDate;
       const isPrev = dtStr >= prevFromStr && dtStr <= prevToStr;
 
-      const cPay = Number(row.contentPayRevenue || 0);
+      const cPay = Number(row.contentPayRevenue || row.revenueWon || row.revenue || 0);
       const aTick = Number(row.adTicketRevenue || 0);
       const gBox = Number(row.giftBoxRevenue || 0);
-      const sTot = Number(row.serviceTotalRevenue || 0);
+      const sTot = Number(row.serviceTotalRevenue || cPay);
 
       if (isCurrent) {
         contentPaySum += cPay;
@@ -385,7 +385,7 @@ export function computeRevenueSummary({
     serviceRevenueRaw.forEach((row) => {
       const dtStr = extractDtStr(row.dt);
       if (!dtStr || !dailyMap[dtStr]) return;
-      const cPay = Number(row.contentPayRevenue || 0);
+      const cPay = Number(row.contentPayRevenue || row.revenueWon || row.revenue || 0);
       const aTick = Number(row.adTicketRevenue || 0);
       const gBox = Number(row.giftBoxRevenue || 0);
       dailyMap[dtStr].serviceRev += cPay;
