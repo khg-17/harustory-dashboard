@@ -1450,16 +1450,14 @@ export async function GET(request: NextRequest) {
       `;
     } else if (type === 'content_revenue') {
       const appCond = getAppCond(app, 'appID');
-      const isOkCbApp = (app === 'okcashback' || app === 'okcashbag' || app.includes('okcashback'));
-      const divisor = isOkCbApp ? 1.2 : 1.0;
       sql = `
         SELECT 
           dt,
           sumMerge(contentRevenueCoin) AS revenueCoin,
-          round(sumMerge(contentRevenueWon) / ${divisor}) AS revenueWon,
+          sumMerge(contentRevenueWon) AS revenueWon,
           uniqExactMerge(contentPayerUu) AS payerUu,
           sumMerge(chargeCoin) AS chargeCoin,
-          round(sumMerge(chargeWon) / ${divisor}) AS chargeWon,
+          sumMerge(chargeWon) AS chargeWon,
           round(revenueCoin / nullIf(payerUu, 0), 1) AS arppuCoin,
           round(revenueWon / nullIf(payerUu, 0)) AS arppuWon
         FROM Performance.CashDaily
