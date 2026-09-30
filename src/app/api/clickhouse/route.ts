@@ -198,48 +198,7 @@ function mergeManualAdRevenue(app: string, from: string, to: string, baseData: a
   }
 }
 
-function mergeManualContentRevenue(app: string, from: string, to: string, baseData: any[]): any[] {
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const manualFile = path.resolve(process.cwd(), 'src/lib/manual_okcashback_content_revenue.json');
-    if (!fs.existsSync(manualFile)) return baseData || [];
 
-    const manualRows: any[] = JSON.parse(fs.readFileSync(manualFile, 'utf8'));
-    if (!Array.isArray(manualRows) || manualRows.length === 0) return baseData || [];
-
-    const targetApp = app.toLowerCase();
-    const isTotal = targetApp === 'tc' || targetApp === 'ph_all' || targetApp === 'general_all';
-
-    const filteredManual = manualRows.filter((r) => {
-      if (!r.dt || r.dt < from || r.dt > to) return false;
-      if (isTotal) return true;
-      const rApp = (r.app || '').toLowerCase();
-      return rApp === targetApp || targetApp.includes(rApp) || rApp.includes(targetApp);
-    });
-
-    if (filteredManual.length === 0) return baseData || [];
-
-    const map = new Map<string, any>();
-    (baseData || []).forEach((item) => {
-      if (item && item.dt) map.set(item.dt, { ...item });
-    });
-
-    filteredManual.forEach((r) => {
-      const existing = map.get(r.dt) || { dt: r.dt, revenueCoin: 0, revenueWon: 0, payerUu: 0, chargeCoin: 0, chargeWon: 0, arppuCoin: 0, arppuWon: 0 };
-      map.set(r.dt, {
-        ...existing,
-        revenueWon: Number(r.revenueWon || 0),
-        contentPayRevenue: Number(r.revenueWon || 0),
-        serviceTotalRevenue: Number(r.revenueWon || 0),
-      });
-    });
-
-    return Array.from(map.values()).sort((a, b) => (a.dt || '').localeCompare(b.dt || ''));
-  } catch (e) {
-    return baseData || [];
-  }
-}
 
 async function getNewUserRatio(app: string, from: string, to: string): Promise<number> {
   try {
@@ -1491,14 +1450,16 @@ export async function GET(request: NextRequest) {
       `;
     } else if (type === 'content_revenue') {
       const appCond = getAppCond(app, 'appID');
+      const isOkCbApp = (app === 'okcashback' || app === 'okcashbag' || app.includes('okcashback'));
+      const divisor = isOkCbApp ? 1.2 : 1.0;
       sql = `
         SELECT 
           dt,
           sumMerge(contentRevenueCoin) AS revenueCoin,
-          round(sumMerge(contentRevenueWon)) AS revenueWon,
+          round(sumMerge(contentRevenueWon) / ${divisor}) AS revenueWon,
           uniqExactMerge(contentPayerUu) AS payerUu,
           sumMerge(chargeCoin) AS chargeCoin,
-          round(sumMerge(chargeWon)) AS chargeWon,
+          round(sumMerge(chargeWon) / ${divisor}) AS chargeWon,
           round(revenueCoin / nullIf(payerUu, 0), 1) AS arppuCoin,
           round(revenueWon / nullIf(payerUu, 0)) AS arppuWon
         FROM Performance.CashDaily
@@ -1929,8 +1890,6 @@ export async function GET(request: NextRequest) {
 
     if (type === 'ad_revenue') {
       data = mergeManualAdRevenue(app, from, to, data || []);
-    } else if (type === 'content_revenue') {
-      data = mergeManualContentRevenue(app, from, to, data || []);
     }
 
     if (Array.isArray(data) && data.length > 0) {
@@ -1940,8 +1899,6 @@ export async function GET(request: NextRequest) {
       let sliced = sliceGlobalStore(app, type, from, to, userSegment);
       if (type === 'ad_revenue') {
         sliced = mergeManualAdRevenue(app, from, to, sliced || []);
-      } else if (type === 'content_revenue') {
-        sliced = mergeManualContentRevenue(app, from, to, sliced || []);
       }
       if (sliced.length > 0) {
         data = sanitizeDataset(type, sliced, userSegment, newUserRatio);
