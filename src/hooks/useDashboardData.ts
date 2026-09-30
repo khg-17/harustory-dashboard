@@ -106,10 +106,14 @@ export function useDashboardData({
         setVisitRetentionRaw(visitJson.success ? visitJson.data || [] : []);
         setEarningRetentionRaw(earningActJson.success ? earningActJson.data || [] : []);
       } else if (activeTab === "revenue") {
-        const [currentRes, contentRevRes, contentPurchaseRes] = await Promise.all([
+        const { prevFromStr, prevToStr } = getPreviousMonthDateRange(fromDate, toDate);
+        const fetchFromDate = (prevFromStr && prevFromStr < fromDate) ? prevFromStr : fromDate;
+
+        const [currentRes, contentRevRes, contentPurchaseRes, adRevRes] = await Promise.all([
           fetch(`/api/settlement?from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
           fetch(`/api/clickhouse?type=content_revenue&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
           fetch(`/api/clickhouse?type=content_purchase&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
+          fetch(`/api/clickhouse?type=ad_revenue&app=${selectedApp}&from=${fetchFromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
         ]);
 
         let currentItems: SettlementDailyItem[] = [];
@@ -143,7 +147,17 @@ export function useDashboardData({
           setContentPurchaseRaw([]);
         }
 
-        const { prevFromStr, prevToStr } = getPreviousMonthDateRange(fromDate, toDate);
+        if (adRevRes) {
+          const adRevJson = await adRevRes.json().catch(() => null);
+          if (adRevJson && adRevJson.success && Array.isArray(adRevJson.data)) {
+            setAdRevenueRaw(adRevJson.data);
+          } else {
+            setAdRevenueRaw([]);
+          }
+        } else {
+          setAdRevenueRaw([]);
+        }
+
         if (prevFromStr && prevToStr) {
           fetch(`/api/settlement?from=${prevFromStr}&to=${prevToStr}&_t=${timestamp}`, fetchOpts)
             .then((res) => res.json())

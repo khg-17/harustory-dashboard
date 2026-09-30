@@ -120,6 +120,7 @@ export function computeRevenueSummary({
   const adCategoryMap: Record<string, { revenue: number; impression: number }> = {};
   const networkMap: Record<string, { revenue: number; impression: number }> = {};
   let totalAdRevenue = 0;
+  let rawTotalAdRevenue = 0;
   let rewardAdRevenue = 0;
   let totalExchangedPoints = 0;
   let totalMissionReward = 0;
@@ -191,6 +192,39 @@ export function computeRevenueSummary({
         prevAdTicketSum += (adFree || 0);
         prevTotalAdRevenue += dayTotalAd;
         prevChargeWonSum += (chargeCoin || 0);
+      }
+    });
+
+    // Merge manual/external uploaded ad revenue from adRevenueRaw (e.g. OK캐쉬백) even when hasActiveSettlement is true
+    adRevenueRaw.forEach((row) => {
+      const dtStr = extractDtStr(row.dt);
+      if (!dtStr) return;
+      const net = String(row.network || "기타");
+      const isInternalSettlementNet = ["Buzzvil", "apWebCPC", "Adforus", "AdCash", "RC (비토스)", "Toss Mini", "AdSense"].includes(net);
+      if (isInternalSettlementNet) return;
+
+      const isCurrent = dtStr >= fromDate && dtStr <= toDate;
+      const isPrev = dtStr >= prevFromStr && dtStr <= prevToStr;
+      const rev = Number(row.revenue || 0);
+      const imp = Number(row.impression || 0);
+      const cat = String(row.adCategory || "display");
+
+      const isOkCb = net.toLowerCase().includes("okcashback") || net.toLowerCase().includes("ok캐쉬백") || net.toLowerCase().includes("guru_");
+      const effectiveRev = isOkCb ? rev * 0.2 : rev;
+
+      if (isCurrent) {
+        totalAdRevenue += effectiveRev;
+        if (!adCategoryMap[cat]) adCategoryMap[cat] = { revenue: 0, impression: 0 };
+        adCategoryMap[cat].revenue += effectiveRev;
+        adCategoryMap[cat].impression += imp;
+
+        if (!networkMap[net]) networkMap[net] = { revenue: 0, impression: 0 };
+        networkMap[net].revenue += effectiveRev;
+        networkMap[net].impression += imp;
+      }
+
+      if (isPrev) {
+        prevTotalAdRevenue += effectiveRev;
       }
     });
   } else {
@@ -332,6 +366,21 @@ export function computeRevenueSummary({
       dailyMap[dtStr].eCost = usedReward;
       dailyMap[dtStr].mCost = sData.missionRewardP || 0;
     });
+
+    // Also merge manual/external uploaded ad revenue from adRevenueRaw into dailyMap
+    adRevenueRaw.forEach((row) => {
+      const dtStr = extractDtStr(row.dt);
+      if (!dtStr || !dailyMap[dtStr]) return;
+      const net = String(row.network || "");
+      const isInternalSettlementNet = ["Buzzvil", "apWebCPC", "Adforus", "AdCash", "RC (비토스)", "Toss Mini", "AdSense"].includes(net);
+      if (isInternalSettlementNet) return;
+
+      const rev = Number(row.revenue || 0);
+      const isOkCb = net.toLowerCase().includes("okcashback") || net.toLowerCase().includes("ok캐쉬백") || net.toLowerCase().includes("guru_");
+      const effectiveRev = isOkCb ? (selectedApp === "okcashback" ? rev : rev * 0.2) : rev;
+
+      dailyMap[dtStr].adRev += effectiveRev;
+    });
   } else {
     serviceRevenueRaw.forEach((row) => {
       const dtStr = extractDtStr(row.dt);
@@ -377,14 +426,17 @@ export function computeRevenueSummary({
     });
   }
 
+  const isOkCashbackSelected = selectedApp === "okcashback" || selectedApp?.toLowerCase().includes("okcashback") || selectedApp?.includes("ok캐쉬백") || selectedApp?.includes("오케이캐쉬백");
+
   Object.values(dailyMap).forEach((d) => {
+    const effectiveAdRev = isOkCashbackSelected ? d.adRev * 0.2 : d.adRev;
     d.adRev = Math.round(d.adRev);
     d.rewardAdRev = Math.round(d.rewardAdRev);
     d.serviceRev = Math.round(d.serviceRev);
-    d.grossTotal = Math.round(d.serviceRev + d.adRev);
+    d.grossTotal = Math.round(d.serviceRev + effectiveAdRev);
     d.cost = Math.round(d.eCost);
-    d.margin = Math.round(d.adRev - d.cost);
-    d.marginRate = d.adRev > 0 ? Number(((d.margin / d.adRev) * 100).toFixed(1)) : 0;
+    d.margin = Math.round(effectiveAdRev - d.cost);
+    d.marginRate = effectiveAdRev > 0 ? Number(((d.margin / effectiveAdRev) * 100).toFixed(1)) : 0;
   });
 
   const rawDailyTrend = Object.values(dailyMap).sort((a, b) => a.dt.localeCompare(b.dt));
@@ -626,6 +678,7 @@ export function computeRevenueSummary({
     giftBoxSum,
     serviceTotalSum,
     totalAdRevenue,
+    rawTotalAdRevenue: rawTotalAdRevenue || totalAdRevenue,
     rewardAdRevenue,
     grossRevenue,
     totalMissionReward,

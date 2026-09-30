@@ -46,6 +46,7 @@ export function useDashboardFilters() {
     { label: "비트버니 (bitbunny)", value: "bitbunny" },
     { label: "야핏무브 (yafit)", value: "yafit" },
     { label: "하루스토리 (harustory)", value: "harustory" },
+    { label: "OK캐쉬백 (okcashback)", value: "okcashback" },
     { label: "토스 (toss)", value: "toss" },
     { label: "카카오페이 (kakaopay)", value: "kakaopay" },
     { label: "포인트홈-하루날씨 (ph-hw)", value: "ph-hw" },

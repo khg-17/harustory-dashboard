@@ -1,0 +1,198 @@
+{
+  "metrics": [
+    {
+      "metric_id": "d1_retention",
+      "metric_name": "Day 1 방문 리텐션",
+      "unit": "%",
+      "current": 24.5,
+      "previous": 24.5,
+      "wow": 0.0,
+      "avg_4w": 24.5,
+      "vs_4w_avg": 0.0,
+      "trend": "보합",
+      "status": "정상"
+    },
+    {
+      "metric_id": "d7_retention",
+      "metric_name": "Day 7 방문 리텐션",
+      "unit": "%",
+      "current": 11.2,
+      "previous": 11.2,
+      "wow": 0.0,
+      "avg_4w": 11.2,
+      "vs_4w_avg": 0.0,
+      "trend": "보합",
+      "status": "정상"
+    },
+    {
+      "metric_id": "dau",
+      "metric_name": "DAU (일간 활성 유저)",
+      "unit": "users",
+      "current": 53119,
+      "previous": 54370,
+      "wow": -2.3,
+      "avg_4w": 49512.2,
+      "vs_4w_avg": 7.3,
+      "trend": "전주 대비 하락",
+      "status": "정상"
+    },
+    {
+      "metric_id": "exchanged_points",
+      "metric_name": "포인트 교환/환전액",
+      "unit": "KRW",
+      "current": 74366600,
+      "previous": 76118000,
+      "wow": -2.3,
+      "avg_4w": 69317150,
+      "vs_4w_avg": 7.3,
+      "trend": "전주 대비 하락",
+      "status": "정상"
+    },
+    {
+      "metric_id": "gross_revenue",
+      "metric_name": "전체 총 매출",
+      "unit": "KRW",
+      "current": 169980800,
+      "previous": 173984000,
+      "wow": -2.3,
+      "avg_4w": 158439200,
+      "vs_4w_avg": 7.3,
+      "trend": "전주 대비 하락",
+      "status": "정상"
+    },
+    {
+      "metric_id": "mission_points",
+      "metric_name": "미션 지급 리워드",
+      "unit": "P",
+      "current": 223099800,
+      "previous": 228354000,
+      "wow": -2.3,
+      "avg_4w": 207951450,
+      "vs_4w_avg": 7.3,
+      "trend": "전주 대비 하락",
+      "status": "정상"
+    },
+    {
+      "metric_id": "net_margin",
+      "metric_name": "순 영업 마진",
+      "unit": "KRW",
+      "current": 95614200,
+      "previous": 97866000,
+      "wow": -2.3,
+      "avg_4w": 89122050,
+      "vs_4w_avg": 7.3,
+      "trend": "전주 대비 하락",
+      "status": "정상"
+    },
+    {
+      "metric_id": "new_users",
+      "metric_name": "신규 사용자",
+      "unit": "users",
+      "current": 13184,
+      "previous": 14812,
+      "wow": -11.0,
+      "avg_4w": 10543.5,
+      "vs_4w_avg": 25.0,
+      "trend": "전주 대비 하락",
+      "status": "확인 필요"
+    },
+    {
+      "metric_id": "retained_users",
+      "metric_name": "기존 사용자",
+      "unit": "users",
+      "current": 39935,
+      "previous": 39558,
+      "wow": 1.0,
+      "avg_4w": 38968.8,
+      "vs_4w_avg": 2.5,
+      "trend": "2주 연속 상승",
+      "status": "정상"
+    }
+  ],
+  "group_analyses": [
+    {
+      "group_key": "users",
+      "group_name": "유저 현황",
+      "primary_metric": "DAU (일간 활성 유저)",
+      "primary_wow": -2.3,
+      "metrics_summary": [
+        "DAU (일간 활성 유저): WoW -2.3%",
+        "신규 사용자: WoW -11.0%",
+        "기존 사용자: WoW +1.0%"
+      ],
+      "observation": "전체 활성 유저(DAU -2.3%) 감소 중 신규 사용자(-11.0%) 유입 축소가 주 원인으로 관찰됨 (기존 유저는 +1.0%로 상대적 방어).",
+      "interpretation_hint": "신규 마케팅 채널 유입량 및 앱스토어 노출 수치 확인 필요."
+    },
+    {
+      "group_key": "retention",
+      "group_name": "방문 리텐션",
+      "primary_metric": "Day 1 방문 리텐션",
+      "primary_wow": 0.0,
+      "metrics_summary": [
+        "Day 1 방문 리텐션: WoW +0.0%",
+        "Day 7 방문 리텐션: WoW +0.0%"
+      ],
+      "observation": "Day 1 방문 리텐션은 24.5%(WoW +0.0%), Day 7 리텐션은 11.2%(WoW +0.0%) 기록.",
+      "interpretation_hint": "초기 신규 유저 온보딩 경험 및 중장기 유저 리워드 동기부여 확인 필요."
+    },
+    {
+      "group_key": "revenue",
+      "group_name": "매출 및 손익 마진",
+      "primary_metric": "순 영업 마진",
+      "primary_wow": -2.3,
+      "metrics_summary": [
+        "전체 총 매출: WoW -2.3%",
+        "포인트 교환/환전액: WoW -2.3%",
+        "순 영업 마진: WoW -2.3%"
+      ],
+      "observation": "총 매출(WoW -2.3%)과 포인트 환전액 차감 후 실제 순 영업 마진은 WoW -2.3% 변동함.",
+      "interpretation_hint": "광고 매출 단가(CPM/CPC) 및 포인트 환전 비율 추이 점검 필요."
+    },
+    {
+      "group_key": "mission_reward",
+      "group_name": "미션 리워드",
+      "primary_metric": "미션 지급 리워드",
+      "primary_wow": -2.3,
+      "metrics_summary": [
+        "미션 지급 리워드: WoW -2.3%"
+      ],
+      "observation": "유저 미션 지급 리워드는 총 223,099,800 P (WoW -2.3%) 기록.",
+      "interpretation_hint": "미션 완료율 및 유저별 포인트 적립 소진 패턴 모니터링."
+    }
+  ],
+  "app_anomalies": [
+    {
+      "app_name": "비트버니",
+      "app_code": "bitbunny",
+      "cur_dau": 2672,
+      "prev_dau": 4075,
+      "wow": -34.4,
+      "summary": "비트버니(bitbunny) 앱의 DAU가 전주 대비 -34.4% 급락 📉함."
+    },
+    {
+      "app_name": "포인트홈-하루날씨",
+      "app_code": "ph-hw",
+      "cur_dau": 2021,
+      "prev_dau": 2882,
+      "wow": -29.9,
+      "summary": "포인트홈-하루날씨(ph-hw) 앱의 DAU가 전주 대비 -29.9% 급락 📉함."
+    }
+  ],
+  "action_items": [
+    {
+      "priority": "High",
+      "metric_name": "신규 사용자",
+      "reason": "WoW -11.0%로 급격한 하락세 감지 (최근 4주 평균 대비 +25.0%)"
+    },
+    {
+      "priority": "High",
+      "metric_name": "앱별 수치 변동: 비트버니",
+      "reason": "DAU 전주 대비 -34.4% 변동 (4,075명 ➔ 2,672명)"
+    },
+    {
+      "priority": "High",
+      "metric_name": "앱별 수치 변동: 포인트홈-하루날씨",
+      "reason": "DAU 전주 대비 -29.9% 변동 (2,882명 ➔ 2,021명)"
+    }
+  ]
+}

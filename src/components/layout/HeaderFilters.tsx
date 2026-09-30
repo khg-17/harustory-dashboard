@@ -238,33 +238,95 @@ export const HeaderFilters: React.FC<HeaderFiltersProps> = ({
                 ) : (
                   /* Categorized Sections: 전체 / 일반 / 포인트홈 */
                   <>
-                    {/* 1. 전체 Category View */}
-                    {activeCategory === "total" && totalApp.length > 0 && (
-                      <div>
-                        <div className="px-2.5 py-1 text-[11px] font-bold text-[#8b95a1]">
-                          전체
-                        </div>
-                        <div className="mt-0.5 space-y-0.5">
-                          {totalApp.map((app) => (
-                            <button
-                              key={app.value}
-                              onClick={() => {
-                                setSelectedApp(app.value);
-                                setIsOpen(false);
-                              }}
-                              className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl transition-all cursor-pointer ${
-                                selectedApp === app.value
-                                  ? "bg-[#e8f3ff] text-[#3182f6] font-bold"
-                                  : "hover:bg-[#f2f4f6] text-[#333d4b]"
-                              }`}
-                            >
-                              <span className="truncate">{app.label}</span>
-                              {selectedApp === app.value && (
-                                <Check className="w-3.5 h-3.5 text-[#3182f6] shrink-0" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
+                    {/* 1. 전체 Category View (모든 앱 합산 + 일반 앱 + 포인트홈 앱 모두 표시) */}
+                    {activeCategory === "total" && (
+                      <div className="space-y-3">
+                        {totalApp.length > 0 && (
+                          <div>
+                            <div className="px-2.5 py-1 text-[11px] font-bold text-[#8b95a1]">
+                              통합
+                            </div>
+                            <div className="mt-0.5 space-y-0.5">
+                              {totalApp.map((app) => (
+                                <button
+                                  key={app.value}
+                                  onClick={() => {
+                                    setSelectedApp(app.value);
+                                    setIsOpen(false);
+                                  }}
+                                  className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl transition-all cursor-pointer ${
+                                    selectedApp === app.value
+                                      ? "bg-[#e8f3ff] text-[#3182f6] font-bold"
+                                      : "hover:bg-[#f2f4f6] text-[#333d4b]"
+                                  }`}
+                                >
+                                  <span className="truncate">{app.label}</span>
+                                  {selectedApp === app.value && (
+                                    <Check className="w-3.5 h-3.5 text-[#3182f6] shrink-0" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {generalApps.length > 0 && (
+                          <div>
+                            <div className="px-2.5 py-1 text-[11px] font-bold text-[#8b95a1]">
+                              일반 서비스 ({generalApps.length - 1}개 앱)
+                            </div>
+                            <div className="mt-0.5 space-y-0.5">
+                              {generalApps.map((app) => (
+                                <button
+                                  key={app.value}
+                                  onClick={() => {
+                                    setSelectedApp(app.value);
+                                    setIsOpen(false);
+                                  }}
+                                  className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl transition-all cursor-pointer ${
+                                    selectedApp === app.value
+                                      ? "bg-[#e8f3ff] text-[#3182f6] font-bold"
+                                      : "hover:bg-[#f2f4f6] text-[#333d4b]"
+                                  }`}
+                                >
+                                  <span className="truncate">{app.label}</span>
+                                  {selectedApp === app.value && (
+                                    <Check className="w-3.5 h-3.5 text-[#3182f6] shrink-0" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {phApps.length > 0 && (
+                          <div>
+                            <div className="px-2.5 py-1 text-[11px] font-bold text-[#8b95a1]">
+                              포인트홈 서비스 ({phApps.length - 1}개 앱)
+                            </div>
+                            <div className="mt-0.5 space-y-0.5">
+                              {phApps.map((app) => (
+                                <button
+                                  key={app.value}
+                                  onClick={() => {
+                                    setSelectedApp(app.value);
+                                    setIsOpen(false);
+                                  }}
+                                  className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-xl transition-all cursor-pointer ${
+                                    selectedApp === app.value
+                                      ? "bg-[#e8f3ff] text-[#3182f6] font-bold"
+                                      : "hover:bg-[#f2f4f6] text-[#333d4b]"
+                                  }`}
+                                >
+                                  <span className="truncate">{app.label}</span>
+                                  {selectedApp === app.value && (
+                                    <Check className="w-3.5 h-3.5 text-[#3182f6] shrink-0" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 

@@ -5,13 +5,21 @@ import { RevenueSummary } from "@/types/dashboard";
 
 interface RevenueKpiCardsProps {
   revenueSummary: RevenueSummary;
+  selectedApp?: string;
 }
 
-export const RevenueKpiCards: React.FC<RevenueKpiCardsProps> = ({ revenueSummary }) => {
+export const RevenueKpiCards: React.FC<RevenueKpiCardsProps> = ({ revenueSummary, selectedApp = "tc" }) => {
+  const isOkCashback =
+    selectedApp === "ph-okcashback" ||
+    selectedApp === "okcashback" ||
+    selectedApp?.toLowerCase().includes("okcashback") ||
+    selectedApp?.includes("ok캐쉬백") ||
+    selectedApp?.includes("오케이캐쉬백");
+
   const grossRevenue = Number(revenueSummary?.grossRevenue || 0);
   const contentPaySum = Number(revenueSummary?.contentPaySum || 0);
   const totalAdRevenue = Number(revenueSummary?.totalAdRevenue || 0);
-  const dailyTrend = revenueSummary?.dailyTrend || [];
+  const rawTotalAdRevenue = Number(revenueSummary?.rawTotalAdRevenue || totalAdRevenue);
 
   const contentRatio = grossRevenue > 0 ? ((contentPaySum / grossRevenue) * 100).toFixed(1) : "0.0";
   const adRatio = grossRevenue > 0 ? ((totalAdRevenue / grossRevenue) * 100).toFixed(1) : "0.0";
@@ -66,11 +74,22 @@ export const RevenueKpiCards: React.FC<RevenueKpiCardsProps> = ({ revenueSummary
         <div className="flex items-center justify-between">
           <span className="text-[13px] font-semibold text-[#8b95a1]">
             광고 매출 ({adRatio}%)
+            {isOkCashback && (
+              <span className="ml-1.5 text-[10px] font-normal text-[#3182f6] bg-[#e8f3ff] px-1.5 py-0.5 rounded-md">
+                RS 20%
+              </span>
+            )}
           </span>
           {renderGrowthBadge(adGrowth)}
         </div>
         <div className="text-[28px] font-bold text-[#191f28] tracking-[-0.04em]">
-          {Math.round(totalAdRevenue).toLocaleString()}<span className="text-[18px] text-[#4e5968] ml-0.5">원</span>
+          {isOkCashback && (
+            <span className="text-[14px] font-normal text-[#8b95a1] mr-1.5">
+              ({Math.round(rawTotalAdRevenue).toLocaleString()}원)
+            </span>
+          )}
+          {Math.round(totalAdRevenue).toLocaleString()}
+          <span className="text-[18px] text-[#4e5968] ml-0.5">원</span>
         </div>
       </div>
     </div>

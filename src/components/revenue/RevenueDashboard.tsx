@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { Receipt, Download } from "lucide-react";
+import React, { useState } from "react";
+import { Receipt, Download, Upload } from "lucide-react";
 import { ChartData } from "chart.js";
 import { RevenueKpiCards } from "./RevenueKpiCards";
 import { RevenueOverallTab } from "./RevenueOverallTab";
@@ -9,6 +9,7 @@ import { AdCategoryTab } from "./AdCategoryTab";
 import { AdNetworkTab } from "./AdNetworkTab";
 import { ContentRevenueTab } from "./ContentRevenueTab";
 import { MarginAnalysisTab } from "./MarginAnalysisTab";
+import { ExcelUploadModal } from "./ExcelUploadModal";
 import { RevenueCategoryTab, RevenueSummary, ViewMode } from "@/types/dashboard";
 
 interface RevenueDashboardProps {
@@ -24,6 +25,7 @@ interface RevenueDashboardProps {
   revenueChartOptions: any;
   hasSettlementData?: boolean;
   selectedApp?: string;
+  onRefreshData?: () => void;
 }
 
 export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
@@ -39,7 +41,10 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
   revenueChartOptions,
   hasSettlementData = false,
   selectedApp = "tc",
+  onRefreshData,
 }) => {
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+
   return (
     <div className="space-y-6">
       {/* Settlement API Integration Active Badge */}
@@ -67,7 +72,7 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
         revenueCategoryTab !== "content" &&
         revenueCategoryTab !== "content_pay" &&
         revenueCategoryTab !== "content_usage" && (
-          <RevenueKpiCards revenueSummary={revenueSummary} />
+          <RevenueKpiCards revenueSummary={revenueSummary} selectedApp={selectedApp} />
         )}
 
       {/* 2. REVENUE CATEGORY CONTAINER WITH CATEGORY BREAKDOWN TABS */}
@@ -147,10 +152,19 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => setIsUploadOpen(true)}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-[#3182f6] hover:bg-[#1b64da] rounded-xl cursor-pointer transition-all shadow-[0_2px_6px_rgba(49,130,246,0.25)]"
+              title="외부 매체사 엑셀/TSV 정산 데이터 업로드"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>엑셀 정산 업로드</span>
+            </button>
+
             <button
               onClick={downloadRevenueCSV}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#4e5968] bg-[#f8f9fa] hover:bg-[#f2f4f6] rounded-lg cursor-pointer transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#4e5968] bg-[#f8f9fa] hover:bg-[#f2f4f6] rounded-xl cursor-pointer transition-colors border border-[#e5e8eb]"
               title="CSV 데이터 다운로드"
             >
               <Download className="w-3.5 h-3.5 text-[#8b95a1]" />
@@ -167,6 +181,7 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
             revenueSummary={revenueSummary}
             revenueChartData={revenueChartData}
             revenueChartOptions={revenueChartOptions}
+            selectedApp={selectedApp}
           />
         )}
 
@@ -192,6 +207,16 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
           />
         )}
       </div>
+
+      {/* EXCEL UPLOAD MODAL */}
+      <ExcelUploadModal
+        isOpen={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+        onSuccess={() => {
+          if (onRefreshData) onRefreshData();
+        }}
+        defaultApp={selectedApp.startsWith("ph-") || selectedApp === "okcashback" ? selectedApp : "ph-okcashback"}
+      />
     </div>
   );
 };

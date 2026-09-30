@@ -4,7 +4,8 @@ export type FunnelCategoryTab = "detail" | "new_user";
 export type MissionSubTab = "general" | "reward" | "attendance";
 
 export interface PagePvUvItem {
-  appID: string;
+  appID?: string;
+  dt?: string;
   label: string;
   PV: number;
   UV: number;
@@ -220,6 +221,7 @@ export interface DailyRevenueTrendItem {
   formattedDt: string;
   serviceRev: number;
   adRev: number;
+  netAdRev?: number;
   rewardAdRev: number;
   grossTotal: number;
   contentPay: number;
@@ -252,6 +254,7 @@ export interface RevenueSummary {
   giftBoxSum: number;
   serviceTotalSum: number;
   totalAdRevenue: number;
+  rawTotalAdRevenue?: number;
   rewardAdRevenue: number;
   grossRevenue: number;
   totalMissionReward: number;

@@ -1,0 +1,42 @@
+[
+  {
+    "app_code": "bitbunny",
+    "app_name": "비트버니",
+    "cur_dau": 2672,
+    "prev_dau": 4075,
+    "wow": -34.4,
+    "is_anomaly": true
+  },
+  {
+    "app_code": "yafit",
+    "app_name": "야핏무브",
+    "cur_dau": 1273,
+    "prev_dau": 1434,
+    "wow": -11.2,
+    "is_anomaly": false
+  },
+  {
+    "app_code": "kakaopay",
+    "app_name": "카카오페이",
+    "cur_dau": 27880,
+    "prev_dau": 29283,
+    "wow": -4.8,
+    "is_anomaly": false
+  },
+  {
+    "app_code": "toss",
+    "app_name": "토스",
+    "cur_dau": 10376,
+    "prev_dau": 10982,
+    "wow": -5.5,
+    "is_anomaly": false
+  },
+  {
+    "app_code": "ph-hw",
+    "app_name": "포인트홈-하루날씨",
+    "cur_dau": 2021,
+    "prev_dau": 2882,
+    "wow": -29.9,
+    "is_anomaly": true
+  }
+]

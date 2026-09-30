@@ -48,9 +48,14 @@ function updateGlobalStore(app: string, type: string, rows: any[], userSegment?:
 function sliceGlobalStore(app: string, type: string, from: string, to: string, userSegment?: string): any[] {
   const targetApp = (app === 'general_all' || app === 'ph_all') ? 'tc' : app;
   const segSuffix = userSegment && userSegment !== 'all' ? `_${userSegment}` : '';
-  const storeKey = `${targetApp}_${type}${segSuffix}`;
-  if (!appGlobalStore.has(storeKey)) return [];
-  const map = appGlobalStore.get(storeKey)!;
+
+  const map = appGlobalStore.get(`${targetApp}_${type}${segSuffix}`) ||
+              appGlobalStore.get(`${targetApp}_${type}`) ||
+              appGlobalStore.get(`tc_${type}${segSuffix}`) ||
+              appGlobalStore.get(`tc_${type}`);
+
+  if (!map) return [];
+
   const sliced: any[] = [];
   map.forEach((row, dt) => {
     if (dt >= from && dt <= to) {
@@ -58,12 +63,7 @@ function sliceGlobalStore(app: string, type: string, from: string, to: string, u
     }
   });
 
-  const sorted = sliced.sort((a, b) => (a.dt || '').localeCompare(b.dt || ''));
-  if (sorted.length > 0) return sorted;
-
-  // Fallback: If exact date range is out of cached scope, return the latest 30 rows available in store
-  const allRows: any[] = Array.from(map.values()).sort((a, b) => (a.dt || '').localeCompare(b.dt || ''));
-  return allRows.slice(-30);
+  return sliced.sort((a, b) => (a.dt || '').localeCompare(b.dt || ''));
 }
 
 // Circuit Breaker state to prevent sending queries when DB quota is hit
@@ -152,6 +152,49 @@ function getAppCondWithSn(app: string, appIdCol: string = 'ac.appID', appSnCol: 
       return `(${appIdCol} = '${app}' OR ${appSnCol} = ${targetSN})`;
     }
     return `${appIdCol} = '${app}'`;
+  }
+}
+
+function mergeManualAdRevenue(app: string, from: string, to: string, baseData: any[]): any[] {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const manualFile = path.resolve(process.cwd(), 'src/lib/manual_ad_revenue.json');
+    if (!fs.existsSync(manualFile)) return baseData || [];
+
+    const manualRows: any[] = JSON.parse(fs.readFileSync(manualFile, 'utf8'));
+    if (!Array.isArray(manualRows) || manualRows.length === 0) return baseData || [];
+
+    const targetApp = app.toLowerCase();
+    const isTotal = targetApp === 'tc' || targetApp === 'ph_all' || targetApp === 'general_all';
+
+    const filteredManual = manualRows.filter((r) => {
+      if (!r.dt || r.dt < from || r.dt > to) return false;
+      if (isTotal) return true;
+      const rApp = (r.app || '').toLowerCase();
+      return rApp === targetApp || rApp === `ph-${targetApp}` || targetApp.includes(rApp) || rApp.includes(targetApp);
+    });
+
+    if (filteredManual.length === 0) return baseData || [];
+
+    const formattedManual = filteredManual.map((r) => {
+      const unit = (r.adUnit || 'OK캐쉬백 매체').toLowerCase();
+      const isReward = unit.includes('guru_ri_') || unit.includes('reward') || unit.includes('rc');
+      return {
+        dt: r.dt,
+        adCategory: isReward ? 'reward' : 'display',
+        network: r.adUnit || 'OK캐쉬백 매체',
+        revenue: Number(r.grossRevenue || 0),
+        impression: Number(r.impressions || 0),
+      };
+    });
+
+    const manualKeys = new Set(formattedManual.map((m) => `${m.dt}_${m.network.toLowerCase()}`));
+    const cleanBase = (baseData || []).filter((b) => !manualKeys.has(`${b.dt}_${(b.network || '').toLowerCase()}`));
+
+    return [...cleanBase, ...formattedManual];
+  } catch (e) {
+    return baseData || [];
   }
 }
 
@@ -244,6 +287,8 @@ function sanitizeDataset(type: string, data: any[], userSegment?: string, newUse
   if (type === 'page_pv_uv') {
     return data.map((item: any) => ({
       ...item,
+      dt: item?.dt ? String(item.dt).split('T')[0] : '',
+      label: item?.label || '',
       PV: Number(item?.PV ?? item?.pv ?? 0) || 0,
       UV: Number(item?.UV ?? item?.uv ?? 0) || 0,
     }));
@@ -316,7 +361,7 @@ export async function GET(request: NextRequest) {
         "ph-tvdalin": "포인트홈-TV의달인",
       };
 
-      const coreApps = ["tc", "bitbunny", "yafit", "harustory"];
+      const coreApps = ["tc", "bitbunny", "yafit", "harustory", "okcashback"];
       const activeAppSet = new Set<string>(coreApps);
 
       if (Array.isArray(rawApps)) {
@@ -347,12 +392,20 @@ export async function GET(request: NextRequest) {
         { label: "비트버니 (bitbunny)", value: "bitbunny" },
         { label: "야핏무브 (yafit)", value: "yafit" },
         { label: "하루스토리 (harustory)", value: "harustory" },
+        { label: "포인트홈-OK캐쉬백 (ph-okcashback)", value: "ph-okcashback" },
+        { label: "OK캐쉬백 (okcashback)", value: "okcashback" },
         { label: "토스 (toss)", value: "toss" },
         { label: "카카오페이 (kakaopay)", value: "kakaopay" },
         { label: "포인트홈-하루날씨 (ph-hw)", value: "ph-hw" },
       ];
       return NextResponse.json({ success: true, data: defaultAppList });
     }
+  }
+
+  if (type === 'clear_cache') {
+    responseCache.clear();
+    appGlobalStore.clear();
+    return NextResponse.json({ success: true, message: "Server response cache and global store cleared" });
   }
 
   let app = searchParams.get('app') || 'tc';
@@ -491,13 +544,14 @@ export async function GET(request: NextRequest) {
         return `${y}-${m}-${day}`;
       };
       const extendedTo = addDaysStr(to, 6);
+      const fromYYYYMMDD = parseInt(from.replace(/-/g, ''), 10);
+      const extendedToYYYYMMDD = parseInt(extendedTo.replace(/-/g, ''), 10);
       const appCondUfs = getAppCond(app, 'ufs.appID');
       const appCondUal = getAppCond(app, 'ual.appID');
       sql = `
         WITH 
         cohorts AS (
           SELECT 
-            ufs.appID AS appID,
             ufs.accountSN AS accountSN,
             ufs.firstEventDateKst AS cohortDateKst
           FROM Log.UserFirstSeen_V AS ufs
@@ -514,20 +568,26 @@ export async function GET(request: NextRequest) {
           FROM cohorts
           GROUP BY cohortDateKst
         ),
+        ual_filtered AS (
+          SELECT 
+            accountSN, 
+            toDate(toTimeZone(ts, 'Asia/Seoul')) AS actionDate
+          FROM Log.UserActionLog AS ual
+          WHERE ual.env = 'prod'
+            AND ${appCondUal}
+            AND toYYYYMMDD(ual.ts) >= ${fromYYYYMMDD}
+            AND toYYYYMMDD(ual.ts) <= ${extendedToYYYYMMDD}
+          GROUP BY accountSN, actionDate
+        ),
         retention_raw AS (
           SELECT 
             c.cohortDateKst AS cohortDateKst,
-            dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) AS dayN,
-            uniqExact(c.accountSN) AS retainedUserCount
+            dateDiff('day', c.cohortDateKst, u.actionDate) AS dayN,
+            count() AS retainedUserCount
           FROM cohorts AS c
-          INNER JOIN Log.UserActionLog AS ual 
-            ON ual.accountSN = c.accountSN 
-           AND ${appCondUal}
-          WHERE ual.env = 'prod'
-            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= '${from}'
-            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) <= '${extendedTo}'
-            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= c.cohortDateKst
-            AND dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) <= 30
+          INNER JOIN ual_filtered AS u ON u.accountSN = c.accountSN
+          WHERE u.actionDate >= c.cohortDateKst
+            AND dateDiff('day', c.cohortDateKst, u.actionDate) <= 30
           GROUP BY cohortDateKst, dayN
         )
         SELECT 
@@ -538,7 +598,7 @@ export async function GET(request: NextRequest) {
         FROM retention_raw AS r
         INNER JOIN cohort_sizes AS b ON r.cohortDateKst = b.cohortDateKst
         ORDER BY cohortDate ASC, dayN ASC
-        SETTINGS max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296, max_partitions_to_read = 1000, max_rows_to_read = 0
+        SETTINGS max_threads = 4, max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296, max_partitions_to_read = 1000, max_rows_to_read = 0
       `;
     } else if (type === 'earning_activation') {
       const addDaysStr = (dStr: string, days: number) => {
@@ -550,13 +610,14 @@ export async function GET(request: NextRequest) {
         return `${y}-${m}-${day}`;
       };
       const extendedTo = addDaysStr(to, 6);
+      const fromYYYYMMDD = parseInt(from.replace(/-/g, ''), 10);
+      const extendedToYYYYMMDD = parseInt(extendedTo.replace(/-/g, ''), 10);
       const appCondUfs = getAppCond(app, 'ufs.appID');
       const appCondUal = getAppCond(app, 'ual.appID');
       sql = `
         WITH 
         cohorts AS (
           SELECT 
-            ufs.appID AS appID,
             ufs.accountSN AS accountSN,
             ufs.firstEventDateKst AS cohortDateKst
           FROM Log.UserFirstSeen_V AS ufs
@@ -573,20 +634,15 @@ export async function GET(request: NextRequest) {
           FROM cohorts
           GROUP BY cohortDateKst
         ),
-        earning_raw AS (
+        ual_filtered AS (
           SELECT 
-            c.cohortDateKst AS cohortDateKst,
-            dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) AS dayN,
-            uniqExact(c.accountSN) AS activatedUu
-          FROM cohorts AS c
-          INNER JOIN Log.UserActionLog AS ual 
-            ON ual.accountSN = c.accountSN 
-           AND ${appCondUal}
+            accountSN, 
+            toDate(toTimeZone(ts, 'Asia/Seoul')) AS actionDate
+          FROM Log.UserActionLog AS ual
           WHERE ual.env = 'prod'
-            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= '${from}'
-            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) <= '${extendedTo}'
-            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= c.cohortDateKst
-            AND dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) <= 30
+            AND ${appCondUal}
+            AND toYYYYMMDD(ual.ts) >= ${fromYYYYMMDD}
+            AND toYYYYMMDD(ual.ts) <= ${extendedToYYYYMMDD}
             AND (
               ual.label LIKE 'reward_%' 
               OR ual.label LIKE '%mission%' 
@@ -595,6 +651,17 @@ export async function GET(request: NextRequest) {
               OR ual.label LIKE '%claim%' 
               OR ual.label LIKE '%earn%'
             )
+          GROUP BY accountSN, actionDate
+        ),
+        earning_raw AS (
+          SELECT 
+            c.cohortDateKst AS cohortDateKst,
+            dateDiff('day', c.cohortDateKst, u.actionDate) AS dayN,
+            count() AS activatedUu
+          FROM cohorts AS c
+          INNER JOIN ual_filtered AS u ON u.accountSN = c.accountSN
+          WHERE u.actionDate >= c.cohortDateKst
+            AND dateDiff('day', c.cohortDateKst, u.actionDate) <= 30
           GROUP BY cohortDateKst, dayN
         )
         SELECT 
@@ -605,7 +672,7 @@ export async function GET(request: NextRequest) {
         FROM earning_raw AS r
         INNER JOIN cohort_sizes AS b ON r.cohortDateKst = b.cohortDateKst
         ORDER BY cohortDate ASC, dayN ASC
-        SETTINGS max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296, max_partitions_to_read = 1000, max_rows_to_read = 0
+        SETTINGS max_threads = 4, max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296, max_partitions_to_read = 1000, max_rows_to_read = 0
       `;
     } else if (type === 'attendance_activation') {
       const appCondUfs = getAppCond(app, 'ufs.appID');
@@ -687,37 +754,40 @@ export async function GET(request: NextRequest) {
         ? rawLabels.split(',').map(l => `'${l.trim().replace(/'/g, "")}'`).filter(Boolean)
         : ["'all_tab_view'", "'today_tab_view'", "'library_tab_view'", "'free_tab_view'", "'reward_tab_view'"];
       const labelInList = labelList.join(',');
+      const fromYYYYMMDD = parseInt(from.replace(/-/g, ''), 10);
+      const toYYYYMMDD = parseInt(to.replace(/-/g, ''), 10);
 
       if (type === 'page_pv_uv') {
         sql = `
-          SELECT label,
+          SELECT toDate(toTimeZone(ts, 'Asia/Seoul')) AS dt,
+                 label,
                  count() AS PV,
                  uniqExact(accountSN) AS UV
           FROM Log.UserActionLog
-          WHERE event = 'impression'
-            AND label IN (${labelInList})
+          WHERE env = 'prod'
             AND ${appCond}
-            AND env = 'prod'
-            AND toDate(toTimeZone(ts, 'Asia/Seoul')) >= '${from}'
-            AND toDate(toTimeZone(ts, 'Asia/Seoul')) <= '${to}'
-          GROUP BY label
-          ORDER BY label
-          SETTINGS max_partitions_to_read = 300, max_threads = 4
+            AND toYYYYMMDD(ts) >= ${fromYYYYMMDD}
+            AND toYYYYMMDD(ts) <= ${toYYYYMMDD}
+            AND event = 'impression'
+            AND label IN (${labelInList})
+          GROUP BY dt, label
+          ORDER BY dt ASC, label ASC
+          SETTINGS max_threads = 4, max_rows_to_read = 0
         `;
       } else {
         sql = `
           SELECT toDate(toTimeZone(ts, 'Asia/Seoul')) AS dt,
                  uniqExact(accountSN) AS DAU
           FROM Log.UserActionLog
-          WHERE event = 'impression'
-            AND label IN (${labelInList})
+          WHERE env = 'prod'
             AND ${appCond}
-            AND env = 'prod'
-            AND toDate(toTimeZone(ts, 'Asia/Seoul')) >= '${from}'
-            AND toDate(toTimeZone(ts, 'Asia/Seoul')) <= '${to}'
+            AND toYYYYMMDD(ts) >= ${fromYYYYMMDD}
+            AND toYYYYMMDD(ts) <= ${toYYYYMMDD}
+            AND event = 'impression'
+            AND label IN (${labelInList})
           GROUP BY dt
           ORDER BY dt ASC
-          SETTINGS max_partitions_to_read = 300, max_threads = 4
+          SETTINGS max_threads = 4, max_rows_to_read = 0
         `;
       }
     } else if (type === 'custom_funnel') {
@@ -1663,155 +1733,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Dynamic Live Raw Log Fallback for 'retention' query (Pure Watermark-filtered New User Retention)
-    if (type === 'retention' && (!Array.isArray(data) || data.length < 10 || app === 'ph-hw')) {
-      const addDaysStr = (dStr: string, days: number) => {
-        const d = new Date(dStr);
-        d.setDate(d.getDate() + days);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${y}-${m}-${day}`;
-      };
-      const extendedTo = addDaysStr(to, 6);
-      const appCondUfs = getAppCond(app, 'ufs.appID');
-      const appCondUal = getAppCond(app, 'ual.appID');
-      const rawRetentionSql = `
-        WITH 
-        cohorts AS (
-          SELECT 
-            ufs.appID AS appID,
-            ufs.accountSN AS accountSN,
-            ufs.firstEventDateKst AS cohortDateKst
-          FROM Log.UserFirstSeen_V AS ufs
-          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ufs.appID = wm.appID
-          WHERE ${appCondUfs}
-            AND toInt64OrZero(ufs.accountSN) > ifNull(wm.watermark, 0)
-            AND ufs.firstEventDateKst >= '${from}'
-            AND ufs.firstEventDateKst <= '${to}'
-        ),
-        cohort_sizes AS (
-          SELECT 
-            cohortDateKst, 
-            uniqExact(accountSN) AS d0Count
-          FROM cohorts
-          GROUP BY cohortDateKst
-        ),
-        retention_raw AS (
-          SELECT 
-            c.cohortDateKst AS cohortDateKst,
-            dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) AS dayN,
-            uniqExact(c.accountSN) AS retainedUserCount
-          FROM cohorts AS c
-          INNER JOIN Log.UserActionLog AS ual 
-            ON ual.accountSN = c.accountSN 
-           AND ${appCondUal}
-          WHERE ual.env = 'prod'
-            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= '${from}'
-            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) <= '${extendedTo}'
-            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= c.cohortDateKst
-            AND dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) <= 30
-          GROUP BY cohortDateKst, dayN
-        )
-        SELECT 
-          r.cohortDateKst AS cohortDate,
-          r.dayN AS dayN,
-          r.retainedUserCount AS retainedUserCount,
-          if(b.d0Count > 0, round(r.retainedUserCount / b.d0Count * 100, 2), 0) AS retentionRate
-        FROM retention_raw AS r
-        INNER JOIN cohort_sizes AS b ON r.cohortDateKst = b.cohortDateKst
-        ORDER BY cohortDate ASC, dayN ASC
-        SETTINGS max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296, max_partitions_to_read = 1000, max_rows_to_read = 0
-      `;
-
-      try {
-        const rawRetention: any[] = await queryClickHouse(rawRetentionSql);
-        if (Array.isArray(rawRetention) && rawRetention.length > 0) {
-          data = rawRetention;
-        }
-      } catch (e) {
-        console.warn("Failed live raw retention fallback:", e);
-      }
-    }
-
-    // Dynamic Live Raw Log Fallback for 'earning_activation' query
-    if (type === 'earning_activation' && (!Array.isArray(data) || data.length < 10 || app === 'ph-hw')) {
-      const addDaysStr = (dStr: string, days: number) => {
-        const d = new Date(dStr);
-        d.setDate(d.getDate() + days);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${y}-${m}-${day}`;
-      };
-      const extendedTo = addDaysStr(to, 6);
-      const appCondUfs = getAppCond(app, 'ufs.appID');
-      const appCondUal = getAppCond(app, 'ual.appID');
-      const rawEarningSql = `
-        WITH 
-        cohorts AS (
-          SELECT 
-            ufs.appID AS appID,
-            ufs.accountSN AS accountSN,
-            ufs.firstEventDateKst AS cohortDateKst
-          FROM Log.UserFirstSeen_V AS ufs
-          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ufs.appID = wm.appID
-          WHERE ${appCondUfs}
-            AND toInt64OrZero(ufs.accountSN) > ifNull(wm.watermark, 0)
-            AND ufs.firstEventDateKst >= '${from}'
-            AND ufs.firstEventDateKst <= '${to}'
-        ),
-        cohort_sizes AS (
-          SELECT 
-            cohortDateKst, 
-            uniqExact(accountSN) AS d0Count
-          FROM cohorts
-          GROUP BY cohortDateKst
-        ),
-        earning_raw AS (
-          SELECT 
-            c.cohortDateKst AS cohortDateKst,
-            dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) AS dayN,
-            uniqExact(c.accountSN) AS activatedUu
-          FROM cohorts AS c
-          INNER JOIN Log.UserActionLog AS ual 
-            ON ual.accountSN = c.accountSN 
-           AND ${appCondUal}
-          WHERE ual.env = 'prod'
-            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= '${from}'
-            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) <= '${extendedTo}'
-            AND toDate(toTimeZone(ual.ts, 'Asia/Seoul')) >= c.cohortDateKst
-            AND dateDiff('day', c.cohortDateKst, toDate(toTimeZone(ual.ts, 'Asia/Seoul'))) <= 30
-            AND (
-              ual.label LIKE 'reward_%' 
-              OR ual.label LIKE '%mission%' 
-              OR ual.label LIKE '%complete%' 
-              OR ual.label LIKE '%confirm%' 
-              OR ual.label LIKE '%claim%' 
-              OR ual.label LIKE '%earn%'
-            )
-          GROUP BY cohortDateKst, dayN
-        )
-        SELECT 
-          r.cohortDateKst AS cohortDate,
-          r.dayN AS dayN,
-          r.activatedUu AS activatedUu,
-          if(b.d0Count > 0, round(r.activatedUu / b.d0Count * 100, 2), 0) AS activationRate
-        FROM earning_raw AS r
-        INNER JOIN cohort_sizes AS b ON r.cohortDateKst = b.cohortDateKst
-        ORDER BY cohortDate ASC, dayN ASC
-        SETTINGS max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296, max_partitions_to_read = 1000, max_rows_to_read = 0
-      `;
-
-      try {
-        const rawEarning: any[] = await queryClickHouse(rawEarningSql);
-        if (Array.isArray(rawEarning) && rawEarning.length > 0) {
-          data = rawEarning;
-        }
-      } catch (e) {
-        console.warn("Failed live raw earning activation fallback:", e);
-      }
-    }
 
     // Dynamic Live Raw Log Fallback for 'attendance_daily'
     if (type === 'attendance_daily' && (!Array.isArray(data) || data.length === 0)) {
@@ -1963,11 +1884,18 @@ export async function GET(request: NextRequest) {
 
     data = sanitizeDataset(type, data, userSegment, newUserRatio);
 
+    if (type === 'ad_revenue') {
+      data = mergeManualAdRevenue(app, from, to, data || []);
+    }
+
     if (Array.isArray(data) && data.length > 0) {
       responseCache.set(cacheKey, { timestamp: Date.now(), data });
       updateGlobalStore(app, type, data, userSegment);
-    } else if (app !== 'harustory') {
-      const sliced = sliceGlobalStore(app, type, from, to, userSegment);
+    } else {
+      let sliced = sliceGlobalStore(app, type, from, to, userSegment);
+      if (type === 'ad_revenue') {
+        sliced = mergeManualAdRevenue(app, from, to, sliced || []);
+      }
       if (sliced.length > 0) {
         data = sanitizeDataset(type, sliced, userSegment, newUserRatio);
         responseCache.set(cacheKey, { timestamp: Date.now(), data });

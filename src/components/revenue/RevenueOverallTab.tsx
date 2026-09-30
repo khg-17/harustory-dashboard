@@ -34,6 +34,7 @@ interface RevenueOverallTabProps {
   revenueSummary: RevenueSummary;
   revenueChartData: ChartData<"line">;
   revenueChartOptions: any;
+  selectedApp?: string;
 }
 
 export const RevenueOverallTab: React.FC<RevenueOverallTabProps> = ({
@@ -42,8 +43,16 @@ export const RevenueOverallTab: React.FC<RevenueOverallTabProps> = ({
   revenueSummary,
   revenueChartData,
   revenueChartOptions,
+  selectedApp = "tc",
 }) => {
   const dailyTrend = revenueSummary?.dailyTrend || [];
+
+  const isOkCashback =
+    selectedApp === "ph-okcashback" ||
+    selectedApp === "okcashback" ||
+    selectedApp?.toLowerCase().includes("okcashback") ||
+    selectedApp?.includes("ok캐쉬백") ||
+    selectedApp?.includes("오케이캐쉬백");
 
   return (
     <div className="space-y-4">
@@ -84,7 +93,14 @@ export const RevenueOverallTab: React.FC<RevenueOverallTabProps> = ({
             <div className="text-xs font-bold text-[#4e5968] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <TableIcon className="w-3.5 h-3.5 text-[#3182f6]" />
-                <span>일별/기간별 매출 상세 데이터</span>
+                <span>
+                  일별/기간별 매출 상세 데이터
+                  {isOkCashback && (
+                    <span className="ml-2 text-[11px] font-normal text-[#3182f6] bg-[#e8f3ff] px-2 py-0.5 rounded-md">
+                      OK캐쉬백 RS (8:2) 적용 - (전체 매출) 실제 매출 20%
+                    </span>
+                  )}
+                </span>
               </div>
               <span className="text-[11px] text-[#8b95a1] font-normal">
                 총 {dailyTrend.length}개 기록
@@ -96,15 +112,21 @@ export const RevenueOverallTab: React.FC<RevenueOverallTabProps> = ({
                   <tr className="bg-[#f8f9fa] font-bold text-[#4e5968] border-b border-[#e5e8eb]">
                     <th className="py-3.5 px-4">날짜 / 기간 (dt)</th>
                     <th className="py-3.5 px-4 text-right">콘텐츠 매출</th>
-                    <th className="py-3.5 px-4 text-right">광고 매출</th>
+                    <th className="py-3.5 px-4 text-right">
+                      {isOkCashback ? "광고 매출 (전체 / 실제 20%)" : "광고 매출"}
+                    </th>
                     <th className="py-3.5 px-4 text-right">전체 총 매출</th>
                     <th className="py-3.5 px-4 text-right">콘텐츠 비중 (%)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f2f4f6] font-medium text-[#4e5968]">
                   {dailyTrend.map((row) => {
+                    const grossAdRev = row.adRev;
+                    const netAdRev = isOkCashback ? Math.round(row.adRev * 0.2) : row.adRev;
+                    const effectiveTotal = isOkCashback ? row.serviceRev + netAdRev : row.grossTotal;
+
                     const ratio =
-                      row.grossTotal > 0 ? ((row.serviceRev / row.grossTotal) * 100).toFixed(1) : "0.0";
+                      effectiveTotal > 0 ? ((row.serviceRev / effectiveTotal) * 100).toFixed(1) : "0.0";
                     return (
                       <tr key={row.dt} className="hover:bg-[#f8f9fa] transition-colors">
                         <td className="py-3.5 px-4 font-semibold text-[#191f28]">{row.dt}</td>
@@ -112,10 +134,21 @@ export const RevenueOverallTab: React.FC<RevenueOverallTabProps> = ({
                           {Math.round(row.serviceRev).toLocaleString()}원
                         </td>
                         <td className="py-3.5 px-4 text-right font-medium text-[#4e5968]">
-                          {Math.round(row.adRev).toLocaleString()}원
+                          {isOkCashback ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <span className="text-[#8b95a1] font-normal text-[11px]">
+                                ({Math.round(grossAdRev).toLocaleString()}원)
+                              </span>
+                              <span className="font-bold text-[#191f28]">
+                                {Math.round(netAdRev).toLocaleString()}원
+                              </span>
+                            </div>
+                          ) : (
+                            `${Math.round(row.adRev).toLocaleString()}원`
+                          )}
                         </td>
                         <td className="py-3.5 px-4 text-right font-bold text-[#00c980]">
-                          {Math.round(row.grossTotal).toLocaleString()}원
+                          {Math.round(effectiveTotal).toLocaleString()}원
                         </td>
                         <td className="py-3.5 px-4 text-right font-medium text-[#4e5968]">{ratio}%</td>
                       </tr>

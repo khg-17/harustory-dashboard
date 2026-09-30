@@ -766,6 +766,7 @@ export default function Dashboard() {
             revenueChartOptions={revenueChartOptions}
             hasSettlementData={hasActiveSettlement}
             selectedApp={selectedApp}
+            onRefreshData={fetchDashboardData}
           />
         )}
 
