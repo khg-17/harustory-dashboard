@@ -41,6 +41,7 @@ import {
   JourneyNodeData,
   FunnelCategoryTab,
 } from "@/types/dashboard";
+import { externalGlassTooltip } from "@/utils/chartGlassTooltip";
 
 ChartJS.register(
   CategoryScale,
@@ -916,6 +917,8 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
                       plugins: {
                         legend: { display: false },
                         tooltip: {
+                          enabled: false,
+                          external: externalGlassTooltip,
                           callbacks: {
                             title: (items: any) => {
                               const idx = items[0]?.dataIndex;
@@ -1013,6 +1016,8 @@ export const FunnelDashboard: React.FC<FunnelDashboardProps> = ({
                     plugins: {
                       legend: { display: false },
                       tooltip: {
+                        enabled: false,
+                        external: externalGlassTooltip,
                         callbacks: {
                           label: (ctx: any) => ` 전환율: ${Number(ctx.raw).toFixed(1)}%`,
                         },

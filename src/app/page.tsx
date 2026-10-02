@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import { RefreshCw, Menu } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -37,6 +37,7 @@ import { useDashboardData } from "@/hooks/useDashboardData";
 import { getSettlementDataForApp } from "@/utils/settlementHelpers";
 import { computeRevenueSummary } from "@/utils/revenueProcessors";
 import { processRawDataToMap, computeAvgDecay } from "@/utils/retentionProcessors";
+import { externalGlassTooltip } from "@/utils/chartGlassTooltip";
 
 // Register Chart.js Modules
 ChartJS.register(
@@ -194,7 +195,7 @@ export default function Dashboard() {
   }, [chartProcessedData]);
 
   // DAU & New User Line Chart Configuration
-  const dauChartData: ChartData<"line"> = {
+  const dauChartData = useMemo<ChartData<"line">>(() => ({
     labels: chartProcessedData.map((d) => d.label),
     datasets: [
       {
@@ -232,9 +233,9 @@ export default function Dashboard() {
         fill: true,
       },
     ],
-  };
+  }), [chartProcessedData, periodType]);
 
-  const dauChartOptions = {
+  const dauChartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
@@ -256,18 +257,8 @@ export default function Dashboard() {
         },
       },
       tooltip: {
-        backgroundColor: "#191f28",
-        titleColor: "#ffffff",
-        bodyColor: "#b0b8c1",
-        titleFont: { family: "Pretendard, sans-serif", size: 12, weight: "bold" },
-        bodyFont: { family: "Pretendard, sans-serif", size: 12 },
-        padding: 12,
-        cornerRadius: 12,
-        displayColors: true,
-        boxWidth: 8,
-        boxHeight: 8,
-        usePointStyle: true,
-        boxPadding: 6,
+        enabled: false,
+        external: externalGlassTooltip,
         callbacks: {
           label: (context: any) => ` ${context.dataset.label}: ${Number(context.raw).toLocaleString()}명`,
         },
@@ -285,10 +276,10 @@ export default function Dashboard() {
         ticks: { color: "#8b95a1", font: { family: "Pretendard, sans-serif", size: 11, weight: 500 }, callback: (v: any) => Number(v).toLocaleString() },
       },
     },
-  };
+  }), []);
 
   // CSV Exporter for DAU
-  const downloadCSV = () => {
+  const downloadCSV = useCallback(() => {
     if (chartProcessedData.length === 0) return;
     let csv = "날짜/기간,전체 DAU (활성 유저),신규 유저 수,신규 비율(%)\n";
     chartProcessedData.forEach((row) => {
@@ -303,7 +294,7 @@ export default function Dashboard() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, [chartProcessedData, selectedApp, fromDate, toDate]);
 
   // 2. Process Cohort Retention & Activation Datasets
   const visitRows = useMemo<CohortRow[]>(() => processRawDataToMap(visitRetentionRaw, false), [visitRetentionRaw]);
@@ -385,7 +376,7 @@ export default function Dashboard() {
     };
   }, [dayNList, avgVisitDecay, avgEarningDecay, retentionMode]);
 
-  const decayChartOptions = {
+  const decayChartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
@@ -395,13 +386,8 @@ export default function Dashboard() {
     plugins: {
       legend: { position: "top" as const, align: "end" as const, labels: { boxWidth: 12, usePointStyle: true, font: { family: "Pretendard, sans-serif", size: 11, weight: 600 } } },
       tooltip: {
-        backgroundColor: "#191f28",
-        titleFont: { family: "Pretendard, sans-serif", size: 12, weight: "bold" },
-        bodyFont: { family: "Pretendard, sans-serif", size: 12 },
-        padding: 10,
-        cornerRadius: 10,
-        displayColors: true,
-        boxPadding: 4,
+        enabled: false,
+        external: externalGlassTooltip,
         callbacks: {
           label: (context: any) => ` ${context.dataset.label}: ${context.raw !== null ? context.raw + "%" : "-"}`,
         },
@@ -449,7 +435,7 @@ export default function Dashboard() {
         },
       },
     },
-  };
+  }), []);
 
   const hasActiveSettlement = useMemo(() => {
     return (
@@ -478,7 +464,7 @@ export default function Dashboard() {
   }, [serviceRevenueRaw, adRevenueRaw, missionTotalRaw, earningRaw, contentRevenueRaw, contentPurchaseRaw, settlementRaw, selectedApp, periodType, fromDate, toDate, hasActiveSettlement]);
 
   // Overall Revenue Line Chart Configuration
-  const revenueChartData: ChartData<"line"> = {
+  const revenueChartData = useMemo<ChartData<"line">>(() => ({
     labels: (revenueSummary.dailyTrend || []).map((d) => d.formattedDt || d.dt),
     datasets: [
       {
@@ -522,10 +508,10 @@ export default function Dashboard() {
         tension: 0.35,
       },
     ],
-  };
+  }), [revenueSummary.dailyTrend]);
 
   // Margin Analysis Line Chart Configuration
-  const marginChartData: ChartData<"line"> = {
+  const marginChartData = useMemo<ChartData<"line">>(() => ({
     labels: (revenueSummary.dailyTrend || []).map((d) => d.formattedDt || d.dt),
     datasets: [
       {
@@ -569,9 +555,9 @@ export default function Dashboard() {
         fill: true,
       },
     ],
-  };
+  }), [revenueSummary.dailyTrend]);
 
-  const revenueChartOptions = {
+  const revenueChartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
@@ -593,18 +579,8 @@ export default function Dashboard() {
         },
       },
       tooltip: {
-        backgroundColor: "#191f28",
-        titleColor: "#ffffff",
-        bodyColor: "#b0b8c1",
-        titleFont: { family: "Pretendard, sans-serif", size: 12, weight: "bold" },
-        bodyFont: { family: "Pretendard, sans-serif", size: 12 },
-        padding: 12,
-        cornerRadius: 12,
-        displayColors: true,
-        boxWidth: 8,
-        boxHeight: 8,
-        usePointStyle: true,
-        boxPadding: 6,
+        enabled: false,
+        external: externalGlassTooltip,
         callbacks: {
           label: (context: any) => ` ${context.dataset.label}: ${Number(context.raw).toLocaleString()}원`,
         },
@@ -622,10 +598,10 @@ export default function Dashboard() {
         ticks: { color: "#8b95a1", font: { family: "Pretendard, sans-serif", size: 11, weight: 500 }, callback: (v: any) => `${Number(v).toLocaleString()}원` },
       },
     },
-  };
+  }), []);
 
   // CSV Exporter for Revenue
-  const downloadRevenueCSV = () => {
+  const downloadRevenueCSV = useCallback(() => {
     if (revenueSummary.dailyTrend.length === 0) return;
     let csv = "날짜(dt),콘텐츠매출(원),광고매출(원),전체총매출(원),미션리워드비용(원),포인트환전비용(원),총비용(원),순영업마진(원),손익마진율(%)\n";
 
@@ -641,7 +617,7 @@ export default function Dashboard() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, [revenueSummary.dailyTrend, selectedApp, fromDate, toDate]);
 
   return (
     <div className="flex min-h-screen bg-[#f2f4f6] text-[#191f28] font-sans antialiased relative">
@@ -835,28 +811,45 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* MINIMALIST ULTRA-CLEAN CORPORATE TOOLTIP */}
+      {/* MINIMALIST ULTRA-CLEAN CORPORATE TOOLTIP (GLASSMORPHISM) */}
       {heatmapTooltip && (
         <div
-          className="fixed z-50 transform -translate-x-1/2 -translate-y-full mb-1.5 bg-[#191f28] text-white px-3 py-2 rounded-xl shadow-lg text-xs font-sans pointer-events-none transition-all duration-75 space-y-1"
-          style={{ left: `${heatmapTooltip.x}px`, top: `${heatmapTooltip.y}px` }}
+          className="fixed z-50 transform -translate-x-1/2 -translate-y-full mb-2.5 px-3.5 py-2.5 rounded-2xl shadow-[0_12px_36px_rgba(0,0,0,0.12),0_4px_12px_rgba(0,0,0,0.04)] text-xs font-sans pointer-events-none transition-all duration-75 space-y-1.5"
+          style={{
+            left: `${heatmapTooltip.x}px`,
+            top: `${heatmapTooltip.y}px`,
+            background: "rgba(255, 255, 255, 0.85)",
+            backdropFilter: "blur(20px) saturate(180%)",
+            WebkitBackdropFilter: "blur(20px) saturate(180%)",
+            border: "1px solid rgba(255, 255, 255, 0.9)",
+            color: "#191f28",
+          }}
         >
-          <div className="font-semibold text-gray-300 text-[11px] border-b border-gray-700 pb-1">
+          <div className="font-bold text-[#191f28] text-xs border-b border-[#e5e8eb] pb-1 tracking-tight">
             {heatmapTooltip.date} 가입자 · Day {heatmapTooltip.dayNum}
           </div>
           {heatmapTooltip.isCombined ? (
-            <div className="space-y-0.5 text-[11px] font-medium">
-              <div className="text-[#8bb8ff]">
-                방문: <span className="font-bold">{heatmapTooltip.visitCount.toLocaleString()}명</span> ({heatmapTooltip.visitRate}%)
+            <div className="space-y-1.5 text-[11.5px]">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#3182f6] shadow-[0_1px_3px_rgba(49,130,246,0.4)]" />
+                <span className="text-[#4e5968] font-medium">방문:</span>
+                <span className="font-bold text-[#191f28]">{heatmapTooltip.visitCount.toLocaleString()}명</span>
+                <span className="font-bold text-[#3182f6] text-[11px]">({heatmapTooltip.visitRate}%)</span>
               </div>
-              <div className="text-[#d4b8ff]">
-                적립: <span className="font-bold">{heatmapTooltip.earningCount.toLocaleString()}명</span> ({heatmapTooltip.earningRate}%)
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#8b5cf6] shadow-[0_1px_3px_rgba(139,92,246,0.4)]" />
+                <span className="text-[#4e5968] font-medium">적립:</span>
+                <span className="font-bold text-[#191f28]">{heatmapTooltip.earningCount.toLocaleString()}명</span>
+                <span className="font-bold text-[#8b5cf6] text-[11px]">({heatmapTooltip.earningRate}%)</span>
               </div>
             </div>
           ) : (
-            <div className="text-gray-300 text-[11px] font-medium whitespace-nowrap">
-              {heatmapTooltip.typeText}: <span className="font-bold text-white">{heatmapTooltip.visitCount.toLocaleString()}명</span> / 가입{" "}
-              <span className="font-bold text-white">{heatmapTooltip.newUserCount.toLocaleString()}명</span> ({heatmapTooltip.visitRate}%)
+            <div className="flex items-center gap-1.5 text-[11.5px] whitespace-nowrap">
+              <span className="w-2 h-2 rounded-full bg-[#3182f6] shadow-[0_1px_3px_rgba(49,130,246,0.4)]" />
+              <span className="text-[#4e5968] font-medium">{heatmapTooltip.typeText}:</span>
+              <span className="font-bold text-[#191f28]">{heatmapTooltip.visitCount.toLocaleString()}명</span>
+              <span className="text-[#8b95a1] text-[10.5px]">/ 가입 {heatmapTooltip.newUserCount.toLocaleString()}명</span>
+              <span className="font-bold text-[#3182f6] ml-0.5">({heatmapTooltip.visitRate}%)</span>
             </div>
           )}
         </div>

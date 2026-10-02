@@ -119,7 +119,7 @@ export async function verifySessionToken(token: string): Promise<AuthUser | null
 
     const user: AuthUser = JSON.parse(payloadStr);
     return user;
-  } catch (e) {
+  } catch {
     return null;
   }
 }

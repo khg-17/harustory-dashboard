@@ -62,15 +62,25 @@ export const DauChartSection: React.FC<DauChartSectionProps> = ({
           </h2>
           <div className="relative group">
             <Info className="w-4 h-4 text-[#8b95a1] cursor-pointer hover:text-[#4e5968] transition-colors" />
-            <div className="absolute left-0 top-6 hidden group-hover:block z-50 w-72 p-3 bg-[#191f28] text-white text-xs rounded-xl shadow-xl border border-gray-700 font-normal leading-relaxed space-y-1.5 pointer-events-none transition-all">
-              <div className="font-bold text-gray-200 border-b border-gray-700 pb-1 flex items-center gap-1.5">
+            <div
+              className="absolute left-0 top-6 hidden group-hover:block z-50 w-72 p-3.5 rounded-2xl shadow-[0_12px_36px_rgba(0,0,0,0.12),0_4px_12px_rgba(0,0,0,0.04)] text-xs pointer-events-none transition-all duration-150 space-y-2"
+              style={{
+                background: "rgba(255, 255, 255, 0.88)",
+                backdropFilter: "blur(20px) saturate(180%)",
+                WebkitBackdropFilter: "blur(20px) saturate(180%)",
+                border: "1px solid rgba(255, 255, 255, 0.9)",
+                color: "#191f28",
+              }}
+            >
+              <div className="font-bold text-[#191f28] border-b border-[#e5e8eb] pb-1.5 flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 text-[#3182f6]" />
                 <span>DAU 및 신규 유저 지표 안내</span>
               </div>
-              <p className="text-[11px] text-gray-300">
-                <strong className="text-[#8bb8ff]">DAU (활성 유저):</strong> 선택한 기간 동안 앱을 방문하여 이벤트를 발생시킨 중복 없는 실사용자 수입니다. (주별/월별 선택 시 일평균 DAU)
+              <p className="text-[11.5px] text-[#4e5968] leading-relaxed">
+                <strong className="text-[#3182f6]">DAU (활성 유저):</strong> 선택한 기간 동안 앱을 방문하여 이벤트를 발생시킨 중복 없는 실사용자 수입니다. (주별/월별 선택 시 일평균 DAU)
               </p>
-              <p className="text-[11px] text-gray-300">
-                <strong className="text-[#5ae4a7]">신규 가입 유저:</strong> 해당 기간 동안 앱을 최초 가입 및 설치한 신규 유저 수입니다.
+              <p className="text-[11.5px] text-[#4e5968] leading-relaxed">
+                <strong className="text-[#00c980]">신규 가입 유저:</strong> 해당 기간 동안 앱을 최초 가입 및 설치한 신규 유저 수입니다.
               </p>
             </div>
           </div>

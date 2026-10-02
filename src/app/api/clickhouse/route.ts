@@ -172,12 +172,24 @@ function mergeManualAdRevenue(app: string, from: string, to: string, baseData: a
       if (!r.dt || r.dt < from || r.dt > to) return false;
       if (isTotal) return true;
       const rApp = (r.app || '').toLowerCase();
-      return rApp === targetApp || rApp === `ph-${targetApp}` || targetApp.includes(rApp) || rApp.includes(targetApp);
+      // Strict matching only: exact match or explicit ph- prefix variant.
+      return rApp === targetApp || rApp === `ph-${targetApp}` || `ph-${rApp}` === targetApp;
     });
 
-    if (filteredManual.length === 0) return baseData || [];
+    // Deduplicate by dt+adUnit+grossRevenue to prevent double counting
+    const deduped: typeof filteredManual = [];
+    const seenKeys = new Set<string>();
+    filteredManual.forEach((r) => {
+      const key = `${r.dt}_${(r.adUnit || '').toLowerCase()}_${r.grossRevenue}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        deduped.push(r);
+      }
+    });
 
-    const formattedManual = filteredManual.map((r) => {
+    if (deduped.length === 0) return baseData || [];
+
+    const formattedManual = deduped.map((r) => {
       const unit = (r.adUnit || 'OK캐쉬백 매체').toLowerCase();
       const isReward = unit.includes('guru_ri_') || unit.includes('reward') || unit.includes('rc');
       return {
@@ -186,11 +198,27 @@ function mergeManualAdRevenue(app: string, from: string, to: string, baseData: a
         network: r.adUnit || 'OK캐쉬백 매체',
         revenue: Number(r.grossRevenue || 0),
         impression: Number(r.impressions || 0),
+        isManual: true,
       };
     });
 
+    // Dates that have manual OK캐쉬백 / Guru ad revenue data
+    const manualDates = new Set(formattedManual.map((m) => m.dt));
     const manualKeys = new Set(formattedManual.map((m) => `${m.dt}_${m.network.toLowerCase()}`));
-    const cleanBase = (baseData || []).filter((b) => !manualKeys.has(`${b.dt}_${(b.network || '').toLowerCase()}`));
+
+    // Clean baseData: if manual entries exist for OK캐쉬백/Guru on date 'dt',
+    // remove any DB raw rows for OK캐쉬백/Guru to prevent double counting (1+1=2x)
+    const cleanBase = (baseData || []).filter((b) => {
+      const bNet = (b.network || '').toLowerCase();
+      const bCat = (b.adCategory || '').toLowerCase();
+      const isOkCbDbRow = bNet.includes('okcashback') || bNet.includes('ok캐쉬백') || bNet.includes('guru_') || bCat.includes('okcashback');
+
+      // If it's a DB OK캐쉬백 row on a date where manual OK캐쉬백 entries exist, remove it
+      if (isOkCbDbRow && manualDates.has(b.dt)) {
+        return false;
+      }
+      return !manualKeys.has(`${b.dt}_${bNet}`);
+    });
 
     return [...cleanBase, ...formattedManual];
   } catch (e) {

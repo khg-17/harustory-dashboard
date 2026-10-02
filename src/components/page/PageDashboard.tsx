@@ -16,6 +16,7 @@ import {
 } from "chart.js";
 import { BarChart2, Table as TableIcon, TrendingUp } from "lucide-react";
 import { PagePvUvItem, PageDauItem, ViewMode } from "@/types/dashboard";
+import { externalGlassTooltip } from "@/utils/chartGlassTooltip";
 
 ChartJS.register(
   CategoryScale,
@@ -334,9 +335,8 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
         labels: { font: { family: "Pretendard", size: 12 }, usePointStyle: true },
       },
       tooltip: {
-        padding: 12,
-        titleFont: { family: "Pretendard", size: 13, weight: "bold" as const },
-        bodyFont: { family: "Pretendard", size: 12 },
+        enabled: false,
+        external: externalGlassTooltip,
         callbacks: {
           label: function (context: any) {
             return `${context.dataset.label}: ${Number(context.raw).toLocaleString()} 회/명`;
@@ -377,9 +377,8 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
         labels: { font: { family: "Pretendard", size: 11, weight: 600 as const }, usePointStyle: true, boxWidth: 8 },
       },
       tooltip: {
-        padding: 12,
-        titleFont: { family: "Pretendard", size: 13, weight: "bold" as const },
-        bodyFont: { family: "Pretendard", size: 12 },
+        enabled: false,
+        external: externalGlassTooltip,
         callbacks: {
           label: function (context: any) {
             return `${context.dataset.label}: ${Number(context.raw).toLocaleString()} 회/명`;

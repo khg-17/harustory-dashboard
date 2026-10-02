@@ -59,22 +59,25 @@ cd /Users/khg/Desktop/clickhouse-dashboard/harustory-report-agent
 source venv/bin/activate
 ```
 
-### STEP 2: Daily Intelligence Report 생성
+### STEP 2: 하루스토리 일간 모니터링 리포트 생성
 
-#### 기본 실행 (어제 전일 완료 데이터 기준)
+#### 기본 실행 (전일 완료 데이터 기준 실시간 DB 자동 쿼리)
 ```bash
-python main.py --real-db --no-llm
+python main.py
 ```
 
-#### 특이사항 포함 실행 (이벤트, 점검 등)
+#### 특정 날짜 지정 실행 (예: 2026-10-01)
 ```bash
-python main.py --real-db --notes "전일 신규 프로모션 오픈, 서비스 장애 0건"
+python main.py --date 2026-10-01
 ```
 
 ---
 
 ## 📄 4. 결과 파일 확인 방법
 
-1. **`output/daily_intelligence_report.md`**: 완성된 Daily Intelligence Report
-   - VSCode에서 해당 파일을 열고 **`Cmd + K, V`**를 누르면 예쁜 미리보기 패널로 열람하실 수 있습니다.
-2. **`output/daily_analysis.json`**: 7가지 수치가 정밀 계산된 JSON 파일
+1. **`output/daily_monitoring_report.md`**: 완성된 하루스토리 일간 모니터링 리포트
+   - VSCode에서 해당 파일을 열고 **`Cmd + K, V`**를 누르면 표와 지표가 예쁜 마크다운 패널로 열람 가능합니다.
+2. 터미널에서 Finder 폴더 바로 열기:
+```bash
+open output
+```

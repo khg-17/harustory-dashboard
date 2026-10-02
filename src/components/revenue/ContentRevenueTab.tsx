@@ -16,6 +16,7 @@ import {
   ChartData,
 } from "chart.js";
 import { RevenueCategoryTab, RevenueSummary, ViewMode } from "@/types/dashboard";
+import { externalGlassTooltip } from "@/utils/chartGlassTooltip";
 
 ChartJS.register(
   CategoryScale,
@@ -95,9 +96,8 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
         labels: { boxWidth: 12, usePointStyle: true, font: { family: "Pretendard", size: 11, weight: 600 } },
       },
       tooltip: {
-        backgroundColor: "#191f28",
-        padding: 10,
-        cornerRadius: 10,
+        enabled: false,
+        external: externalGlassTooltip,
         callbacks: {
           label: (context: any) => ` ${context.dataset.label}: ${Number(context.raw).toLocaleString()}원`,
         },
@@ -202,9 +202,8 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
         labels: { boxWidth: 12, usePointStyle: true, font: { family: "Pretendard", size: 11, weight: 600 } },
       },
       tooltip: {
-        backgroundColor: "#191f28",
-        padding: 10,
-        cornerRadius: 10,
+        enabled: false,
+        external: externalGlassTooltip,
         callbacks: {
           label: (context: any) => ` ${context.dataset.label}: ${Number(context.raw).toLocaleString()}건`,
         },
@@ -249,9 +248,8 @@ export const ContentRevenueTab: React.FC<ContentRevenueTabProps> = ({
         labels: { boxWidth: 10, usePointStyle: true, font: { family: "Pretendard", size: 10, weight: 600 } },
       },
       tooltip: {
-        backgroundColor: "#191f28",
-        padding: 10,
-        cornerRadius: 10,
+        enabled: false,
+        external: externalGlassTooltip,
         callbacks: {
           label: (context: any) => {
             const val = Number(context.raw);

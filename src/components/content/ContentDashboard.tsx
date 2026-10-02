@@ -32,6 +32,7 @@ import {
   ChartData,
 } from "chart.js";
 import { ContentItem, GenreItem, ContentViewItem } from "@/types/dashboard";
+import { externalGlassTooltip } from "@/utils/chartGlassTooltip";
 
 ChartJS.register(
   CategoryScale,
@@ -46,14 +47,6 @@ ChartJS.register(
 );
 
 ChartJS.defaults.font.family = "Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif";
-
-interface ContentDashboardProps {
-  contentRaw: ContentItem[];
-  genresRaw: GenreItem[];
-  contentViewRaw: ContentViewItem[];
-  contentPurchaseRaw: any[];
-  loading: boolean;
-}
 
 interface ContentDashboardProps {
   contentRaw: ContentItem[];
@@ -482,6 +475,18 @@ export const ContentDashboard: React.FC<ContentDashboardProps> = ({
                     maintainAspectRatio: false,
                     plugins: {
                       legend: { position: "right", labels: { boxWidth: 10, font: { size: 11 } } },
+                      tooltip: {
+                        enabled: false,
+                        external: externalGlassTooltip,
+                        callbacks: {
+                          label: (ctx) => {
+                            const val = Number(ctx.raw) || 0;
+                            const total = genreAggregated.totalClicks || 1;
+                            const pct = ((val / total) * 100).toFixed(1);
+                            return ` ${ctx.label}: ${val.toLocaleString()}회 (${pct}%)`;
+                          },
+                        },
+                      },
                     },
                     cutout: "68%",
                   }}
@@ -541,6 +546,8 @@ export const ContentDashboard: React.FC<ContentDashboardProps> = ({
                   plugins: {
                     legend: { display: false },
                     tooltip: {
+                      enabled: false,
+                      external: externalGlassTooltip,
                       callbacks: {
                         label: (ctx) => ` ${ctx.label}: ${Number(ctx.raw).toLocaleString()}건`,
                       },

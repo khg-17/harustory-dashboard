@@ -64,7 +64,7 @@ export function parseExchangedPoints(item: any): number {
 export function generateDateRange(fromStr: string, toStr: string): string[] {
   const dates: string[] = [];
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fromStr) || !/^\d{4}-\d{2}-\d{2}$/.test(toStr)) return dates;
-  let curr = new Date(fromStr + "T00:00:00");
+  const curr = new Date(fromStr + "T00:00:00");
   const end = new Date(toStr + "T00:00:00");
   while (curr <= end) {
     const y = curr.getFullYear();
@@ -195,13 +195,16 @@ export function computeRevenueSummary({
       }
     });
 
-    // Merge manual/external uploaded ad revenue from adRevenueRaw (e.g. OK캐쉬백) even when hasActiveSettlement is true
+    // When hasActiveSettlement is true, strictly ONLY merge manual uploaded ad revenue (e.g. OK캐쉬백 Excel upload).
+    // Use ONLY row.isManual === true as the gate — network name patterns like "guru_" or "okcashback"
+    // can accidentally match ClickHouse DB rows and cause double counting with manual JSON rows.
     adRevenueRaw.forEach((row) => {
       const dtStr = extractDtStr(row.dt);
       if (!dtStr) return;
       const net = String(row.network || "기타");
-      const isInternalSettlementNet = ["Buzzvil", "apWebCPC", "Adforus", "AdCash", "RC (비토스)", "Toss Mini", "AdSense"].includes(net);
-      if (isInternalSettlementNet) return;
+
+      // Strict: only process rows explicitly flagged as manual upload
+      if (row.isManual !== true) return;
 
       const isCurrent = dtStr >= fromDate && dtStr <= toDate;
       const isPrev = dtStr >= prevFromStr && dtStr <= prevToStr;
@@ -209,11 +212,23 @@ export function computeRevenueSummary({
       const imp = Number(row.impression || 0);
       const cat = String(row.adCategory || "display");
 
-      const isOkCb = net.toLowerCase().includes("okcashback") || net.toLowerCase().includes("ok캐쉬백") || net.toLowerCase().includes("guru_");
+      const isOkCb =
+        selectedApp === "okcashback" ||
+        selectedApp === "ph-okcashback" ||
+        net.toLowerCase().includes("okcashback") ||
+        net.toLowerCase().includes("ok캐쉬백") ||
+        net.toLowerCase().includes("guru_");
+
       const effectiveRev = isOkCb ? rev * 0.2 : rev;
 
       if (isCurrent) {
         totalAdRevenue += effectiveRev;
+        if (isOkCb) {
+          rawTotalAdRevenue += rev;
+        } else {
+          rawTotalAdRevenue += rev;
+        }
+
         if (!adCategoryMap[cat]) adCategoryMap[cat] = { revenue: 0, impression: 0 };
         adCategoryMap[cat].revenue += effectiveRev;
         adCategoryMap[cat].impression += imp;
@@ -258,13 +273,26 @@ export function computeRevenueSummary({
       const isCurrent = dtStr >= fromDate && dtStr <= toDate;
       const isPrev = dtStr >= prevFromStr && dtStr <= prevToStr;
 
-      const rev = Number(row.revenue || 0);
-      const imp = Number(row.impression || 0);
-      const cat = String(row.adCategory || "기타");
       const net = String(row.network || "기타");
+      const cat = String(row.adCategory || "기타");
+      const imp = Number(row.impression || 0);
+      const rawRev = Number(row.revenue || 0);
+
+      // OK캐쉬백 / Guru ad revenue rows (whether manual upload or ClickHouse DB): apply 20% RS factor (0.2)
+      const isOkCb =
+        selectedApp === "okcashback" ||
+        selectedApp === "ph-okcashback" ||
+        net.toLowerCase().includes("guru_") ||
+        net.toLowerCase().includes("okcashback") ||
+        net.includes("OK캐쉬백");
+
+      const effectiveRev = isOkCb ? rawRev * 0.2 : rawRev;
 
       if (isCurrent) {
-        totalAdRevenue += rev;
+        totalAdRevenue += effectiveRev;
+        if (isOkCb) {
+          rawTotalAdRevenue += rawRev;
+        }
 
         const catLower = cat.toLowerCase();
         const netLower = net.toLowerCase();
@@ -273,20 +301,20 @@ export function computeRevenueSummary({
           : (catLower === "rc" || (catLower === "display" && (netLower === "adpopcorn" || netLower === "adforus")));
 
         if (isRewardAd) {
-          rewardAdRevenue += rev;
+          rewardAdRevenue += effectiveRev;
         }
 
         if (!adCategoryMap[cat]) adCategoryMap[cat] = { revenue: 0, impression: 0 };
-        adCategoryMap[cat].revenue += rev;
+        adCategoryMap[cat].revenue += effectiveRev;
         adCategoryMap[cat].impression += imp;
 
         if (!networkMap[net]) networkMap[net] = { revenue: 0, impression: 0 };
-        networkMap[net].revenue += rev;
+        networkMap[net].revenue += effectiveRev;
         networkMap[net].impression += imp;
       }
 
       if (isPrev) {
-        prevTotalAdRevenue += rev;
+        prevTotalAdRevenue += effectiveRev;
       }
     });
 
@@ -319,7 +347,11 @@ export function computeRevenueSummary({
     });
   }
 
-  const totalRewardCost = totalExchangedPoints;
+  // okcashback: 포인트 환전 비용을 당사가 부담하지 않으므로 cost = 0, 순이익 = 순수 20% 광고매출
+  const isOkCashbackApp =
+    selectedApp === "okcashback" || selectedApp === "ph-okcashback" ||
+    selectedApp?.toLowerCase().includes("okcashback");
+  const totalRewardCost = isOkCashbackApp ? 0 : totalExchangedPoints;
   const netProfit = totalAdRevenue - totalRewardCost;
   const marginRate = totalAdRevenue > 0 ? (netProfit / totalAdRevenue) * 100 : 0;
 
@@ -367,17 +399,25 @@ export function computeRevenueSummary({
       dailyMap[dtStr].mCost = sData.missionRewardP || 0;
     });
 
-    // Also merge manual/external uploaded ad revenue from adRevenueRaw into dailyMap
+    // Merge manual/external uploaded ad revenue (e.g. OK캐쉬백 Excel upload) into dailyMap.
+    // Strict: only row.isManual === true — network name patterns may match ClickHouse rows and cause double counting.
     adRevenueRaw.forEach((row) => {
       const dtStr = extractDtStr(row.dt);
       if (!dtStr || !dailyMap[dtStr]) return;
       const net = String(row.network || "");
-      const isInternalSettlementNet = ["Buzzvil", "apWebCPC", "Adforus", "AdCash", "RC (비토스)", "Toss Mini", "AdSense"].includes(net);
-      if (isInternalSettlementNet) return;
+
+      // Strict: only process rows explicitly flagged as manual upload
+      if (row.isManual !== true) return;
 
       const rev = Number(row.revenue || 0);
-      const isOkCb = net.toLowerCase().includes("okcashback") || net.toLowerCase().includes("ok캐쉬백") || net.toLowerCase().includes("guru_");
-      const effectiveRev = isOkCb ? (selectedApp === "okcashback" ? rev : rev * 0.2) : rev;
+      const isOkCb =
+        selectedApp === "okcashback" ||
+        selectedApp === "ph-okcashback" ||
+        net.toLowerCase().includes("okcashback") ||
+        net.toLowerCase().includes("ok캐쉬백") ||
+        net.toLowerCase().includes("guru_");
+
+      const effectiveRev = isOkCb ? rev * 0.2 : rev;
 
       dailyMap[dtStr].adRev += effectiveRev;
     });
@@ -397,17 +437,27 @@ export function computeRevenueSummary({
     adRevenueRaw.forEach((row) => {
       const dtStr = extractDtStr(row.dt);
       if (!dtStr || !dailyMap[dtStr]) return;
-      const rev = Number(row.revenue || 0);
-      dailyMap[dtStr].adRev += rev;
+      const net = String(row.network || "");
+      const rawRev = Number(row.revenue || 0);
+
+      // Manual okcashback upload rows: apply 20% RS factor
+      const isManualOkCb =
+        row.isManual === true &&
+        (net.toLowerCase().includes("guru_") ||
+          net.toLowerCase().includes("okcashback") ||
+          net.includes("OK캐쉬백"));
+      const effectiveRev = isManualOkCb ? rawRev * 0.2 : rawRev;
+
+      dailyMap[dtStr].adRev += effectiveRev;
 
       const catLower = String(row.adCategory || "").toLowerCase();
-      const netLower = String(row.network || "").toLowerCase();
+      const netLower = net.toLowerCase();
       const isRewardAd = isPhApp
         ? (catLower === "rc" || netLower === "adcash" || (catLower === "display" && netLower === "adcash"))
         : (catLower === "rc" || (catLower === "display" && (netLower === "adpopcorn" || netLower === "adforus")));
 
       if (isRewardAd) {
-        dailyMap[dtStr].rewardAdRev += rev;
+        dailyMap[dtStr].rewardAdRev += effectiveRev;
       }
     });
 
@@ -426,17 +476,17 @@ export function computeRevenueSummary({
     });
   }
 
-  const isOkCashbackSelected = selectedApp === "okcashback" || selectedApp?.toLowerCase().includes("okcashback") || selectedApp?.includes("ok캐쉬백") || selectedApp?.includes("오케이캐쉬백");
-
+  // NOTE: okcashback manual upload revenue is already multiplied by 0.2 inside adRevenueRaw.forEach above.
+  // Do NOT apply 0.2 again here — that would cause a 0.04 (4%) effective rate instead of 20%.
   Object.values(dailyMap).forEach((d) => {
-    const effectiveAdRev = isOkCashbackSelected ? d.adRev * 0.2 : d.adRev;
     d.adRev = Math.round(d.adRev);
     d.rewardAdRev = Math.round(d.rewardAdRev);
     d.serviceRev = Math.round(d.serviceRev);
-    d.grossTotal = Math.round(d.serviceRev + effectiveAdRev);
-    d.cost = Math.round(d.eCost);
-    d.margin = Math.round(effectiveAdRev - d.cost);
-    d.marginRate = effectiveAdRev > 0 ? Number(((d.margin / effectiveAdRev) * 100).toFixed(1)) : 0;
+    d.grossTotal = Math.round(d.serviceRev + d.adRev);
+    // okcashback: 포인트 환전 비용 당사 부담 아님 → cost = 0, margin = 광고매출 그 자체
+    d.cost = isOkCashbackApp ? 0 : Math.round(d.eCost);
+    d.margin = Math.round(d.adRev - d.cost);
+    d.marginRate = d.adRev > 0 ? Number(((d.margin / d.adRev) * 100).toFixed(1)) : 0;
   });
 
   const rawDailyTrend = Object.values(dailyMap).sort((a, b) => a.dt.localeCompare(b.dt));

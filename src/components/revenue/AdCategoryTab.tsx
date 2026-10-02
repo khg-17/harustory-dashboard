@@ -15,6 +15,7 @@ import {
   ChartData,
 } from "chart.js";
 import { RevenueSummary } from "@/types/dashboard";
+import { externalGlassTooltip } from "@/utils/chartGlassTooltip";
 
 ChartJS.register(
   CategoryScale,
@@ -85,18 +86,8 @@ export const AdCategoryTab: React.FC<AdCategoryTabProps> = ({ revenueSummary }) 
         },
       },
       tooltip: {
-        backgroundColor: "#191f28",
-        titleColor: "#ffffff",
-        bodyColor: "#b0b8c1",
-        titleFont: { family: "Pretendard, sans-serif", size: 12, weight: "bold" as const },
-        bodyFont: { family: "Pretendard, sans-serif", size: 12 },
-        padding: 12,
-        cornerRadius: 12,
-        displayColors: true,
-        boxWidth: 8,
-        boxHeight: 8,
-        usePointStyle: true,
-        boxPadding: 6,
+        enabled: false,
+        external: externalGlassTooltip,
         callbacks: {
           label: (context: any) => ` ${context.dataset.label}: ${Number(context.raw).toLocaleString()}원`,
         },

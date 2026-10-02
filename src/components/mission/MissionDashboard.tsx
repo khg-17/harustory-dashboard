@@ -28,6 +28,7 @@ import {
   MissionSubTab,
   UserSegment,
 } from "@/types/dashboard";
+import { externalGlassTooltip } from "@/utils/chartGlassTooltip";
 
 ChartJS.register(
   CategoryScale,
@@ -120,60 +121,8 @@ const TOSS_COLORS = [
   "#14b8a6", // Teal
 ];
 
-// Custom HTML External Tooltip Handler for authentic iOS Frosted Glass Effect
-const externalGlassTooltip = (context: any) => {
-  let tooltipEl = document.getElementById("chartjs-tooltip-glass");
+// externalGlassTooltip is imported from @/utils/chartGlassTooltip
 
-  if (!tooltipEl) {
-    tooltipEl = document.createElement("div");
-    tooltipEl.id = "chartjs-tooltip-glass";
-    tooltipEl.style.position = "absolute";
-    tooltipEl.style.pointerEvents = "none";
-    tooltipEl.style.transition = "all 0.12s ease-out";
-    tooltipEl.style.zIndex = "9999";
-    tooltipEl.style.padding = "10px 14px";
-    tooltipEl.style.borderRadius = "16px";
-    tooltipEl.style.background = "rgba(255, 255, 255, 0.82)";
-    tooltipEl.style.backdropFilter = "blur(20px) saturate(180%)";
-    (tooltipEl.style as any).webkitBackdropFilter = "blur(20px) saturate(180%)";
-    tooltipEl.style.border = "1px solid rgba(255, 255, 255, 0.85)";
-    tooltipEl.style.boxShadow = "0 12px 36px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.04)";
-    tooltipEl.style.color = "#191f28";
-    tooltipEl.style.fontSize = "11.5px";
-    tooltipEl.style.fontFamily = "Pretendard, -apple-system, sans-serif";
-    document.body.appendChild(tooltipEl);
-  }
-
-  const tooltipModel = context.tooltip;
-  if (tooltipModel.opacity === 0) {
-    tooltipEl.style.opacity = "0";
-    return;
-  }
-
-  if (tooltipModel.body) {
-    const titleLines = tooltipModel.title || [];
-    const bodyLines = tooltipModel.body.map((b: any) => b.lines);
-
-    let innerHtml = "";
-    if (titleLines.length) {
-      innerHtml += `<div style="font-weight:700;font-size:12px;color:#191f28;margin-bottom:4px;letter-spacing:-0.02em;">${titleLines.join(" ")}</div>`;
-    }
-
-    bodyLines.forEach((body: string[], i: number) => {
-      const colors = tooltipModel.labelColors[i] || { backgroundColor: "#3182f6" };
-      const dot = `<span style="background:${colors.backgroundColor};width:8px;height:8px;display:inline-block;border-radius:50%;margin-right:6px;box-shadow:0 1px 3px ${colors.backgroundColor}60;"></span>`;
-      innerHtml += `<div style="display:flex;align-items:center;font-size:11.5px;font-weight:600;color:#333d4b;margin-top:3px;">${dot}${body.join(" ")}</div>`;
-    });
-
-    tooltipEl.innerHTML = innerHtml;
-  }
-
-  const position = context.chart.canvas.getBoundingClientRect();
-  tooltipEl.style.opacity = "1";
-  tooltipEl.style.left = position.left + window.scrollX + tooltipModel.caretX + "px";
-  tooltipEl.style.top = position.top + window.scrollY + tooltipModel.caretY - 10 + "px";
-  tooltipEl.style.transform = "translate(-50%, -100%)";
-};
 
 // Helper Component for Info Tooltip (Authentic iOS Frosted Glass)
 const InfoTooltip: React.FC<{ text: string }> = ({ text }) => (
@@ -182,19 +131,19 @@ const InfoTooltip: React.FC<{ text: string }> = ({ text }) => (
     <div
       className="absolute left-1/2 -translate-x-1/2 top-6 hidden group-hover:block z-[9999] w-72 p-3.5 rounded-2xl text-[11.5px] font-medium leading-relaxed pointer-events-none transition-all duration-200"
       style={{
-        background: "rgba(25, 31, 40, 0.88)",
+        background: "rgba(255, 255, 255, 0.88)",
         backdropFilter: "blur(20px) saturate(180%)",
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        border: "1px solid rgba(255, 255, 255, 0.2)",
-        boxShadow: "0 16px 40px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.15)",
-        color: "#ffffff",
+        border: "1px solid rgba(255, 255, 255, 0.9)",
+        boxShadow: "0 12px 36px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.04)",
+        color: "#191f28",
       }}
     >
-      <div className="flex items-center gap-1.5 mb-1.5 text-[#3182f6] font-bold text-xs border-b border-white/10 pb-1.5">
+      <div className="flex items-center gap-1.5 mb-1.5 text-[#191f28] font-bold text-xs border-b border-[#e5e8eb] pb-1.5">
         <Info className="w-3.5 h-3.5 shrink-0 text-[#3182f6]" />
         <span>지표 설명 안내</span>
       </div>
-      <div className="text-[#d1d5db] font-normal leading-relaxed">{text}</div>
+      <div className="text-[#4e5968] font-normal leading-relaxed">{text}</div>
     </div>
   </div>
 );

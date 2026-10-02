@@ -18,6 +18,7 @@ import {
   CustomStepConfig, 
   FunnelCategoryTab 
 } from "@/types/dashboard";
+import { externalGlassTooltip } from "@/utils/chartGlassTooltip";
 
 ChartJS.register(
   CategoryScale,
@@ -399,6 +400,8 @@ export const NewUserFunnelDashboard: React.FC<NewUserFunnelDashboardProps> = ({
                 plugins: {
                   legend: { display: false },
                   tooltip: {
+                    enabled: false,
+                    external: externalGlassTooltip,
                     callbacks: {
                       title: (items: any) => {
                         const idx = items[0]?.dataIndex;

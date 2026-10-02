@@ -8,10 +8,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from src.generate_report import run_daily_intelligence_pipeline
 from src.fetch_real_data import sync_daily_intelligence_data
+from src.generate_monitoring_report import run_monitoring_pipeline
 
 def main():
     parser = argparse.ArgumentParser(
-        description="HaruStory Daily Service Intelligence Report Agent - 매일 아침 인텔리전스 분석 도구"
+        description="HaruStory Daily Monitoring Report Agent - 하루스토리 일간 모니터링 리포트 생성기"
     )
     
     parser.add_argument(
@@ -37,7 +38,8 @@ def main():
     parser.add_argument(
         "--real-db", 
         action="store_true",
-        help="대시보드 ClickHouse DB에서 최신 실제 시계열 데이터를 불러와 리포트를 생성합니다."
+        default=True,
+        help="대시보드 ClickHouse DB에서 최신 실제 시계열 데이터를 불러와 리포트를 생성합니다. (기본 True)"
     )
     parser.add_argument(
         "--app",
@@ -58,27 +60,19 @@ def main():
     args = parser.parse_args()
 
     print("=" * 65)
-    print("🧠 HaruStory Daily Service Intelligence Report Agent 실행 시작")
+    print("📊 HaruStory Daily Monitoring Report Agent 실행 시작")
     print("=" * 65)
 
-    # 실제 DB 연동 또는 시계열 동기화
-    if args.real_db or not Path(args.data).exists():
-        print("🔗 [ClickHouse DB 연동] 최근 35일간의 실시간 대시보드 시계열 수치를 동기화합니다...")
-        sync_daily_intelligence_data(target_date_str=args.date)
-
     try:
-        json_path, report_path = run_daily_intelligence_pipeline(
-            csv_path=args.data,
-            config_path=args.config,
-            output_dir=args.output_dir,
-            no_llm=args.no_llm,
-            notes=args.notes
+        # 1. 일간 모니터링 리포트 자동 생성
+        monitoring_report_path = run_monitoring_pipeline(
+            target_date=args.date,
+            output_dir=args.output_dir
         )
         
         print("\n" + "=" * 65)
-        print("✨ Daily Intelligence Report 생성이 성공적으로 완료되었습니다!")
-        print(f"📄 분석 JSON: {json_path}")
-        print(f"📝 Daily 리포트: {report_path}")
+        print("✨ 하루스토리 일간 모니터링 리포트 생성이 성공적으로 완료되었습니다!")
+        print(f"📝 일간 모니터링 리포트: {monitoring_report_path}")
         print("=" * 65)
 
     except Exception as e:

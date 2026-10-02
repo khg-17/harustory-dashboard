@@ -15,6 +15,7 @@ import {
   ChartData,
 } from "chart.js";
 import { RevenueSummary, ViewMode } from "@/types/dashboard";
+import { externalGlassTooltip } from "@/utils/chartGlassTooltip";
 
 ChartJS.register(
   CategoryScale,
@@ -114,9 +115,8 @@ export const AdRevenueTab: React.FC<AdRevenueTabProps> = ({ revenueSummary, reve
     plugins: {
       legend: { position: "top" as const, align: "end" as const, labels: { boxWidth: 12, usePointStyle: true, font: { family: "Pretendard", size: 11, weight: 600 } } },
       tooltip: {
-        backgroundColor: "#191f28",
-        padding: 10,
-        cornerRadius: 10,
+        enabled: false,
+        external: externalGlassTooltip,
         callbacks: {
           label: (context: any) => ` ${context.dataset.label}: ${Number(context.raw).toLocaleString()}원`,
         },

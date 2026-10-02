@@ -5,9 +5,6 @@ import {
   FunnelItem,
   FunnelStepItem,
   EventCatalogItem,
-  ContentItem,
-  GenreItem,
-  ContentViewItem,
   MissionByTypeItem,
   MissionDetailItem,
   MissionDailyTrendItem,
@@ -61,10 +58,6 @@ export function useDashboardData({
   const [funnelStepsRaw, setFunnelStepsRaw] = useState<FunnelStepItem[]>([]);
   const [eventCatalogRaw, setEventCatalogRaw] = useState<EventCatalogItem[]>([]);
 
-  // Content Live States
-  const [contentRaw, setContentRaw] = useState<ContentItem[]>([]);
-  const [genresRaw, setGenresRaw] = useState<GenreItem[]>([]);
-  const [contentViewRaw, setContentViewRaw] = useState<ContentViewItem[]>([]);
 
   // Mission Live States
   const [missionByTypeRaw, setMissionByTypeRaw] = useState<MissionByTypeItem[]>([]);
@@ -301,9 +294,6 @@ export function useDashboardData({
     funnelsRaw,
     funnelStepsRaw,
     eventCatalogRaw,
-    contentRaw,
-    genresRaw,
-    contentViewRaw,
     missionByTypeRaw,
     missionsDetailRaw,
     missionDailyTrendRaw,

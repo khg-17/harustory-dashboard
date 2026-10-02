@@ -121,9 +121,12 @@ export const RevenueOverallTab: React.FC<RevenueOverallTabProps> = ({
                 </thead>
                 <tbody className="divide-y divide-[#f2f4f6] font-medium text-[#4e5968]">
                   {dailyTrend.map((row) => {
-                    const grossAdRev = row.adRev;
-                    const netAdRev = isOkCashback ? Math.round(row.adRev * 0.2) : row.adRev;
-                    const effectiveTotal = isOkCashback ? row.serviceRev + netAdRev : row.grossTotal;
+                    // row.adRev is already multiplied by 0.2 in revenueProcessors.
+                    // grossAdRev = raw full amount (reverse-calc: adRev / 0.2)
+                    // netAdRev   = our 20% share  (= row.adRev as-is, no further multiply)
+                    const grossAdRev = isOkCashback ? Math.round(row.adRev / 0.2) : row.adRev;
+                    const netAdRev = row.adRev; // already 20% for okcashback, or full for others
+                    const effectiveTotal = row.grossTotal; // grossTotal is already correct in dailyMap
 
                     const ratio =
                       effectiveTotal > 0 ? ((row.serviceRev / effectiveTotal) * 100).toFixed(1) : "0.0";
