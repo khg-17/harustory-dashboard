@@ -77,7 +77,7 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
   if (selectedApp === "tc" || selectedApp === "general_all" || selectedApp === "ph_all") {
     if (Array.isArray(item.apps) && item.apps.length > 0) {
       let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0, adFree = 0, missionRewardP = 0;
-      let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0;
+      let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0, coupang = 0;
 
       const targetApps = item.apps.filter((app) => {
         if (selectedApp === "tc") return true;
@@ -103,6 +103,7 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
         cash += Number(ad.adcash || 0);
         rc += Number(ad.rc || 0);
         toss += Number(ad.tossMini || 0);
+        coupang += Number(ad.coupang || (app.ad as any)?.coupang || 0);
       });
 
       return {
@@ -113,7 +114,7 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
         contentRevenue,
         adFree,
         missionRewardP,
-        ad: { b, pop, forus, sense, cash, rc, toss },
+        ad: { b, pop, forus, sense, cash, rc, toss, coupang },
       };
     } else if (selectedApp === "tc") {
       const ad: Partial<SettlementAdData> = item.ad || {};
@@ -134,6 +135,7 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
           cash: Number(ad.adcash || 0),
           rc: Number(ad.rc || 0),
           toss: Number(ad.tossMini || 0),
+          coupang: Number(ad.coupang || (item.ad as any)?.coupang || 0),
         },
       };
     }
@@ -180,12 +182,43 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
       "ph-directblood": ["ph-directblood", "phdirectblood", "포인트홈-지정헌혈", "포인트홈지정헌혈"],
       "ph-raisehand": ["ph-raisehand", "phraisehand", "포인트홈-고발", "포인트홈고발"],
       "ph-tvdalin": ["ph-tvdalin", "phtvdalin", "포인트홈-tv의달인", "포인트홈tv의달인"],
+      "ph-pinkdiary": ["ph-pinkdiary", "phpinkdiary", "포인트홈-핑크다이어리", "포인트홈핑크다이어리", "핑크다이어리"],
+      "ph-scorecenter": ["ph-scorecenter", "phscorecenter", "포인트홈-스코어센터", "포인트홈스코어센터", "스코어센터"],
+      "ph-lottodraw": ["ph-lottodraw", "phlottodraw", "포인트홈-로또드로잉", "포인트홈로또드로잉", "로또드로잉"],
+      "ph-mbtitest": ["ph-mbtitest", "phmbtitest", "포인트홈-mbti테스트", "포인트홈mbti테스트", "포인트홈-mbti", "포인트홈mbti", "mbti테스트"],
+      "ph-probaseball": ["ph-probaseball", "phprobaseball", "포인트홈-프로야구", "포인트홈프로야구", "프로야구"],
+      "ph-ddokddokvoca": ["ph-ddokddokvoca", "phddokddokvoca", "포인트홈-똑똑보카", "포인트홈똑똑보카", "똑똑보카"],
+      "ph-cultureland": ["ph-cultureland", "phcultureland", "포인트홈-컬쳐랜드문화상품권", "포인트홈컬쳐랜드문화상품권", "컬쳐랜드문화상품권", "포인트홈-컬쳐랜드"],
+      "ph-ggcurrency": ["ph-ggcurrency", "phggcurrency", "포인트홈-경기지역화폐", "포인트홈경기지역화폐", "경기지역화폐"],
+    };
+
+    const APP_SN_MAP: Record<string, number> = {
+      "ph-hw": 58,
+      "ph-scorecenter": 67,
+      "ph-probaseball": 68,
+      "ph-walkingking": 70,
+      "ph-ddokddokvoca": 71,
+      "ph-lottodraw": 73,
+      "ph-mbtitest": 74,
+      "ph-whatisthisnumber": 77,
+      "ph-directblood": 78,
+      "ph-schooltogether": 80,
+      "ph-cultureland": 88,
+      "ph-quizanswer": 91,
+      "ph-specialchars": 92,
+      "ph-raisehand": 93,
+      "ph-pinkdiary": 94,
+      "ph-tvdalin": 96,
+      "ph-mmg": 137,
+      "ph-ggcurrency": 142,
     };
 
     const norm = (s: string) => s.toLowerCase().replace(/[\s\-_]/g, "");
     const targetAliases = (APP_ALIAS_MAP[selLower] || [selLower]).map(norm);
+    const targetSN = APP_SN_MAP[selLower];
 
     const matchedApps = item.apps.filter((app) => {
+      if (targetSN && app.appSN === targetSN) return true;
       if (!app.appName) return false;
       const appNorm = norm(app.appName);
       return targetAliases.some(
@@ -195,7 +228,7 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
 
     if (matchedApps.length > 0) {
       let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0, adFree = 0, missionRewardP = 0;
-      let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0;
+      let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0, coupang = 0;
 
       matchedApps.forEach((app) => {
         paidCoin += Number(app.payingCoin?.paidCoin ?? app.content?.payingCoin?.paidCoin ?? 0);
@@ -214,6 +247,7 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
         cash += Number(ad.adcash || 0);
         rc += Number(ad.rc || 0);
         toss += Number(ad.tossMini || 0);
+        coupang += Number(ad.coupang || (app.ad as any)?.coupang || 0);
       });
 
       return {
@@ -224,7 +258,7 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
         contentRevenue,
         adFree,
         missionRewardP,
-        ad: { b, pop, forus, sense, cash, rc, toss },
+        ad: { b, pop, forus, sense, cash, rc, toss, coupang },
       };
     }
   }

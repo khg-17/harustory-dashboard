@@ -5,7 +5,6 @@ import { Receipt, Download, Upload } from "lucide-react";
 import { ChartData } from "chart.js";
 import { RevenueKpiCards } from "./RevenueKpiCards";
 import { RevenueOverallTab } from "./RevenueOverallTab";
-import { AdCategoryTab } from "./AdCategoryTab";
 import { AdNetworkTab } from "./AdNetworkTab";
 import { ContentRevenueTab } from "./ContentRevenueTab";
 import { MarginAnalysisTab } from "./MarginAnalysisTab";
@@ -57,8 +56,8 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
             </span>
             <span>
               {selectedApp === "tc"
-                ? "전체(tc) 일별 정산 API v2 데이터가 연동되었습니다. (admin.treasurecomics.com 정산 원장 연동)"
-                : `${selectedApp} 일별 정산 API v2 앱별 데이터가 연동되었습니다. (admin.treasurecomics.com 정산 원장 연동)`}
+                ? "전체(tc) 일별 정산 API가 연동되었습니다."
+                : `${selectedApp} 일별 정산 API가 연동되었습니다.`}
             </span>
           </div>
           <span className="text-[11px] text-[#4e5968] font-normal">D-1 기준 정산 원장 데이터 표출 중</span>
@@ -95,22 +94,12 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
                 <button
                   onClick={() => setRevenueCategoryTab("overall")}
                   className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg whitespace-nowrap ${
-                    revenueCategoryTab === "overall"
+                    revenueCategoryTab === "overall" || revenueCategoryTab === "ad_category" || revenueCategoryTab === "ad"
                       ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                       : "text-[#6b7684] font-medium hover:text-[#191f28]"
                   }`}
                 >
                   전체 매출 추이
-                </button>
-                <button
-                  onClick={() => setRevenueCategoryTab("ad_category")}
-                  className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg whitespace-nowrap ${
-                    revenueCategoryTab === "ad_category" || revenueCategoryTab === "ad"
-                      ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
-                      : "text-[#6b7684] font-medium hover:text-[#191f28]"
-                  }`}
-                >
-                  광고 카테고리별
                 </button>
                 <button
                   onClick={() => setRevenueCategoryTab("ad_network")}
@@ -174,7 +163,7 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
         </div>
 
         {/* REVENUE CATEGORY CONTENT VIEWS */}
-        {revenueCategoryTab === "overall" && (
+        {(revenueCategoryTab === "overall" || revenueCategoryTab === "ad_category" || revenueCategoryTab === "ad") && (
           <RevenueOverallTab
             loading={loading}
             revenueViewMode={revenueViewMode}
@@ -183,10 +172,6 @@ export const RevenueDashboard: React.FC<RevenueDashboardProps> = ({
             revenueChartOptions={revenueChartOptions}
             selectedApp={selectedApp}
           />
-        )}
-
-        {(revenueCategoryTab === "ad_category" || revenueCategoryTab === "ad") && (
-          <AdCategoryTab revenueSummary={revenueSummary} />
         )}
 
         {revenueCategoryTab === "ad_network" && (

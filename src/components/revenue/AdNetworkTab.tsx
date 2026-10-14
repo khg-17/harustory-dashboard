@@ -33,7 +33,7 @@ interface AdNetworkTabProps {
 
 export const AdNetworkTab: React.FC<AdNetworkTabProps> = ({ revenueSummary }) => {
   const { dates: netDates, networks } = revenueSummary.networkDailyTrend || { dates: [], networks: {} };
-  const networkColors = ["#a98eff", "#3182f6", "#00c980", "#f59e0b", "#ec4899", "#6366f1"];
+  const networkColors = ["#a98eff", "#3182f6", "#00c980", "#f59e0b", "#ec4899", "#6366f1", "#f97316", "#14b8a6", "#8b5cf6"];
 
   const adNetworkLineChartData: ChartData<"line"> = {
     labels: netDates,

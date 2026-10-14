@@ -82,41 +82,37 @@ export const RetentionHeatmap: React.FC<RetentionHeatmapProps> = ({
     <div className="bg-white rounded-2xl border border-[#e5e8eb] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-6 space-y-6 relative">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#e5e8eb] pb-4">
         <div className="flex items-center gap-3">
-          <Layers className="w-5 h-5 text-[#3182f6]" />
-          <h2 className="text-[17px] font-bold text-[#191f28] tracking-[-0.02em]">신규 유저 코호트 리텐션 분석</h2>
+          <h2 className="text-[17px] font-bold text-[#191f28] tracking-[-0.02em]">신규 유저 리텐션</h2>
 
           <div className="flex bg-[#f2f4f6] p-1 rounded-xl gap-0.5 text-xs ml-2">
             <button
               onClick={() => setRetentionMode("combined")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 transition-all cursor-pointer rounded-lg ${
+              className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg ${
                 retentionMode === "combined"
                   ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                   : "text-[#6b7684] font-medium hover:text-[#191f28]"
               }`}
             >
-              <GitCompare className="w-3.5 h-3.5" />
               <span>전체</span>
             </button>
             <button
               onClick={() => setRetentionMode("retention")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 transition-all cursor-pointer rounded-lg ${
+              className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg ${
                 retentionMode === "retention"
                   ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                   : "text-[#6b7684] font-medium hover:text-[#191f28]"
               }`}
             >
-              <Users className="w-3.5 h-3.5" />
               <span>방문만</span>
             </button>
             <button
               onClick={() => setRetentionMode("earning_activation")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 transition-all cursor-pointer rounded-lg ${
+              className={`px-3 py-1.5 transition-all cursor-pointer rounded-lg ${
                 retentionMode === "earning_activation"
                   ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
                   : "text-[#6b7684] font-medium hover:text-[#191f28]"
               }`}
             >
-              <Coins className="w-3.5 h-3.5" />
               <span>적립만</span>
             </button>
           </div>
@@ -162,12 +158,8 @@ export const RetentionHeatmap: React.FC<RetentionHeatmapProps> = ({
       <div className="space-y-2 bg-[#f8f9fa] p-4 rounded-xl">
         <div className="flex items-center justify-between text-xs font-bold text-[#4e5968]">
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-[#3182f6]" />
             <span>Day N 평균 리텐션 차트</span>
           </div>
-          <span className="text-[11px] text-[#8b95a1] font-medium">
-
-          </span>
         </div>
 
         <div className="h-56 sm:h-64 md:h-72 pt-1 relative w-full">
@@ -189,8 +181,6 @@ export const RetentionHeatmap: React.FC<RetentionHeatmapProps> = ({
       <div className="space-y-2 pt-2">
         <div className="flex items-center justify-between text-xs font-bold text-[#4e5968]">
           <div className="flex items-center gap-2">
-            <Grid className="w-4 h-4 text-[#3182f6]" />
-            <span>날짜별 코호트 히트맵</span>
           </div>
           <span className="text-[11px] text-[#8b95a1] font-semibold">
             셀 표기: <span className="font-bold text-[#3182f6]">상단: 방문%</span> /{" "}

@@ -69,7 +69,7 @@ interface FunnelDashboardProps {
 
 const presetTemplatesMap: Record<string, { name: string; steps: CustomStepConfig[] }> = {
   bookMission: {
-    name: "책 정리하기",
+    name: "책 정리하기(첫 참여)",
     steps: [
       { id: "step-1", label: "reward_otter_click_book_1" },
       { id: "step-2", label: "reward_otter_click_book_2" },
@@ -80,6 +80,22 @@ const presetTemplatesMap: Record<string, { name: string; steps: CustomStepConfig
       { id: "step-7", label: "reward_otter_click_book_7" },
       { id: "step-8", label: "reward_otter_click_book_8" },
       { id: "step-9", label: "reward_book_mission_complete_click" },
+    ],
+  },
+  bookMissionRepeat: {
+    name: "책 정리하기(재참여)",
+    steps: [
+      { id: "step-1", label: "reward_otter_click_book_1" },
+      { id: "step-2", label: "reward_book_ad_click" },
+      { id: "step-3", label: "reward_otter_click_book_1" },
+      { id: "step-4", label: "reward_otter_click_book_2" },
+      { id: "step-5", label: "reward_otter_click_book_3" },
+      { id: "step-6", label: "reward_otter_click_book_4" },
+      { id: "step-7", label: "reward_otter_click_book_5" },
+      { id: "step-8", label: "reward_otter_click_book_6" },
+      { id: "step-9", label: "reward_otter_click_book_7" },
+      { id: "step-10", label: "reward_otter_click_book_8" },
+      { id: "step-11", label: "reward_book_mission_complete_click" },
     ],
   },
   drinkMission: {

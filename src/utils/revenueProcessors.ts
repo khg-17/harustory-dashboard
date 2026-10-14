@@ -116,6 +116,8 @@ export function computeRevenueSummary({
   let prevAdTicketSum = 0;
   let prevTotalAdRevenue = 0;
   let prevChargeWonSum = 0;
+  let prevTotalMissionReward = 0;
+  let prevTotalExchangedPoints = 0;
 
   const adCategoryMap: Record<string, { revenue: number; impression: number }> = {};
   const networkMap: Record<string, { revenue: number; impression: number }> = {};
@@ -141,8 +143,9 @@ export function computeRevenueSummary({
 
       const { paidCoin, chargeCoin, usedReward, contentRevenue, adFree, missionRewardP, ad } = sData;
       const { b, pop, forus, sense, cash, rc, toss } = ad;
+      const coupang = Number((ad as any).coupang || 0);
 
-      const dayTotalAd = b + pop + forus + sense + cash + rc + toss;
+      const dayTotalAd = b + pop + forus + sense + cash + rc + toss + coupang;
       const realContentRev = (contentRevenue && contentRevenue > 0) ? contentRevenue : paidCoin;
 
       if (isCurrent) {
@@ -160,8 +163,9 @@ export function computeRevenueSummary({
           "apWebCPC": pop,
           "Adforus": forus,
           "AdCash": cash,
-          "RC (비토스)": rc,
+          "RC": rc,
           "Toss Mini": toss,
+          "coupang": coupang,
         };
         if (sense > 0) netMap["AdSense"] = sense;
 
@@ -192,6 +196,8 @@ export function computeRevenueSummary({
         prevAdTicketSum += (adFree || 0);
         prevTotalAdRevenue += dayTotalAd;
         prevChargeWonSum += (chargeCoin || 0);
+        prevTotalMissionReward += (missionRewardP || 0);
+        prevTotalExchangedPoints += usedReward;
       }
     });
 
@@ -320,12 +326,38 @@ export function computeRevenueSummary({
 
     earningRaw.forEach((row) => {
       const dtStr = extractDtStr(row.dt);
+      const val = parseExchangedPoints(row);
       if (dtStr >= fromDate && dtStr <= toDate) {
-        const val = parseExchangedPoints(row);
         totalExchangedPoints += val;
+      } else if (dtStr >= prevFromStr && dtStr <= prevToStr) {
+        prevTotalExchangedPoints += val;
       }
     });
   }
+
+  if (!hasActiveSettlement) {
+    missionTotalRaw.forEach((row) => {
+      const dtStr = extractDtStr(row.dt);
+      const val = parseRewardAmount(row);
+      if (dtStr >= fromDate && dtStr <= toDate) {
+        totalMissionReward += val;
+      } else if (dtStr >= prevFromStr && dtStr <= prevToStr) {
+        prevTotalMissionReward += val;
+      }
+    });
+  }
+
+  // okcashback: 포인트 환전 비용을 당사가 부담하지 않으므로 cost = 0, 순이익 = 순수 20% 광고매출
+  const isOkCashbackApp =
+    selectedApp === "okcashback" || selectedApp === "ph-okcashback" ||
+    selectedApp?.toLowerCase().includes("okcashback");
+  const totalRewardCost = isOkCashbackApp ? 0 : totalExchangedPoints;
+  const prevTotalRewardCost = isOkCashbackApp ? 0 : prevTotalExchangedPoints;
+
+  const netProfit = totalAdRevenue - totalRewardCost;
+  const prevNetProfit = prevTotalAdRevenue - prevTotalRewardCost;
+
+  const marginRate = totalAdRevenue > 0 ? (netProfit / totalAdRevenue) * 100 : 0;
 
   const grossRevenue = contentPaySum + totalAdRevenue;
   const prevGrossRevenue = prevContentPaySum + prevTotalAdRevenue;
@@ -337,23 +369,9 @@ export function computeRevenueSummary({
   const paidCoinGrowth = prevPaidCoinSum > 0 ? ((paidCoinSum - prevPaidCoinSum) / prevPaidCoinSum) * 100 : 0;
   const adTicketGrowth = prevAdTicketSum > 0 ? ((adTicketSum - prevAdTicketSum) / prevAdTicketSum) * 100 : 0;
 
-  if (!hasActiveSettlement) {
-    missionTotalRaw.forEach((row) => {
-      const dtStr = extractDtStr(row.dt);
-      if (dtStr >= fromDate && dtStr <= toDate) {
-        const val = parseRewardAmount(row);
-        totalMissionReward += val;
-      }
-    });
-  }
-
-  // okcashback: 포인트 환전 비용을 당사가 부담하지 않으므로 cost = 0, 순이익 = 순수 20% 광고매출
-  const isOkCashbackApp =
-    selectedApp === "okcashback" || selectedApp === "ph-okcashback" ||
-    selectedApp?.toLowerCase().includes("okcashback");
-  const totalRewardCost = isOkCashbackApp ? 0 : totalExchangedPoints;
-  const netProfit = totalAdRevenue - totalRewardCost;
-  const marginRate = totalAdRevenue > 0 ? (netProfit / totalAdRevenue) * 100 : 0;
+  const missionRewardGrowth = prevTotalMissionReward > 0 ? ((totalMissionReward - prevTotalMissionReward) / prevTotalMissionReward) * 100 : 0;
+  const exchangedPointsGrowth = prevTotalExchangedPoints > 0 ? ((totalExchangedPoints - prevTotalExchangedPoints) / prevTotalExchangedPoints) * 100 : 0;
+  const netProfitGrowth = prevNetProfit !== 0 ? ((netProfit - prevNetProfit) / Math.abs(prevNetProfit)) * 100 : 0;
 
   const allRevenueDates = generateDateRange(fromDate, toDate);
 
@@ -387,8 +405,9 @@ export function computeRevenueSummary({
 
       const { paidCoin, contentRevenue, usedReward, ad } = sData;
       const { b, pop, forus, sense, cash, rc, toss } = ad;
+      const coupang = Number((ad as any).coupang || 0);
 
-      const dayTotalAd = b + pop + forus + sense + cash + rc + toss;
+      const dayTotalAd = b + pop + forus + sense + cash + rc + toss + coupang;
       const realContentRev = (contentRevenue && contentRevenue > 0) ? contentRevenue : paidCoin;
 
       dailyMap[dtStr].serviceRev = realContentRev;
@@ -680,8 +699,8 @@ export function computeRevenueSummary({
 
     const metricsList = filteredSettlement.map((s) => {
       const sData = getSettlementDataForApp(s, selectedApp);
-      if (sData) return { ...sData.ad, adFree: sData.adFree || 0 };
-      return { b: 0, pop: 0, forus: 0, sense: 0, cash: 0, rc: 0, toss: 0, adFree: 0 };
+      if (sData) return { ...sData.ad, coupang: Number((sData.ad as any).coupang || 0), adFree: sData.adFree || 0 };
+      return { b: 0, pop: 0, forus: 0, sense: 0, cash: 0, rc: 0, toss: 0, coupang: 0, adFree: 0 };
     });
 
     const netDailyCandidate: Record<string, number[]> = {
@@ -689,8 +708,9 @@ export function computeRevenueSummary({
       "apWebCPC": metricsList.map((m) => m.pop),
       "Adforus": metricsList.map((m) => m.forus),
       "AdCash": metricsList.map((m) => m.cash),
-      "RC (비토스)": metricsList.map((m) => m.rc),
+      "RC": metricsList.map((m) => m.rc),
       "Toss Mini": metricsList.map((m) => m.toss),
+      "coupang": metricsList.map((m) => m.coupang),
     };
     if (metricsList.some((m) => m.sense > 0)) {
       netDailyCandidate["AdSense"] = metricsList.map((m) => m.sense);
@@ -698,7 +718,7 @@ export function computeRevenueSummary({
 
     const netDaily: Record<string, number[]> = {};
     Object.entries(netDailyCandidate).forEach(([netName, arr]) => {
-      if (arr.some((v) => v > 0)) {
+      if (arr.some((v) => v > 0) || netName === "coupang") {
         netDaily[netName] = arr;
       }
     });
@@ -754,6 +774,9 @@ export function computeRevenueSummary({
     chargeGrowth,
     paidCoinGrowth,
     adTicketGrowth,
+    missionRewardGrowth,
+    exchangedPointsGrowth,
+    netProfitGrowth,
     prevPeriodRange: { from: prevFromStr, to: prevToStr },
   };
 }

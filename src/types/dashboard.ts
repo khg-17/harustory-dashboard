@@ -280,6 +280,9 @@ export interface RevenueSummary {
   chargeGrowth?: number;
   paidCoinGrowth?: number;
   adTicketGrowth?: number;
+  missionRewardGrowth?: number;
+  exchangedPointsGrowth?: number;
+  netProfitGrowth?: number;
   prevPeriodRange?: { from: string; to: string };
 }
 
@@ -315,6 +318,7 @@ export interface SettlementAdData {
   buzzvil: number;
   rc: number;
   tossMini: number;
+  coupang?: number;
 }
 
 export interface SettlementAdFreeData {

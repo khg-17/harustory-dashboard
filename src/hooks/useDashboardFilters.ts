@@ -31,7 +31,7 @@ export function useDashboardFilters() {
   const [revenueViewMode, setRevenueViewMode] = useState<ViewMode>("chart");
 
   const [retentionMode, setRetentionMode] = useState<RetentionMode>("combined");
-  const [retentionDayMax, setRetentionDayMax] = useState<RetentionDayMax>(30);
+  const [retentionDayMax, setRetentionDayMax] = useState<RetentionDayMax>(14);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
@@ -50,6 +50,9 @@ export function useDashboardFilters() {
     { label: "토스 (toss)", value: "toss" },
     { label: "카카오페이 (kakaopay)", value: "kakaopay" },
     { label: "포인트홈-하루날씨 (ph-hw)", value: "ph-hw" },
+    { label: "포인트홈-메모지 (ph-mmg)", value: "ph-mmg" },
+    { label: "포인트홈-핑크다이어리 (ph-pinkdiary)", value: "ph-pinkdiary" },
+    { label: "포인트홈-스코어센터 (ph-scorecenter)", value: "ph-scorecenter" },
   ]);
 
   useEffect(() => {

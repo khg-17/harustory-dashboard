@@ -330,7 +330,7 @@ export default function Dashboard() {
 
   const decayChartData = useMemo<ChartData<"line">>(() => {
     const visitDataset = {
-      label: "방문 리텐션 평균 (Visit)",
+      label: "방문 리텐션",
       data: avgVisitDecay,
       borderColor: "#3182f6",
       backgroundColor: "rgba(49, 130, 246, 0.12)",
@@ -346,7 +346,7 @@ export default function Dashboard() {
     };
 
     const earningDataset = {
-      label: "적립 수행 리텐션 평균 (Earning)",
+      label: "적립 리텐션",
       data: avgEarningDecay,
       borderColor: "#a98eff",
       backgroundColor: "rgba(169, 142, 255, 0.12)",
@@ -468,7 +468,7 @@ export default function Dashboard() {
     labels: (revenueSummary.dailyTrend || []).map((d) => d.formattedDt || d.dt),
     datasets: [
       {
-        label: "전체 총 매출 (Gross Revenue)",
+        label: "전체 총 매출",
         data: (revenueSummary.dailyTrend || []).map((d) => d.grossTotal),
         borderColor: "#00c980",
         backgroundColor: "rgba(0, 201, 128, 0.06)",
@@ -814,11 +814,12 @@ export default function Dashboard() {
       {/* MINIMALIST ULTRA-CLEAN CORPORATE TOOLTIP (GLASSMORPHISM) */}
       {heatmapTooltip && (
         <div
-          className="fixed z-50 transform -translate-x-1/2 -translate-y-full mb-2.5 px-3.5 py-2.5 rounded-2xl shadow-[0_12px_36px_rgba(0,0,0,0.12),0_4px_12px_rgba(0,0,0,0.04)] text-xs font-sans pointer-events-none transition-all duration-75 space-y-1.5"
+          className="fixed z-50 px-3.5 py-2.5 rounded-2xl shadow-[0_12px_36px_rgba(0,0,0,0.12),0_4px_12px_rgba(0,0,0,0.04)] text-xs font-sans pointer-events-none transition-all duration-75 space-y-1.5 whitespace-nowrap min-w-max"
           style={{
-            left: `${heatmapTooltip.x}px`,
+            left: `${Math.min(Math.max(heatmapTooltip.x, 110), typeof window !== 'undefined' ? window.innerWidth - 110 : heatmapTooltip.x)}px`,
             top: `${heatmapTooltip.y}px`,
-            background: "rgba(255, 255, 255, 0.85)",
+            transform: "translate(-50%, -100%)",
+            background: "rgba(255, 255, 255, 0.92)",
             backdropFilter: "blur(20px) saturate(180%)",
             WebkitBackdropFilter: "blur(20px) saturate(180%)",
             border: "1px solid rgba(255, 255, 255, 0.9)",

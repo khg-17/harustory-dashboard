@@ -294,7 +294,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
       if (dailyMetric === "pv") {
         const pvData = sortedDates.map((d) => dateMap[d]?.[tabKey]?.PV || 0);
         datasets.push({
-          label: `${tabLabel} (PV)`,
+          label: tabLabel,
           data: pvData,
           borderColor: color.main,
           backgroundColor: color.bg,
@@ -305,7 +305,7 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
       } else if (dailyMetric === "uv") {
         const uvData = sortedDates.map((d) => dateMap[d]?.[tabKey]?.UV || 0);
         datasets.push({
-          label: `${tabLabel} (UV)`,
+          label: tabLabel,
           data: uvData,
           borderColor: color.main,
           backgroundColor: color.bg,
@@ -444,9 +444,6 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
                 {selectedApp === "tc" ? "전체 서비스" : selectedApp}
               </span>
             </div>
-            <p className="text-xs text-[#8b95a1]">
-              주요 탭별 페이지 뷰(PV), 순 방문자 수(UV) 및 일자별 추이 현황입니다.
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -584,7 +581,6 @@ export const PageDashboard: React.FC<PageDashboardProps> = ({
         <div className="space-y-4 pt-6 border-t border-[#f2f4f6]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-[#3182f6]" />
               <h3 className="text-base font-bold text-[#191f28]">일자별 PV & UV 추이 현황</h3>
             </div>
 

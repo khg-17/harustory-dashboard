@@ -20,6 +20,8 @@ export const externalGlassTooltip = (context: any) => {
     tooltipEl.style.color = "#191f28";
     tooltipEl.style.fontSize = "11.5px";
     tooltipEl.style.fontFamily = "Pretendard, -apple-system, sans-serif";
+    tooltipEl.style.whiteSpace = "nowrap";
+    tooltipEl.style.minWidth = "max-content";
     document.body.appendChild(tooltipEl);
   }
 
@@ -35,7 +37,7 @@ export const externalGlassTooltip = (context: any) => {
 
     let innerHtml = "";
     if (titleLines.length) {
-      innerHtml += `<div style="font-weight:700;font-size:12px;color:#191f28;margin-bottom:5px;letter-spacing:-0.02em;">${titleLines.join(
+      innerHtml += `<div style="font-weight:700;font-size:12px;color:#191f28;margin-bottom:5px;letter-spacing:-0.02em;white-space:nowrap;">${titleLines.join(
         " "
       )}</div>`;
     }
@@ -52,15 +54,15 @@ export const externalGlassTooltip = (context: any) => {
         const dot = `<span style="background:${solidColor};width:8.5px;height:8.5px;display:inline-block;border-radius:50%;margin-right:7px;box-shadow:0 1.5px 4px ${solidColor}40;flex-shrink:0;"></span>`;
         
         // Format "Label: Value" with crisp distinct typography
-        let contentHtml = `<span>${line}</span>`;
+        let contentHtml = `<span style="white-space:nowrap;">${line}</span>`;
         if (line.includes(":")) {
           const colonIdx = line.indexOf(":");
           const labelPart = line.substring(0, colonIdx).trim();
           const valPart = line.substring(colonIdx + 1).trim();
-          contentHtml = `<span style="color:#4e5968;font-weight:500;margin-right:4px;">${labelPart}:</span><span style="color:#191f28;font-weight:700;">${valPart}</span>`;
+          contentHtml = `<span style="color:#4e5968;font-weight:500;margin-right:4px;white-space:nowrap;">${labelPart}:</span><span style="color:#191f28;font-weight:700;white-space:nowrap;">${valPart}</span>`;
         }
 
-        innerHtml += `<div style="display:flex;align-items:center;font-size:11.5px;margin-top:3.5px;line-height:1.4;">${dot}${contentHtml}</div>`;
+        innerHtml += `<div style="display:flex;align-items:center;font-size:11.5px;margin-top:3.5px;line-height:1.4;white-space:nowrap;">${dot}${contentHtml}</div>`;
       });
     });
 
@@ -68,19 +70,32 @@ export const externalGlassTooltip = (context: any) => {
   }
 
   const position = context.chart.canvas.getBoundingClientRect();
-  const left = position.left + window.scrollX + tooltipModel.caretX;
+  const rawLeft = position.left + window.scrollX + tooltipModel.caretX;
   let top = position.top + window.scrollY + tooltipModel.caretY - 10;
-  let transform = "translate(-50%, -100%)";
+  
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const tooltipWidth = tooltipEl.offsetWidth || 180;
 
-  if (position.top + tooltipModel.caretY - 70 < 0) {
+  let transformX = "-50%";
+  let transformY = "-100%";
+
+  // Prevent right-edge overflow stretching
+  if (rawLeft + tooltipWidth / 2 > viewportWidth - 20) {
+    transformX = "-100%";
+  } else if (rawLeft - tooltipWidth / 2 < 20) {
+    transformX = "0%";
+  }
+
+  // Prevent top-edge overflow
+  if (position.top + tooltipModel.caretY - 80 < 0) {
     top = position.top + window.scrollY + tooltipModel.caretY + 15;
-    transform = "translate(-50%, 0%)";
+    transformY = "0%";
   }
 
   tooltipEl.style.opacity = "1";
-  tooltipEl.style.left = `${left}px`;
+  tooltipEl.style.left = `${rawLeft}px`;
   tooltipEl.style.top = `${top}px`;
-  tooltipEl.style.transform = transform;
+  tooltipEl.style.transform = `translate(${transformX}, ${transformY})`;
 };
 
 // Common glass tooltip config to spread into Chart.js options.plugins.tooltip

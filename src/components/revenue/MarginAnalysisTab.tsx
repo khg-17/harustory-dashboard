@@ -54,14 +54,35 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
 
   const isPhApp = (selectedApp || "").toLowerCase().includes("ph-");
 
+  const adGrowth = revenueSummary?.adGrowth ?? 0;
+  const missionRewardGrowth = revenueSummary?.missionRewardGrowth ?? 0;
+  const exchangedPointsGrowth = revenueSummary?.exchangedPointsGrowth ?? 0;
+  const netProfitGrowth = revenueSummary?.netProfitGrowth ?? 0;
+
+  const renderGrowthBadge = (growth: number) => {
+    const isUp = growth >= 0;
+    const absVal = Math.abs(growth).toFixed(1);
+    return (
+      <span className={`inline-flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-md ${
+        isUp ? "bg-[#fff0f1] text-[#f04452]" : "bg-[#e8f3ff] text-[#3182f6]"
+      }`}>
+        {isUp ? `▲ +${absVal}%` : `▼ -${absVal}%`}
+        <span className="text-[10px] font-normal text-[#8b95a1] ml-0.5">전월대비</span>
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* ── 4-CARD TOSS KPI GRID (CRISP BORDER & SHADOW) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: 총 광고 매출 */}
         <div className="bg-white rounded-2xl border border-[#e5e8eb] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5 space-y-2">
-          <div className="text-[13px] font-semibold text-[#8b95a1]">
-            총 광고 매출
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-semibold text-[#8b95a1]">
+              총 광고 매출
+            </span>
+            {renderGrowthBadge(adGrowth)}
           </div>
           <div className="text-[26px] font-bold text-[#191f28] tracking-[-0.04em]">
             {Math.round(totalAdRevenue).toLocaleString()}
@@ -71,8 +92,11 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
 
         {/* Card 2: 적립 알바비 (P) */}
         <div className="bg-white rounded-2xl border border-[#e5e8eb] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5 space-y-2">
-          <div className="text-[13px] font-semibold text-[#8b95a1]">
-            적립 알바비 (P)
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-semibold text-[#8b95a1]">
+              적립 알바비 (P)
+            </span>
+            {renderGrowthBadge(missionRewardGrowth)}
           </div>
           <div className="text-[26px] font-bold text-[#191f28] tracking-[-0.04em]">
             {totalMissionReward.toLocaleString()}
@@ -82,8 +106,11 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
 
         {/* Card 3: 포인트 환전 지급액 */}
         <div className="bg-white rounded-2xl border border-[#e5e8eb] shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5 space-y-2">
-          <div className="text-[13px] font-semibold text-[#8b95a1]">
-            포인트 환전 지급액
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-semibold text-[#8b95a1]">
+              포인트 환전 지급액
+            </span>
+            {renderGrowthBadge(exchangedPointsGrowth)}
           </div>
           <div className="text-[26px] font-bold text-[#191f28] tracking-[-0.04em]">
             {totalExchangedPoints.toLocaleString()}
@@ -97,11 +124,7 @@ export const MarginAnalysisTab: React.FC<MarginAnalysisTabProps> = ({
             <span className="text-[13px] font-semibold text-[#8b95a1]">
               {isLoss ? "순 영업 마진 (역마진)" : "순 영업 마진"}
             </span>
-            <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
-              isLoss ? "bg-[#e8f3ff] text-[#3182f6]" : "bg-[#fff0f1] text-[#f04452]"
-            }`}>
-              {marginRate > 0 ? `+${marginRate.toFixed(1)}` : marginRate.toFixed(1)}%
-            </span>
+            {renderGrowthBadge(netProfitGrowth)}
           </div>
           <div className={`text-[26px] font-bold tracking-[-0.04em] ${isLoss ? "text-[#3182f6]" : "text-[#f04452]"}`}>
             {netProfit > 0 ? `+${Math.round(netProfit).toLocaleString()}` : Math.round(netProfit).toLocaleString()}

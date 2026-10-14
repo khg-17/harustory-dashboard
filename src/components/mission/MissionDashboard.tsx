@@ -1437,49 +1437,41 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
           {/* ── UNIFIED MASTER PANEL: CONTROL + KPI RIBBON + TREND CHARTS ── */}
           <div className="bg-white rounded-3xl border border-[#e5e8eb] shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6 space-y-6">
 
-            {/* TOP HEADER & USER SEGMENT FILTER SWITCHER */}
+            {/* TOP HEADER & USER SEGMENT FILTER CONTROL BAR */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[#f2f4f6]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-[#ecf4fe] flex items-center justify-center text-[#3182f6]">
-                  <Layers className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-[#191f28] tracking-tight">미션 참여 현황 대시보드</h2>
-                </div>
-              </div>
+              <h2 className="text-base sm:text-lg font-bold text-[#191f28] tracking-tight">
+                미션 참여 현황
+              </h2>
 
               {/* USER SEGMENT SWITCHER */}
-              <div className="flex items-center gap-2 bg-[#f8f9fa] border border-[#e5e8eb] p-1 rounded-2xl shrink-0">
-                <span className="text-[11px] font-semibold text-[#8b95a1] px-2 hidden md:inline">유저 분류</span>
-                <div className="flex bg-[#f2f4f6] p-0.5 rounded-xl gap-1 text-xs">
-                  <button
-                    onClick={() => onUserSegmentChange?.("all")}
-                    className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${userSegment === "all"
-                        ? "bg-white text-[#3182f6] font-bold shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
-                        : "text-[#4e5968] hover:text-[#191f28]"
-                      }`}
-                  >
-                    전체 유저
-                  </button>
-                  <button
-                    onClick={() => onUserSegmentChange?.("existing")}
-                    className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${userSegment === "existing"
-                        ? "bg-white text-[#3182f6] font-bold shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
-                        : "text-[#4e5968] hover:text-[#191f28]"
-                      }`}
-                  >
-                    기존 유저
-                  </button>
-                  <button
-                    onClick={() => onUserSegmentChange?.("new")}
-                    className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${userSegment === "new"
-                        ? "bg-white text-[#3182f6] font-bold shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
-                        : "text-[#4e5968] hover:text-[#191f28]"
-                      }`}
-                  >
-                    신규 유저
-                  </button>
-                </div>
+              <div className="flex items-center bg-[#f2f4f6] p-1 rounded-xl gap-1 text-xs shrink-0">
+                <button
+                  onClick={() => onUserSegmentChange?.("all")}
+                  className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${userSegment === "all"
+                      ? "bg-white text-[#3182f6] font-bold shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
+                      : "text-[#4e5968] hover:text-[#191f28]"
+                    }`}
+                >
+                  전체 유저
+                </button>
+                <button
+                  onClick={() => onUserSegmentChange?.("existing")}
+                  className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${userSegment === "existing"
+                      ? "bg-white text-[#3182f6] font-bold shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
+                      : "text-[#4e5968] hover:text-[#191f28]"
+                    }`}
+                >
+                  기존 유저
+                </button>
+                <button
+                  onClick={() => onUserSegmentChange?.("new")}
+                  className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${userSegment === "new"
+                      ? "bg-white text-[#3182f6] font-bold shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
+                      : "text-[#4e5968] hover:text-[#191f28]"
+                    }`}
+                >
+                  신규 유저
+                </button>
               </div>
             </div>
 
@@ -2002,7 +1994,6 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-[#f2f4f6]">
               <div className="flex items-center gap-2">
                 <div>
-                  <h3 className="text-base font-bold text-[#191f28]">미션별 리워드 지급 성과 및 지급 랭킹</h3>
                 </div>
               </div>
               <span className="text-xs font-semibold text-[#3182f6] bg-[#ecf4fe] px-3 py-1 rounded-full shrink-0">
@@ -2578,28 +2569,6 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
                 </h2>
                 <InfoTooltip text="날짜별 1일차 시작 유저가 결석 없이 다음 날(D+1) 2일차, 다다음 날(D+2) 3일차... 7일차까지 연속 출석을 유지한 실제 날짜별 코호트 잔존율을 추적합니다. (미도달 경과일은 '-' 표시)" />
               </div>
-
-              {/* View Switcher: Rate (%) vs Count (명) */}
-              <div className="flex bg-[#f2f4f6] p-1 rounded-xl gap-0.5 text-xs">
-                <button
-                  onClick={() => setCohortViewMode("rate")}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${cohortViewMode === "rate"
-                      ? "bg-white text-[#3182f6] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
-                      : "text-[#6b7684] font-medium hover:text-[#191f28]"
-                    }`}
-                >
-                  비율 (%)
-                </button>
-                <button
-                  onClick={() => setCohortViewMode("count")}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${cohortViewMode === "count"
-                      ? "bg-white text-[#3182f6] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
-                      : "text-[#6b7684] font-medium hover:text-[#191f28]"
-                    }`}
-                >
-                  유저 수 (명)
-                </button>
-              </div>
             </div>
 
             {/* BLOCK A: HEATMAP MATRIX TABLE */}
@@ -2648,26 +2617,54 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
                           { cnt: row.d5, rate: row.d5Rate },
                           { cnt: row.d6, rate: row.d6Rate },
                           { cnt: row.d7, rate: row.d7Rate },
-                        ].map((cell, idx) => (
-                          <td
-                            key={idx}
-                            className={`py-2 px-2.5 transition-all ${cohortViewMode === "rate" ? getCohortTextColor(cell.rate) : "text-[#191f28]"
-                              }`}
-                            style={{
-                              backgroundColor: cohortViewMode === "rate" ? getCohortBg(cell.rate) : undefined,
-                            }}
-                          >
-                            {cell.cnt !== undefined ? (
-                              cohortViewMode === "rate" ? (
-                                <span>{cell.rate}%</span>
+                        ].map((cell, idx) => {
+                          const isDarkBg = cell.rate !== undefined && cell.rate >= 45;
+                          const isRightColumn = idx >= 5;
+
+                          return (
+                            <td
+                              key={idx}
+                              className={`relative group py-2 px-2.5 transition-all cursor-pointer ${getCohortTextColor(cell.rate)}`}
+                              style={{
+                                backgroundColor: getCohortBg(cell.rate),
+                              }}
+                            >
+                              {cell.cnt !== undefined ? (
+                                <span className={`text-[11.5px] font-sans font-extrabold select-none ${isDarkBg ? "text-white" : "text-[#191f28]"}`}>
+                                  {cell.rate}%
+                                </span>
                               ) : (
-                                <span>{cell.cnt.toLocaleString()}명</span>
-                              )
-                            ) : (
-                              <span className="text-[#c2c7d0] font-normal">-</span>
-                            )}
-                          </td>
-                        ))}
+                                <span className="text-[#c2c7d0] font-normal">-</span>
+                              )}
+
+                              {/* INSTANT ZERO-DELAY HOVER TOOLTIP */}
+                              {cell.cnt !== undefined && (
+                                <div
+                                  className={`absolute bottom-full mb-2 hidden group-hover:block z-[9999] w-max px-3.5 py-2.5 rounded-2xl text-[11.5px] font-medium pointer-events-none whitespace-nowrap shadow-[0_12px_36px_rgba(0,0,0,0.12),0_4px_12px_rgba(0,0,0,0.04)] ${
+                                    isRightColumn ? "right-0 translate-x-0" : "left-1/2 -translate-x-1/2"
+                                  }`}
+                                  style={{
+                                    background: "rgba(255, 255, 255, 0.95)",
+                                    backdropFilter: "blur(20px) saturate(180%)",
+                                    WebkitBackdropFilter: "blur(20px) saturate(180%)",
+                                    border: "1px solid rgba(255, 255, 255, 0.9)",
+                                    color: "#191f28",
+                                  }}
+                                >
+                                  <div className="font-bold text-[#191f28] text-xs pb-1 border-b border-[#e5e8eb] tracking-tight">
+                                    {row.dt} 가입자 · {idx + 1}일차 출석
+                                  </div>
+                                  <div className="flex items-center gap-1.5 pt-1.5 text-[11.5px]">
+                                    <span className="w-2 h-2 rounded-full bg-[#3182f6] shrink-0" />
+                                    <span className="text-[#4e5968] font-medium">출석 인원:</span>
+                                    <span className="font-bold text-[#191f28]">{cell.cnt.toLocaleString()}명</span>
+                                    <span className="font-bold text-[#3182f6] text-[11px]">({cell.rate}%)</span>
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))
                   ) : (
@@ -2685,7 +2682,6 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
             <div className="bg-[#f8f9fa] rounded-2xl border border-[#f2f4f6] p-6 space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#e5e8eb]">
                 <div className="flex items-center gap-2">
-                  <PieChartIcon className="w-4 h-4 text-[#3182f6]" />
                   <h3 className="text-sm font-bold text-[#191f28]">
                     출석 수령 형태 옵션 비중
                   </h3>
@@ -2805,11 +2801,7 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
 
             {/* BLOCK A: DAILY TREND LINE CHART */}
             <div className="bg-[#f8f9fa] rounded-2xl border border-[#f2f4f6] p-5 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-[#e5e8eb]">
-                <h3 className="text-xs font-bold text-[#191f28] flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5 text-[#00c980]" />
-                  <span>일별 출석체크 시작·완주·총 수령 유저 추이</span>
-                </h3>
+              <div className="flex items-center justify-end pb-2 border-b border-[#e5e8eb]">
                 <span className="text-[11px] font-semibold text-[#8b95a1]">단위: 명 (일별 UU)</span>
               </div>
               <div className="h-64 pt-2">

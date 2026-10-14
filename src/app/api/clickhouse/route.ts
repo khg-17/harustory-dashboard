@@ -116,15 +116,27 @@ function extractExchangedPoints(item: any): number {
 
 // Mapping map for Point Home sub-apps whose AppChannel_V appID is empty
 const APP_CODE_TO_SN_MAP: Record<string, number> = {
-  'ph-mmg': 137,
-  'ph-whatisthisnumber': 77,
-  'ph-quizanswer': 91,
-  'ph-schooltogether': 80,
+  'ph-hw': 58,
+  'ph-scorecenter': 67,
+  'ph-probaseball': 68,
   'ph-walkingking': 70,
-  'ph-specialchars': 92,
+  'ph-ddokddokvoca': 71,
+  'ph-lottodraw': 73,
+  'ph-mbtitest': 74,
+  'ph-whatisthisnumber': 77,
   'ph-directblood': 78,
+  'ph-schooltogether': 80,
+  'ph-cultureland': 88,
+  'ph-quizanswer': 91,
+  'ph-specialchars': 92,
   'ph-raisehand': 93,
+  'ph-pinkdiary': 94,
+  'ph-tvdalin': 96,
+  'ph-mmg': 137,
+  'ph-ggcurrency': 142,
 };
+
+const ALL_PH_SNS_LIST = Object.values(APP_CODE_TO_SN_MAP).join(', ');
 
 // Helper to construct exact app condition for ClickHouse queries handling virtual app codes and sub-app appSN mappings
 function getAppCond(app: string, column: string = 'appID'): string {
@@ -143,9 +155,9 @@ function getAppCondWithSn(app: string, appIdCol: string = 'ac.appID', appSnCol: 
   if (app === 'tc') {
     return '(1 = 1)';
   } else if (app === 'general_all') {
-    return `(${appIdCol} NOT LIKE 'ph-%' AND ${appIdCol} != '' AND ${appSnCol} NOT IN (137, 77, 91, 80, 70, 92, 78, 93))`;
+    return `(${appIdCol} NOT LIKE 'ph-%' AND ${appIdCol} != '' AND ${appSnCol} NOT IN (${ALL_PH_SNS_LIST}))`;
   } else if (app === 'ph_all') {
-    return `(${appIdCol} LIKE 'ph-%' OR ${appSnCol} IN (137, 77, 91, 80, 70, 92, 78, 93))`;
+    return `(${appIdCol} LIKE 'ph-%' OR ${appSnCol} IN (${ALL_PH_SNS_LIST}))`;
   } else {
     const targetSN = APP_CODE_TO_SN_MAP[app];
     if (targetSN) {
@@ -389,6 +401,14 @@ export async function GET(request: NextRequest) {
         "ph-directblood": "포인트홈-지정헌혈",
         "ph-raisehand": "포인트홈-고발",
         "ph-tvdalin": "포인트홈-TV의달인",
+        "ph-pinkdiary": "포인트홈-핑크다이어리",
+        "ph-scorecenter": "포인트홈-스코어센터",
+        "ph-lottodraw": "포인트홈-로또드로잉",
+        "ph-mbtitest": "포인트홈-MBTI테스트",
+        "ph-probaseball": "포인트홈-프로야구",
+        "ph-ddokddokvoca": "포인트홈-똑똑보카",
+        "ph-cultureland": "포인트홈-컬쳐랜드",
+        "ph-ggcurrency": "포인트홈-경기지역화폐",
       };
 
       const coreApps = ["tc", "bitbunny", "yafit", "harustory", "okcashback"];
@@ -427,6 +447,18 @@ export async function GET(request: NextRequest) {
         { label: "토스 (toss)", value: "toss" },
         { label: "카카오페이 (kakaopay)", value: "kakaopay" },
         { label: "포인트홈-하루날씨 (ph-hw)", value: "ph-hw" },
+        { label: "포인트홈-메모지 (ph-mmg)", value: "ph-mmg" },
+        { label: "포인트홈-뭐야이번호 (ph-whatisthisnumber)", value: "ph-whatisthisnumber" },
+        { label: "포인트홈-스쿨투게더 (ph-schooltogether)", value: "ph-schooltogether" },
+        { label: "포인트홈-퀴즈정답 (ph-quizanswer)", value: "ph-quizanswer" },
+        { label: "포인트홈-걸음왕 (ph-walkingking)", value: "ph-walkingking" },
+        { label: "포인트홈-특수문자 (ph-specialchars)", value: "ph-specialchars" },
+        { label: "포인트홈-지정헌혈 (ph-directblood)", value: "ph-directblood" },
+        { label: "포인트홈-고발 (ph-raisehand)", value: "ph-raisehand" },
+        { label: "포인트홈-핑크다이어리 (ph-pinkdiary)", value: "ph-pinkdiary" },
+        { label: "포인트홈-스코어센터 (ph-scorecenter)", value: "ph-scorecenter" },
+        { label: "포인트홈-로또드로잉 (ph-lottodraw)", value: "ph-lottodraw" },
+        { label: "포인트홈-MBTI테스트 (ph-mbtitest)", value: "ph-mbtitest" },
       ];
       return NextResponse.json({ success: true, data: defaultAppList });
     }
@@ -457,13 +489,13 @@ export async function GET(request: NextRequest) {
     to = temp;
   }
 
-  // Prevent ClickHouse 'Too many partitions to read. Max 31' exception
+  // Prevent ClickHouse partition explosion for very large intervals (>90 days)
   const fromDateObj = new Date(from);
   const toDateObj = new Date(to);
   const diffDays = Math.round((toDateObj.getTime() - fromDateObj.getTime()) / (1000 * 3600 * 24));
-  if (diffDays > 30) {
+  if (diffDays > 90) {
     const clampedFrom = new Date(toDateObj);
-    clampedFrom.setDate(clampedFrom.getDate() - 30);
+    clampedFrom.setDate(clampedFrom.getDate() - 90);
     const y = clampedFrom.getFullYear();
     const m = String(clampedFrom.getMonth() + 1).padStart(2, '0');
     const d = String(clampedFrom.getDate()).padStart(2, '0');
@@ -527,21 +559,70 @@ export async function GET(request: NextRequest) {
     if (type === 'overview') {
       const appCond = getAppCond(app, 'appID');
       const ufsCond = getAppCond(app, 'fs.appID');
+      const appCondUda = getAppCond(app, 'appID');
+      const appCondMp = getAppCondWithSn(app, 'ac.appID', 'mp.appSN');
+      const appCondRc = getAppCondWithSn(app, 'ac.appID', 'rc.appSN');
       sql = `
-        SELECT 
-          d.eventDateKst AS eventDateKst,
-          d.activeUserCount AS activeUserCount,
-          ifNull(n.newUserCount, 0) AS newUserCount,
-          ifNull(e.totalEventCount, 0) AS eventCount
-        FROM
-        (
+        WITH 
+        union_active AS (
+          SELECT 
+            dt AS eventDateKst,
+            uniqExact(accountSN) AS activeUserCount
+          FROM (
+            SELECT 
+              eventDateKst AS dt,
+              toInt64OrZero(accountSN) AS accountSN
+            FROM Log.UserDailyActivity
+            WHERE ${appCondUda} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}'
+            
+            UNION ALL
+            
+            SELECT 
+              mp.dt AS dt,
+              mp.accountSN AS accountSN
+            FROM Performance.MissionParticipation_Raw AS mp
+            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
+            WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
+              AND ${appCondMp}
+              AND mp.status = 'COMPLETED'
+              AND mp.rewardType IN ('POINT', 'DIRECT')
+              AND mp.missionSN > 0
+
+            UNION ALL
+
+            SELECT 
+              rc.dt AS dt,
+              rc.accountSN AS accountSN
+            FROM Performance.RCPayload_Raw AS rc
+            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
+            WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
+              AND ${appCondRc}
+              AND rc.status = 2
+              AND rc.subType BETWEEN 101 AND 112
+          )
+          GROUP BY dt
+        ),
+        old_active AS (
           SELECT
             eventDateKst,
             uniqExactMerge(activeUserCount) AS activeUserCount
           FROM Log.DailyActiveUsers
           WHERE ${appCond} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}'
           GROUP BY eventDateKst
-        ) AS d
+        ),
+        combined_dau AS (
+          SELECT
+            coalesce(u.eventDateKst, o.eventDateKst) AS eventDateKst,
+            greatest(ifNull(u.activeUserCount, 0), ifNull(o.activeUserCount, 0)) AS activeUserCount
+          FROM union_active AS u
+          FULL OUTER JOIN old_active AS o ON o.eventDateKst = u.eventDateKst
+        )
+        SELECT 
+          c.eventDateKst AS eventDateKst,
+          c.activeUserCount AS activeUserCount,
+          ifNull(n.newUserCount, 0) AS newUserCount,
+          ifNull(e.totalEventCount, 0) AS eventCount
+        FROM combined_dau AS c
         LEFT JOIN
         (
           SELECT
@@ -551,7 +632,7 @@ export async function GET(request: NextRequest) {
           LEFT JOIN Log.AppNewUserWatermark_V AS w ON w.appID = fs.appID
           WHERE ${ufsCond} AND (toInt64OrZero(fs.accountSN) > ifNull(w.watermark, 0)) AND fs.firstEventDateKst >= '${from}' AND fs.firstEventDateKst <= '${to}'
           GROUP BY eventDateKst
-        ) AS n ON n.eventDateKst = d.eventDateKst
+        ) AS n ON n.eventDateKst = c.eventDateKst
         LEFT JOIN
         (
           SELECT
@@ -560,9 +641,9 @@ export async function GET(request: NextRequest) {
           FROM Log.DailyEventCounts_V
           WHERE ${appCond} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}'
           GROUP BY eventDateKst
-        ) AS e ON e.eventDateKst = d.eventDateKst
+        ) AS e ON e.eventDateKst = c.eventDateKst
         ORDER BY eventDateKst ASC
-        SETTINGS max_threads = 2, max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296
+        SETTINGS max_partitions_to_read = 300, max_rows_to_read = 0, max_threads = 4, max_bytes_before_external_group_by = 268435456, max_memory_usage = 8589934592
       `;
     } else if (type === 'retention') {
       const addDaysStr = (dStr: string, days: number) => {
@@ -1667,99 +1748,110 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      const appCondUal = getAppCond(app, 'appID');
-      const rawDauSql = `
-        SELECT 
-          toDate(toTimeZone(ts, 'Asia/Seoul')) AS dt,
-          uniqExact(accountSN) AS activeUserCount,
-          count() AS eventCount
-        FROM Log.UserActionLog
-        WHERE env = 'prod' AND ${appCondUal}
-          AND toDate(toTimeZone(ts, 'Asia/Seoul')) >= '${from}'
-          AND toDate(toTimeZone(ts, 'Asia/Seoul')) <= '${to}'
-        GROUP BY dt
-      `;
+      const dateList: string[] = [];
+      const curDate = new Date(from);
+      const endDate = new Date(to);
+      while (curDate <= endDate) {
+        const y = curDate.getFullYear();
+        const m = String(curDate.getMonth() + 1).padStart(2, '0');
+        const d = String(curDate.getDate()).padStart(2, '0');
+        dateList.push(`${y}-${m}-${d}`);
+        curDate.setDate(curDate.getDate() + 1);
+      }
 
-      const appCondUfs = getAppCond(app, 'ufs.appID');
-      const rawNewUserSql = `
-        SELECT 
-          ufs.firstEventDateKst AS dt,
-          uniqExact(ufs.accountSN) AS newUserCount
-        FROM Log.UserFirstSeen_V AS ufs
-        LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ufs.appID = wm.appID
-        WHERE ${appCondUfs}
-          AND toInt64OrZero(ufs.accountSN) > ifNull(wm.watermark, 0)
-          AND ufs.firstEventDateKst >= '${from}'
-          AND ufs.firstEventDateKst <= '${to}'
-        GROUP BY dt
-      `;
+      const missingDates = dateList.filter((dt) => !rowMap[dt]);
 
-      try {
-        const [rawDauRows, rawNewUserRows] = await Promise.all([
-          queryClickHouse(rawDauSql).catch(() => []),
-          queryClickHouse(rawNewUserSql).catch(() => []),
-        ]);
+      if (missingDates.length > 0) {
+        const appCondUal = getAppCond(app, 'appID');
+        const rawDauSql = `
+          SELECT 
+            toDate(toTimeZone(ts, 'Asia/Seoul')) AS dt,
+            uniqExact(accountSN) AS activeUserCount,
+            count() AS eventCount
+          FROM Log.UserActionLog
+          WHERE env = 'prod' AND ${appCondUal}
+            AND toDate(toTimeZone(ts, 'Asia/Seoul')) >= '${from}'
+            AND toDate(toTimeZone(ts, 'Asia/Seoul')) <= '${to}'
+          GROUP BY dt
+        `;
 
-        const rawDauMap: Record<string, any> = {};
-        if (Array.isArray(rawDauRows)) {
-          rawDauRows.forEach((r: any) => {
-            const d = String(r.dt || "").slice(0, 10);
-            if (d) rawDauMap[d] = r;
+        const appCondUfs = getAppCond(app, 'ufs.appID');
+        const rawNewUserSql = `
+          SELECT 
+            ufs.firstEventDateKst AS dt,
+            uniqExact(ufs.accountSN) AS newUserCount
+          FROM Log.UserFirstSeen_V AS ufs
+          LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ufs.appID = wm.appID
+          WHERE ${appCondUfs}
+            AND toInt64OrZero(ufs.accountSN) > ifNull(wm.watermark, 0)
+            AND ufs.firstEventDateKst >= '${from}'
+            AND ufs.firstEventDateKst <= '${to}'
+          GROUP BY dt
+        `;
+
+        try {
+          const [rawDauRows, rawNewUserRows] = await Promise.all([
+            queryClickHouse(rawDauSql).catch(() => []),
+            queryClickHouse(rawNewUserSql).catch(() => []),
+          ]);
+
+          const rawDauMap: Record<string, any> = {};
+          if (Array.isArray(rawDauRows)) {
+            rawDauRows.forEach((r: any) => {
+              const d = String(r.dt || "").slice(0, 10);
+              if (d) rawDauMap[d] = r;
+            });
+          }
+
+          const rawNewUserMap: Record<string, any> = {};
+          if (Array.isArray(rawNewUserRows)) {
+            rawNewUserRows.forEach((r: any) => {
+              const d = String(r.dt || "").slice(0, 10);
+              if (d) rawNewUserMap[d] = r;
+            });
+          }
+
+          data = dateList.map((dt) => {
+            const existing = rowMap[dt];
+            const rawDau = rawDauMap[dt];
+            const rawNew = rawNewUserMap[dt];
+
+            const activeUserCount = String(
+              Math.max(
+                Number(existing?.activeUserCount || 0),
+                Number(rawDau?.activeUserCount || 0)
+              )
+            );
+            const newUserCount = String(
+              Math.max(
+                Number(existing?.newUserCount || 0),
+                Number(rawNew?.newUserCount || 0)
+              )
+            );
+            const eventCount = String(
+              Math.max(
+                Number(existing?.eventCount || 0),
+                Number(rawDau?.eventCount || 0)
+              )
+            );
+
+            return {
+              eventDateKst: dt,
+              activeUserCount,
+              newUserCount,
+              eventCount,
+            };
           });
+        } catch (e) {
+          console.warn("Failed complete date series overview fallback:", e);
         }
-
-        const rawNewUserMap: Record<string, any> = {};
-        if (Array.isArray(rawNewUserRows)) {
-          rawNewUserRows.forEach((r: any) => {
-            const d = String(r.dt || "").slice(0, 10);
-            if (d) rawNewUserMap[d] = r;
-          });
-        }
-
-        const dateList: string[] = [];
-        const curDate = new Date(from);
-        const endDate = new Date(to);
-        while (curDate <= endDate) {
-          const y = curDate.getFullYear();
-          const m = String(curDate.getMonth() + 1).padStart(2, '0');
-          const d = String(curDate.getDate()).padStart(2, '0');
-          dateList.push(`${y}-${m}-${d}`);
-          curDate.setDate(curDate.getDate() + 1);
-        }
-
-        data = dateList.map((dt) => {
-          const existing = rowMap[dt];
-          const rawDau = rawDauMap[dt];
-          const rawNew = rawNewUserMap[dt];
-
-          const activeUserCount = String(
-            Math.max(
-              Number(existing?.activeUserCount || 0),
-              Number(rawDau?.activeUserCount || 0)
-            )
-          );
-          const newUserCount = String(
-            Math.max(
-              Number(existing?.newUserCount || 0),
-              Number(rawNew?.newUserCount || 0)
-            )
-          );
-          const eventCount = String(
-            Math.max(
-              Number(existing?.eventCount || 0),
-              Number(rawDau?.eventCount || 0)
-            )
-          );
-
-          return {
-            eventDateKst: dt,
-            activeUserCount,
-            newUserCount,
-            eventCount,
-          };
-        });
-      } catch (e) {
-        console.warn("Failed complete date series overview fallback:", e);
+      } else {
+        data = dateList.map((dt) => ({
+          eventDateKst: dt,
+          activeUserCount: String(rowMap[dt]?.activeUserCount || '0'),
+          newUserCount: String(rowMap[dt]?.newUserCount || '0'),
+          eventCount: String(rowMap[dt]?.eventCount || '0'),
+        }));
       }
     }
 
