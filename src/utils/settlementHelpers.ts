@@ -77,7 +77,7 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
   if (selectedApp === "tc" || selectedApp === "general_all" || selectedApp === "ph_all") {
     if (Array.isArray(item.apps) && item.apps.length > 0) {
       let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0, adFree = 0, missionRewardP = 0;
-      let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0, coupang = 0;
+      let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0, coupangSeller = 0, coupangPartners = 0;
 
       const targetApps = item.apps.filter((app) => {
         if (selectedApp === "tc") return true;
@@ -103,7 +103,8 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
         cash += Number(ad.adcash || 0);
         rc += Number(ad.rc || 0);
         toss += Number(ad.tossMini || 0);
-        coupang += Number(ad.coupang || (app.ad as any)?.coupang || 0);
+        coupangSeller += Number(ad.coupangSeller ?? (ad as any).coupang ?? (app.ad as any)?.coupangSeller ?? (app.ad as any)?.coupang ?? 0);
+        coupangPartners += Number(ad.coupangPartners ?? (app.ad as any)?.coupangPartners ?? 0);
       });
 
       return {
@@ -114,7 +115,7 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
         contentRevenue,
         adFree,
         missionRewardP,
-        ad: { b, pop, forus, sense, cash, rc, toss, coupang },
+        ad: { b, pop, forus, sense, cash, rc, toss, coupangSeller, coupangPartners },
       };
     } else if (selectedApp === "tc") {
       const ad: Partial<SettlementAdData> = item.ad || {};
@@ -135,7 +136,8 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
           cash: Number(ad.adcash || 0),
           rc: Number(ad.rc || 0),
           toss: Number(ad.tossMini || 0),
-          coupang: Number(ad.coupang || (item.ad as any)?.coupang || 0),
+          coupangSeller: Number(ad.coupangSeller ?? (ad as any).coupang ?? (item.ad as any)?.coupangSeller ?? (item.ad as any)?.coupang ?? 0),
+          coupangPartners: Number(ad.coupangPartners ?? (item.ad as any)?.coupangPartners ?? 0),
         },
       };
     }
@@ -228,7 +230,7 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
 
     if (matchedApps.length > 0) {
       let paidCoin = 0, freeCoin = 0, chargeCoin = 0, usedReward = 0, contentRevenue = 0, adFree = 0, missionRewardP = 0;
-      let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0, coupang = 0;
+      let b = 0, pop = 0, forus = 0, sense = 0, cash = 0, rc = 0, toss = 0, coupangSeller = 0, coupangPartners = 0;
 
       matchedApps.forEach((app) => {
         paidCoin += Number(app.payingCoin?.paidCoin ?? app.content?.payingCoin?.paidCoin ?? 0);
@@ -247,7 +249,8 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
         cash += Number(ad.adcash || 0);
         rc += Number(ad.rc || 0);
         toss += Number(ad.tossMini || 0);
-        coupang += Number(ad.coupang || (app.ad as any)?.coupang || 0);
+        coupangSeller += Number(ad.coupangSeller ?? (ad as any).coupang ?? (app.ad as any)?.coupangSeller ?? (app.ad as any)?.coupang ?? 0);
+        coupangPartners += Number(ad.coupangPartners ?? (app.ad as any)?.coupangPartners ?? 0);
       });
 
       return {
@@ -258,7 +261,7 @@ export function getSettlementDataForApp(item: SettlementDailyItem, selectedApp: 
         contentRevenue,
         adFree,
         missionRewardP,
-        ad: { b, pop, forus, sense, cash, rc, toss, coupang },
+        ad: { b, pop, forus, sense, cash, rc, toss, coupangSeller, coupangPartners },
       };
     }
   }

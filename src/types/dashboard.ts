@@ -319,6 +319,8 @@ export interface SettlementAdData {
   rc: number;
   tossMini: number;
   coupang?: number;
+  coupangSeller?: number;
+  coupangPartners?: number;
 }
 
 export interface SettlementAdFreeData {

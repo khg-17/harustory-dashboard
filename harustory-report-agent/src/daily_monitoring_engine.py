@@ -74,7 +74,7 @@ def fetch_all_monitoring_data(comp_dates: Dict[str, str]):
     dau_sql = f"""
     SELECT eventDateKst as dt, appID, uniqExactMerge(activeUserCount) as dau
     FROM Log.DailyActiveUsers
-    WHERE eventDateKst IN ({dates_in})
+    WHERE eventDateKst IN ({dates_in}) AND match(appID, '^[0-9]+$') = 0
     GROUP BY eventDateKst, appID
     """
     dau_rows = query_clickhouse(dau_sql)
@@ -83,7 +83,7 @@ def fetch_all_monitoring_data(comp_dates: Dict[str, str]):
     total_dau_sql = f"""
     SELECT eventDateKst as dt, uniqExactMerge(activeUserCount) as dau
     FROM Log.DailyActiveUsers
-    WHERE eventDateKst IN ({dates_in})
+    WHERE eventDateKst IN ({dates_in}) AND match(appID, '^[0-9]+$') = 0
     GROUP BY eventDateKst
     """
     total_dau_rows = query_clickhouse(total_dau_sql)
@@ -93,7 +93,7 @@ def fetch_all_monitoring_data(comp_dates: Dict[str, str]):
     SELECT fs.firstEventDateKst AS dt, fs.appID as appID, count() AS new_users
     FROM Log.UserFirstSeen_V AS fs
     LEFT JOIN Log.AppNewUserWatermark_V AS w ON w.appID = fs.appID
-    WHERE (toInt64OrZero(fs.accountSN) > ifNull(w.watermark, 0)) AND fs.firstEventDateKst IN ({dates_in})
+    WHERE (toInt64OrZero(fs.accountSN) > ifNull(w.watermark, 0)) AND match(fs.appID, '^[0-9]+$') = 0 AND fs.firstEventDateKst IN ({dates_in})
     GROUP BY dt, appID
     """
     new_user_rows = query_clickhouse(new_users_sql)
@@ -102,7 +102,7 @@ def fetch_all_monitoring_data(comp_dates: Dict[str, str]):
     SELECT fs.firstEventDateKst AS dt, count() AS new_users
     FROM Log.UserFirstSeen_V AS fs
     LEFT JOIN Log.AppNewUserWatermark_V AS w ON w.appID = fs.appID
-    WHERE (toInt64OrZero(fs.accountSN) > ifNull(w.watermark, 0)) AND fs.firstEventDateKst IN ({dates_in})
+    WHERE (toInt64OrZero(fs.accountSN) > ifNull(w.watermark, 0)) AND match(fs.appID, '^[0-9]+$') = 0 AND fs.firstEventDateKst IN ({dates_in})
     GROUP BY dt
     """
     total_new_rows = query_clickhouse(total_new_sql)
@@ -111,7 +111,7 @@ def fetch_all_monitoring_data(comp_dates: Dict[str, str]):
     evt_sql = f"""
     SELECT eventDateKst as dt, appID, sum(eventCount) as events
     FROM Log.DailyEventCounts_V
-    WHERE eventDateKst IN ({dates_in})
+    WHERE eventDateKst IN ({dates_in}) AND match(appID, '^[0-9]+$') = 0
     GROUP BY eventDateKst, appID
     """
     evt_rows = query_clickhouse(evt_sql)
@@ -119,7 +119,7 @@ def fetch_all_monitoring_data(comp_dates: Dict[str, str]):
     total_evt_sql = f"""
     SELECT eventDateKst as dt, sum(eventCount) as events
     FROM Log.DailyEventCounts_V
-    WHERE eventDateKst IN ({dates_in})
+    WHERE eventDateKst IN ({dates_in}) AND match(appID, '^[0-9]+$') = 0
     GROUP BY eventDateKst
     """
     total_evt_rows = query_clickhouse(total_evt_sql)
@@ -132,6 +132,7 @@ def fetch_all_monitoring_data(comp_dates: Dict[str, str]):
         SELECT appID, label, count() as pv, uniqExact(accountSN) as uv
         FROM Log.UserActionLog
         WHERE env = 'prod' AND toYYYYMMDD(ts) = {d_int} AND event = 'impression'
+          AND match(appID, '^[0-9]+$') = 0
           AND label IN ('all_tab_view', 'today_tab_view', 'library_tab_view', 'free_tab_view', 'reward_tab_view')
         GROUP BY appID, label
         """

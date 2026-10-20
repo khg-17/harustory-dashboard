@@ -26,11 +26,76 @@ try {
   // Ignore seed load error
 }
 
+// Point Home sub-app mappings
+const PH_APP_SN_MAP: Record<string, number> = {
+  'ph-hw': 58,
+  'ph-scorecenter': 67,
+  'ph-probaseball': 68,
+  'ph-walkingking': 70,
+  'ph-ddokddokvoca': 71,
+  'ph-lottodraw': 73,
+  'ph-mbtitest': 74,
+  'ph-whatisthisnumber': 77,
+  'ph-directblood': 78,
+  'ph-schooltogether': 80,
+  'ph-cultureland': 88,
+  'ph-quizanswer': 91,
+  'ph-specialchars': 92,
+  'ph-raisehand': 93,
+  'ph-pinkdiary': 94,
+  'ph-tvdalin': 96,
+  'ph-mmg': 137,
+  'ph-ggcurrency': 142,
+};
+
+// Comprehensive mapping of app codes to appSN sequence numbers (from Performance.AppChannel and PH sub-apps)
+const APP_CODE_TO_SN_MAP: Record<string, number> = {
+  harustory: 1,
+  toss: 2,
+  bitbunny: 3,
+  memog: 4,
+  bitwalk: 5,
+  zaritalk: 6,
+  happytoon: 7,
+  upluspage: 8,
+  pass: 9,
+  bppay: 10,
+  '3o3': 11,
+  yafit: 12,
+  benecafe: 13,
+  digiloca: 14,
+  olock: 15,
+  pocketcu: 16,
+  kakaopay: 17,
+  kbpay: 18,
+  benepia: 19,
+  treasurer: 20,
+  hanamoney: 21,
+  passbyKT: 22,
+  zum: 23,
+  rround: 24,
+  wabank: 25,
+  lpoint: 26,
+  okcashback: 44,
+  busanbank: 46,
+  ...PH_APP_SN_MAP,
+};
+
+const SN_TO_APP_CODE_MAP: Record<string, string> = Object.entries(APP_CODE_TO_SN_MAP).reduce((acc, [code, sn]) => {
+  acc[String(sn)] = code;
+  return acc;
+}, {} as Record<string, string>);
+
+const ALL_PH_SNS_LIST = Object.values(PH_APP_SN_MAP).join(', ');
+const ALL_PH_SN_STRINGS = Object.values(PH_APP_SN_MAP).map((sn) => `'${sn}'`).join(', ');
+const ALL_NUMERIC_SN_STRINGS = Object.values(APP_CODE_TO_SN_MAP).map((sn) => `'${sn}'`).join(', ');
+
 // Helper to store and merge rows into global store
 function updateGlobalStore(app: string, type: string, rows: any[], userSegment?: string) {
   if (!Array.isArray(rows)) return;
+  const effectiveApp = SN_TO_APP_CODE_MAP[app] || app;
   const segSuffix = userSegment && userSegment !== 'all' ? `_${userSegment}` : '';
-  const storeKey = `${app}_${type}${segSuffix}`;
+  const storeKey = `${effectiveApp}_${type}${segSuffix}`;
   if (!appGlobalStore.has(storeKey)) {
     appGlobalStore.set(storeKey, new Map<string, any>());
   }
@@ -46,7 +111,8 @@ function updateGlobalStore(app: string, type: string, rows: any[], userSegment?:
 
 // Helper to slice data locally from global store by date range
 function sliceGlobalStore(app: string, type: string, from: string, to: string, userSegment?: string): any[] {
-  const targetApp = (app === 'general_all' || app === 'ph_all') ? 'tc' : app;
+  const effectiveApp = SN_TO_APP_CODE_MAP[app] || app;
+  const targetApp = (effectiveApp === 'general_all' || effectiveApp === 'ph_all') ? 'tc' : effectiveApp;
   const segSuffix = userSegment && userSegment !== 'all' ? `_${userSegment}` : '';
 
   const map = appGlobalStore.get(`${targetApp}_${type}${segSuffix}`) ||
@@ -114,56 +180,35 @@ function extractExchangedPoints(item: any): number {
   return !isNaN(num) ? num : 0;
 }
 
-// Mapping map for Point Home sub-apps whose AppChannel_V appID is empty
-const APP_CODE_TO_SN_MAP: Record<string, number> = {
-  'ph-hw': 58,
-  'ph-scorecenter': 67,
-  'ph-probaseball': 68,
-  'ph-walkingking': 70,
-  'ph-ddokddokvoca': 71,
-  'ph-lottodraw': 73,
-  'ph-mbtitest': 74,
-  'ph-whatisthisnumber': 77,
-  'ph-directblood': 78,
-  'ph-schooltogether': 80,
-  'ph-cultureland': 88,
-  'ph-quizanswer': 91,
-  'ph-specialchars': 92,
-  'ph-raisehand': 93,
-  'ph-pinkdiary': 94,
-  'ph-tvdalin': 96,
-  'ph-mmg': 137,
-  'ph-ggcurrency': 142,
-};
-
-const ALL_PH_SNS_LIST = Object.values(APP_CODE_TO_SN_MAP).join(', ');
-
 // Helper to construct exact app condition for ClickHouse queries handling virtual app codes and sub-app appSN mappings
-function getAppCond(app: string, column: string = 'appID'): string {
-  if (app === 'tc') {
-    return '(1 = 1)';
-  } else if (app === 'general_all') {
-    return `(${column} NOT LIKE 'ph-%' AND ${column} != '')`;
-  } else if (app === 'ph_all') {
-    return `(${column} LIKE 'ph-%')`;
+function getAppCond(app: string, column: string = 'appID', allowNumeric: boolean = false): string {
+  const effectiveApp = SN_TO_APP_CODE_MAP[app] || app;
+
+  if (effectiveApp === 'tc') {
+    return `(${column} NOT IN (${ALL_NUMERIC_SN_STRINGS}) AND match(${column}, '^[0-9]+$') = 0)`;
+  } else if (effectiveApp === 'general_all') {
+    return `(${column} NOT LIKE 'ph-%' AND ${column} NOT IN (${ALL_NUMERIC_SN_STRINGS}) AND match(${column}, '^[0-9]+$') = 0 AND ${column} != '')`;
+  } else if (effectiveApp === 'ph_all') {
+    return `(${column} LIKE 'ph-%' AND match(${column}, '^[0-9]+$') = 0)`;
   } else {
-    return `${column} = '${app}'`;
+    return `${column} = '${effectiveApp}'`;
   }
 }
 
 function getAppCondWithSn(app: string, appIdCol: string = 'ac.appID', appSnCol: string = 'mp.appSN'): string {
-  if (app === 'tc') {
+  const effectiveApp = SN_TO_APP_CODE_MAP[app] || app;
+  if (effectiveApp === 'tc') {
     return '(1 = 1)';
-  } else if (app === 'general_all') {
+  } else if (effectiveApp === 'general_all') {
     return `(${appIdCol} NOT LIKE 'ph-%' AND ${appIdCol} != '' AND ${appSnCol} NOT IN (${ALL_PH_SNS_LIST}))`;
-  } else if (app === 'ph_all') {
+  } else if (effectiveApp === 'ph_all') {
     return `(${appIdCol} LIKE 'ph-%' OR ${appSnCol} IN (${ALL_PH_SNS_LIST}))`;
   } else {
-    const targetSN = APP_CODE_TO_SN_MAP[app];
+    const targetSN = APP_CODE_TO_SN_MAP[effectiveApp];
     if (targetSN) {
-      return `(${appIdCol} = '${app}' OR ${appSnCol} = ${targetSN})`;
+      return `(${appIdCol} = '${effectiveApp}' OR ${appIdCol} = '${targetSN}' OR ${appSnCol} = ${targetSN})`;
     }
-    return `${appIdCol} = '${app}'`;
+    return `${appIdCol} = '${effectiveApp}'`;
   }
 }
 
@@ -240,19 +285,52 @@ function mergeManualAdRevenue(app: string, from: string, to: string, baseData: a
 
 
 
+// Upstream ClickHouse table Log.UserFirstSeen and materialized views stopped receiving data from 2026-10-18.
+// For dates on or after 2026-10-18, seamlessly union Log.UserFirstSeen_V with fresh accounts from Log.UserActionLog.
+function getUserFirstSeenExpr(to: string): string {
+  if (to < '2026-10-18') {
+    return 'Log.UserFirstSeen_V';
+  }
+  return `(
+    SELECT appID, accountSN, firstEventDateKst
+    FROM Log.UserFirstSeen_V
+    UNION ALL
+    SELECT 
+      appID,
+      accountSN,
+      min(toDate(toTimeZone(ts, 'Asia/Seoul'))) AS firstEventDateKst
+    FROM Log.UserActionLog
+    WHERE env = 'prod'
+      AND ts >= '2026-10-18 00:00:00'
+      AND toDate(toTimeZone(ts, 'Asia/Seoul')) <= '${to}'
+      AND accountSN NOT IN (SELECT accountSN FROM Log.UserFirstSeen)
+    GROUP BY appID, accountSN
+  )`;
+}
+
 async function getNewUserRatio(app: string, from: string, to: string): Promise<number> {
   try {
     const dbApp = (app === 'general_all' || app === 'ph_all') ? 'tc' : app;
+    const appCond = getAppCond(dbApp, 'appID');
+    const ufsCond = getAppCond(dbApp, 'fs.appID');
+    const ufsExpr = getUserFirstSeenExpr(to);
     const overviewSql = `
       SELECT 
-        sum(activeUserCount) AS totalActive,
-        sum(newUserCount) AS totalNew
-      FROM Report.Overview__app_from_to_PV(
-        app = '${dbApp}',
-        from = '${from}',
-        to = '${to}'
-      )
-      SETTINGS max_threads = 2, max_bytes_before_external_group_by = 268435456, max_memory_usage = 4294967296
+        (
+          SELECT uniqExact(accountSN) 
+          FROM Log.UserActionLog 
+          WHERE env = 'prod' AND ${appCond}
+            AND toDate(toTimeZone(ts, 'Asia/Seoul')) >= '${from}'
+            AND toDate(toTimeZone(ts, 'Asia/Seoul')) <= '${to}'
+        ) AS totalActive,
+        (
+          SELECT count()
+          FROM ${ufsExpr} AS fs
+          LEFT JOIN Log.AppNewUserWatermark_V AS w ON w.appID = fs.appID
+          WHERE ${ufsCond} AND (toInt64OrZero(fs.accountSN) > ifNull(w.watermark, 0))
+            AND fs.firstEventDateKst >= '${from}' AND fs.firstEventDateKst <= '${to}'
+        ) AS totalNew
+      SETTINGS max_threads = 4, max_rows_to_read = 0
     `;
     const rows = await queryClickHouse(overviewSql);
     if (Array.isArray(rows) && rows.length > 0) {
@@ -355,7 +433,7 @@ export async function GET(request: NextRequest) {
     const sqlApps = `
       SELECT appID, count() as user_count
       FROM Log.UserFirstSeen_V
-      WHERE appID != ''
+      WHERE appID != '' AND match(appID, '^[0-9]+$') = 0
       GROUP BY appID
       HAVING user_count >= 5
       ORDER BY appID ASC
@@ -418,7 +496,12 @@ export async function GET(request: NextRequest) {
         rawApps.forEach((item: any) => {
           const val = item.appID?.trim();
           if (val) {
-            activeAppSet.add(val);
+            const mappedCode = SN_TO_APP_CODE_MAP[val];
+            if (mappedCode) {
+              activeAppSet.add(mappedCode);
+            } else if (!/^\d+$/.test(val)) {
+              activeAppSet.add(val);
+            }
           }
         });
       }
@@ -562,6 +645,7 @@ export async function GET(request: NextRequest) {
       const appCondUda = getAppCond(app, 'appID');
       const appCondMp = getAppCondWithSn(app, 'ac.appID', 'mp.appSN');
       const appCondRc = getAppCondWithSn(app, 'ac.appID', 'rc.appSN');
+      const ufsExpr = getUserFirstSeenExpr(to);
       sql = `
         WITH 
         union_active AS (
@@ -575,6 +659,16 @@ export async function GET(request: NextRequest) {
             FROM Log.UserDailyActivity
             WHERE ${appCondUda} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}'
             
+            UNION ALL
+
+            SELECT 
+              toDate(toTimeZone(ts, 'Asia/Seoul')) AS dt,
+              toInt64OrZero(accountSN) AS accountSN
+            FROM Log.UserActionLog
+            WHERE env = 'prod' AND ${appCond}
+              AND ts >= '2026-10-18 00:00:00'
+              AND toDate(toTimeZone(ts, 'Asia/Seoul')) <= '${to}'
+
             UNION ALL
             
             SELECT 
@@ -598,7 +692,7 @@ export async function GET(request: NextRequest) {
             WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
               AND ${appCondRc}
               AND rc.status = 2
-              AND rc.subType BETWEEN 101 AND 112
+              AND rc.subType BETWEEN 101 AND 115
           )
           GROUP BY dt
         ),
@@ -628,7 +722,7 @@ export async function GET(request: NextRequest) {
           SELECT
             fs.firstEventDateKst AS eventDateKst,
             count() AS newUserCount
-          FROM Log.UserFirstSeen_V AS fs
+          FROM ${ufsExpr} AS fs
           LEFT JOIN Log.AppNewUserWatermark_V AS w ON w.appID = fs.appID
           WHERE ${ufsCond} AND (toInt64OrZero(fs.accountSN) > ifNull(w.watermark, 0)) AND fs.firstEventDateKst >= '${from}' AND fs.firstEventDateKst <= '${to}'
           GROUP BY eventDateKst
@@ -637,9 +731,26 @@ export async function GET(request: NextRequest) {
         (
           SELECT
             eventDateKst,
-            sum(eventCount) AS totalEventCount
-          FROM Log.DailyEventCounts_V
-          WHERE ${appCond} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}'
+            max(eventCount) AS totalEventCount
+          FROM (
+            SELECT 
+              eventDateKst,
+              sum(eventCount) AS eventCount
+            FROM Log.DailyEventCounts_V
+            WHERE ${appCond} AND eventDateKst >= '${from}' AND eventDateKst <= '${to}'
+            GROUP BY eventDateKst
+
+            UNION ALL
+
+            SELECT 
+              toDate(toTimeZone(ts, 'Asia/Seoul')) AS eventDateKst,
+              count() AS eventCount
+            FROM Log.UserActionLog
+            WHERE env = 'prod' AND ${appCond}
+              AND ts >= '2026-10-18 00:00:00'
+              AND toDate(toTimeZone(ts, 'Asia/Seoul')) <= '${to}'
+            GROUP BY eventDateKst
+          )
           GROUP BY eventDateKst
         ) AS e ON e.eventDateKst = c.eventDateKst
         ORDER BY eventDateKst ASC
@@ -659,13 +770,14 @@ export async function GET(request: NextRequest) {
       const extendedToYYYYMMDD = parseInt(extendedTo.replace(/-/g, ''), 10);
       const appCondUfs = getAppCond(app, 'ufs.appID');
       const appCondUal = getAppCond(app, 'ual.appID');
+      const ufsExpr = getUserFirstSeenExpr(to);
       sql = `
         WITH 
         cohorts AS (
           SELECT 
             ufs.accountSN AS accountSN,
             ufs.firstEventDateKst AS cohortDateKst
-          FROM Log.UserFirstSeen_V AS ufs
+          FROM ${ufsExpr} AS ufs
           LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ufs.appID = wm.appID
           WHERE ${appCondUfs}
             AND toInt64OrZero(ufs.accountSN) > ifNull(wm.watermark, 0)
@@ -725,13 +837,14 @@ export async function GET(request: NextRequest) {
       const extendedToYYYYMMDD = parseInt(extendedTo.replace(/-/g, ''), 10);
       const appCondUfs = getAppCond(app, 'ufs.appID');
       const appCondUal = getAppCond(app, 'ual.appID');
+      const ufsExpr = getUserFirstSeenExpr(to);
       sql = `
         WITH 
         cohorts AS (
           SELECT 
             ufs.accountSN AS accountSN,
             ufs.firstEventDateKst AS cohortDateKst
-          FROM Log.UserFirstSeen_V AS ufs
+          FROM ${ufsExpr} AS ufs
           LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ufs.appID = wm.appID
           WHERE ${appCondUfs}
             AND toInt64OrZero(ufs.accountSN) > ifNull(wm.watermark, 0)
@@ -788,6 +901,7 @@ export async function GET(request: NextRequest) {
     } else if (type === 'attendance_activation') {
       const appCondUfs = getAppCond(app, 'ufs.appID');
       const appCondCr = getAppCond(app, 'ac.appID');
+      const ufsExpr = getUserFirstSeenExpr(to);
       sql = `
         WITH 
         cohorts AS (
@@ -795,7 +909,7 @@ export async function GET(request: NextRequest) {
             ufs.appID AS appID,
             ufs.accountSN AS accountSN,
             ufs.firstEventDateKst AS cohortDateKst
-          FROM Log.UserFirstSeen_V AS ufs
+          FROM ${ufsExpr} AS ufs
           LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ufs.appID = wm.appID
           WHERE ${appCondUfs}
             AND toInt64OrZero(ufs.accountSN) > ifNull(wm.watermark, 0)
@@ -922,6 +1036,7 @@ export async function GET(request: NextRequest) {
 
         if (newUserOnly) {
           // New-user-only funnel: JOIN with watermark + UserFirstSeen to restrict to new users
+          const ufsExpr = getUserFirstSeenExpr(to);
           sql = `
             SELECT 
               level_step AS step, 
@@ -932,7 +1047,7 @@ export async function GET(request: NextRequest) {
                 ual.accountSN AS accountSN, 
                 windowFunnel(86400)(toDateTime(ual.ts), ${stepConds}) AS level 
               FROM Log.UserActionLog AS ual
-              INNER JOIN Log.UserFirstSeen_V AS ufs 
+              INNER JOIN ${ufsExpr} AS ufs 
                 ON ual.appID = ufs.appID AND ual.accountSN = ufs.accountSN
               LEFT JOIN Log.AppNewUserWatermark_V AS wm
                 ON ual.appID = wm.appID
@@ -1094,7 +1209,7 @@ export async function GET(request: NextRequest) {
             WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
               AND ${appCondRc}
               AND rc.status = 2
-              AND rc.subType BETWEEN 101 AND 112
+              AND rc.subType BETWEEN 101 AND 115
             GROUP BY dt, itemSN, rewardP, accountSN
           ),
           combined AS (
@@ -1150,7 +1265,7 @@ export async function GET(request: NextRequest) {
             WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
               AND ${appCondRc}
               AND rc.status = 2
-              AND rc.subType BETWEEN 101 AND 112
+              AND rc.subType BETWEEN 101 AND 115
               ${segCondRc}
             GROUP BY dt, itemSN, rewardP, accountSN
           ),
@@ -1191,7 +1306,7 @@ export async function GET(request: NextRequest) {
           SELECT 
             mp.dt AS dt,
             mp.participationSN AS itemSN,
-            upper(m.missionType) AS label,
+            multiIf(upper(m.missionType) IN ('RC-SNACK', 'SNACK'), 'SNACK', upper(m.missionType) IN ('RC-DRINK', 'DRINK'), 'DRINK', upper(m.missionType)) AS label,
             toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
             mp.accountSN AS accountSN
           FROM Performance.MissionParticipation_Raw AS mp
@@ -1210,7 +1325,7 @@ export async function GET(request: NextRequest) {
           SELECT 
             rc.dt AS dt,
             rc.seq AS itemSN,
-            'RC' AS label,
+            multiIf(rc.subType = 114, 'SNACK', rc.subType = 115, 'DRINK', 'RC') AS label,
             toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
             rc.accountSN AS accountSN
           FROM Performance.RCPayload_Raw AS rc
@@ -1219,7 +1334,7 @@ export async function GET(request: NextRequest) {
           WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
             AND ${appCondRc}
             AND rc.status = 2
-            AND rc.subType BETWEEN 101 AND 112
+            AND rc.subType BETWEEN 101 AND 115
             ${segCondRc}
           GROUP BY dt, itemSN, label, rewardP, accountSN
         ),
@@ -1279,7 +1394,7 @@ export async function GET(request: NextRequest) {
           SELECT 
             mp.dt AS dt,
             mp.participationSN AS itemSN,
-            upper(m.missionType) AS label,
+            multiIf(upper(m.missionType) IN ('RC-SNACK', 'SNACK'), 'SNACK', upper(m.missionType) IN ('RC-DRINK', 'DRINK'), 'DRINK', upper(m.missionType)) AS label,
             toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
             mp.accountSN AS accountSN
           FROM Performance.MissionParticipation_Raw AS mp
@@ -1298,7 +1413,7 @@ export async function GET(request: NextRequest) {
           SELECT 
             rc.dt AS dt,
             rc.seq AS itemSN,
-            'RC' AS label,
+            multiIf(rc.subType = 114, 'SNACK', rc.subType = 115, 'DRINK', 'RC') AS label,
             toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
             rc.accountSN AS accountSN
           FROM Performance.RCPayload_Raw AS rc
@@ -1307,7 +1422,7 @@ export async function GET(request: NextRequest) {
           WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
             AND ${appCondRc}
             AND rc.status = 2
-            AND rc.subType BETWEEN 101 AND 112
+            AND rc.subType BETWEEN 101 AND 115
             ${segCondRc}
           GROUP BY dt, itemSN, label, rewardP, accountSN
         ),
@@ -1360,7 +1475,7 @@ export async function GET(request: NextRequest) {
           SELECT 
             mp.dt AS dt,
             mp.participationSN AS itemSN,
-            upper(m.missionType) AS missionType,
+            multiIf(upper(m.missionType) IN ('RC-SNACK', 'SNACK'), 'SNACK', upper(m.missionType) IN ('RC-DRINK', 'DRINK'), 'DRINK', upper(m.missionType)) AS missionType,
             toUInt64(coalesce(mp.rewardAmount, 0)) AS rewardP,
             mp.accountSN AS accountSN
           FROM Performance.MissionParticipation_Raw AS mp
@@ -1379,7 +1494,7 @@ export async function GET(request: NextRequest) {
           SELECT 
             rc.dt AS dt,
             rc.seq AS itemSN,
-            'RC' AS missionType,
+            multiIf(rc.subType = 114, 'SNACK', rc.subType = 115, 'DRINK', 'RC') AS missionType,
             toUInt64(coalesce(rc.rewardAmount, 0)) AS rewardP,
             rc.accountSN AS accountSN
           FROM Performance.RCPayload_Raw AS rc
@@ -1388,7 +1503,7 @@ export async function GET(request: NextRequest) {
           WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
             AND ${appCondRc}
             AND rc.status = 2
-            AND rc.subType BETWEEN 101 AND 112
+            AND rc.subType BETWEEN 101 AND 115
             ${segCondRc}
           GROUP BY dt, itemSN, missionType, rewardP, accountSN
         ),
@@ -1418,6 +1533,7 @@ export async function GET(request: NextRequest) {
         return `${y}-${m}-${day}`;
       };
       const extendedTo = addDaysStr(to, 6);
+      const ufsExpr = getUserFirstSeenExpr(to);
       const segCond = userSegment === "all" ? "" : userSegment === "new"
         ? `AND cr.accountSN > wm.watermark AND ufs.firstEventDateKst >= '${from}' AND ufs.firstEventDateKst <= '${to}'`
         : `AND (cr.accountSN <= wm.watermark OR ufs.firstEventDateKst < '${from}' OR ufs.firstEventDateKst IS NULL)`;
@@ -1440,7 +1556,7 @@ export async function GET(request: NextRequest) {
           uniqExact(cr.accountSN) AS completeUserCount
         FROM Performance.CheckInRecord_Raw AS cr
         LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = cr.appSN
-        LEFT JOIN Log.UserFirstSeen_V AS ufs ON ac.appID = ufs.appID AND toString(cr.accountSN) = ufs.accountSN
+        LEFT JOIN ${ufsExpr} AS ufs ON ac.appID = ufs.appID AND toString(cr.accountSN) = ufs.accountSN
         LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
         WHERE ${appCond}
           AND cr.dt >= '${from}' AND cr.dt <= '${extendedTo}'
@@ -1459,6 +1575,7 @@ export async function GET(request: NextRequest) {
         return `${y}-${m}-${day}`;
       };
       const extendedTo = addDaysStr(to, 6);
+      const ufsExpr = getUserFirstSeenExpr(to);
       const segCond = userSegment === "all" ? "" : userSegment === "new"
         ? `AND cr.accountSN > wm.watermark AND ufs.firstEventDateKst >= '${from}' AND ufs.firstEventDateKst <= '${to}'`
         : `AND (cr.accountSN <= wm.watermark OR ufs.firstEventDateKst < '${from}' OR ufs.firstEventDateKst IS NULL)`;
@@ -1469,7 +1586,7 @@ export async function GET(request: NextRequest) {
           if(day1CompleteUserCount > 0, completeUserCount / day1CompleteUserCount, 0) AS completionRate
         FROM Performance.CheckInRecord_Raw AS cr
         LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = cr.appSN
-        LEFT JOIN Log.UserFirstSeen_V AS ufs ON ac.appID = ufs.appID AND toString(cr.accountSN) = ufs.accountSN
+        LEFT JOIN ${ufsExpr} AS ufs ON ac.appID = ufs.appID AND toString(cr.accountSN) = ufs.accountSN
         LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
         WHERE ${appCond}
           AND cr.dt >= '${from}' AND cr.dt <= '${extendedTo}'
@@ -1486,6 +1603,7 @@ export async function GET(request: NextRequest) {
         return `${y}-${m}-${day}`;
       };
       const extendedTo = addDaysStr(to, 6);
+      const ufsExpr = getUserFirstSeenExpr(to);
       const segCond = userSegment === "all" ? "" : userSegment === "new"
         ? `AND cr.accountSN > wm.watermark AND ufs.firstEventDateKst >= '${from}' AND ufs.firstEventDateKst <= '${to}'`
         : `AND (cr.accountSN <= wm.watermark OR ufs.firstEventDateKst < '${from}' OR ufs.firstEventDateKst IS NULL)`;
@@ -1499,7 +1617,7 @@ export async function GET(request: NextRequest) {
             uniqExactIf(cr.accountSN, cr.consecutiveDay = 1) AS day1Count
           FROM Performance.CheckInRecord_Raw AS cr
           LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = cr.appSN
-          LEFT JOIN Log.UserFirstSeen_V AS ufs ON ac.appID = ufs.appID AND toString(cr.accountSN) = ufs.accountSN
+          LEFT JOIN ${ufsExpr} AS ufs ON ac.appID = ufs.appID AND toString(cr.accountSN) = ufs.accountSN
           LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
           WHERE ${appCond}
             AND cr.dt >= '${from}' AND cr.dt <= '${extendedTo}'
@@ -1511,7 +1629,7 @@ export async function GET(request: NextRequest) {
             uniqExact(cr.accountSN) AS completeUserCount
           FROM Performance.CheckInRecord_Raw AS cr
           LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = cr.appSN
-          LEFT JOIN Log.UserFirstSeen_V AS ufs ON ac.appID = ufs.appID AND toString(cr.accountSN) = ufs.accountSN
+          LEFT JOIN ${ufsExpr} AS ufs ON ac.appID = ufs.appID AND toString(cr.accountSN) = ufs.accountSN
           LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ac.appID = wm.appID
           WHERE ${appCond}
             AND cr.dt >= '${from}' AND cr.dt <= '${extendedTo}'
@@ -1760,8 +1878,9 @@ export async function GET(request: NextRequest) {
       }
 
       const missingDates = dateList.filter((dt) => !rowMap[dt]);
+      const needsOverviewEnrichment = missingDates.length > 0 || dateList.some(dt => dt >= '2026-10-18' && Number(rowMap[dt]?.newUserCount || 0) <= 1);
 
-      if (missingDates.length > 0) {
+      if (needsOverviewEnrichment) {
         const appCondUal = getAppCond(app, 'appID');
         const rawDauSql = `
           SELECT 
@@ -1776,11 +1895,12 @@ export async function GET(request: NextRequest) {
         `;
 
         const appCondUfs = getAppCond(app, 'ufs.appID');
+        const ufsExpr = getUserFirstSeenExpr(to);
         const rawNewUserSql = `
           SELECT 
             ufs.firstEventDateKst AS dt,
             uniqExact(ufs.accountSN) AS newUserCount
-          FROM Log.UserFirstSeen_V AS ufs
+          FROM ${ufsExpr} AS ufs
           LEFT JOIN Log.AppNewUserWatermark_V AS wm ON ufs.appID = wm.appID
           WHERE ${appCondUfs}
             AND toInt64OrZero(ufs.accountSN) > ifNull(wm.watermark, 0)

@@ -184,7 +184,7 @@ export const AdRevenueTab: React.FC<AdRevenueTabProps> = ({ revenueSummary, reve
                 <tr className="bg-[#f8f9fa] font-bold text-[#4e5968] border-b border-[#e5e8eb]">
                   <th className="py-3 px-4">광고 카테고리</th>
                   <th className="py-3 px-4 text-right">노출수</th>
-                  <th className="py-3 px-4 text-right">매출 (원)</th>
+                  <th className="py-3 px-4 text-right">매출</th>
                   <th className="py-3 px-4 text-right">비중 (%)</th>
                 </tr>
               </thead>
@@ -234,7 +234,7 @@ export const AdRevenueTab: React.FC<AdRevenueTabProps> = ({ revenueSummary, reve
                 <tr className="bg-[#f8f9fa] font-bold text-[#4e5968] border-b border-[#e5e8eb]">
                   <th className="py-3 px-4">네트워크 매체</th>
                   <th className="py-3 px-4 text-right">노출수</th>
-                  <th className="py-3 px-4 text-right">매출 (원)</th>
+                  <th className="py-3 px-4 text-right">매출</th>
                   <th className="py-3 px-4 text-right">비중 (%)</th>
                 </tr>
               </thead>

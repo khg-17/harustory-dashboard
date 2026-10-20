@@ -143,9 +143,10 @@ export function computeRevenueSummary({
 
       const { paidCoin, chargeCoin, usedReward, contentRevenue, adFree, missionRewardP, ad } = sData;
       const { b, pop, forus, sense, cash, rc, toss } = ad;
-      const coupang = Number((ad as any).coupang || 0);
+      const coupangSeller = Number(ad.coupangSeller ?? (ad as any).coupang ?? 0);
+      const coupangPartners = Number(ad.coupangPartners ?? 0);
 
-      const dayTotalAd = b + pop + forus + sense + cash + rc + toss + coupang;
+      const dayTotalAd = b + pop + forus + sense + cash + rc + toss + coupangSeller + coupangPartners;
       const realContentRev = (contentRevenue && contentRevenue > 0) ? contentRevenue : paidCoin;
 
       if (isCurrent) {
@@ -165,7 +166,8 @@ export function computeRevenueSummary({
           "AdCash": cash,
           "RC": rc,
           "Toss Mini": toss,
-          "coupang": coupang,
+          "쿠팡 셀러": coupangSeller,
+          "쿠팡 파트너스": coupangPartners,
         };
         if (sense > 0) netMap["AdSense"] = sense;
 
@@ -405,9 +407,10 @@ export function computeRevenueSummary({
 
       const { paidCoin, contentRevenue, usedReward, ad } = sData;
       const { b, pop, forus, sense, cash, rc, toss } = ad;
-      const coupang = Number((ad as any).coupang || 0);
+      const coupangSeller = Number(ad.coupangSeller ?? (ad as any).coupang ?? 0);
+      const coupangPartners = Number(ad.coupangPartners ?? 0);
 
-      const dayTotalAd = b + pop + forus + sense + cash + rc + toss + coupang;
+      const dayTotalAd = b + pop + forus + sense + cash + rc + toss + coupangSeller + coupangPartners;
       const realContentRev = (contentRevenue && contentRevenue > 0) ? contentRevenue : paidCoin;
 
       dailyMap[dtStr].serviceRev = realContentRev;
@@ -699,8 +702,15 @@ export function computeRevenueSummary({
 
     const metricsList = filteredSettlement.map((s) => {
       const sData = getSettlementDataForApp(s, selectedApp);
-      if (sData) return { ...sData.ad, coupang: Number((sData.ad as any).coupang || 0), adFree: sData.adFree || 0 };
-      return { b: 0, pop: 0, forus: 0, sense: 0, cash: 0, rc: 0, toss: 0, coupang: 0, adFree: 0 };
+      if (sData) {
+        return {
+          ...sData.ad,
+          coupangSeller: Number(sData.ad.coupangSeller ?? (sData.ad as any).coupang ?? 0),
+          coupangPartners: Number(sData.ad.coupangPartners ?? 0),
+          adFree: sData.adFree || 0,
+        };
+      }
+      return { b: 0, pop: 0, forus: 0, sense: 0, cash: 0, rc: 0, toss: 0, coupangSeller: 0, coupangPartners: 0, adFree: 0 };
     });
 
     const netDailyCandidate: Record<string, number[]> = {
@@ -710,7 +720,8 @@ export function computeRevenueSummary({
       "AdCash": metricsList.map((m) => m.cash),
       "RC": metricsList.map((m) => m.rc),
       "Toss Mini": metricsList.map((m) => m.toss),
-      "coupang": metricsList.map((m) => m.coupang),
+      "쿠팡 셀러": metricsList.map((m) => m.coupangSeller),
+      "쿠팡 파트너스": metricsList.map((m) => m.coupangPartners),
     };
     if (metricsList.some((m) => m.sense > 0)) {
       netDailyCandidate["AdSense"] = metricsList.map((m) => m.sense);
@@ -718,7 +729,7 @@ export function computeRevenueSummary({
 
     const netDaily: Record<string, number[]> = {};
     Object.entries(netDailyCandidate).forEach(([netName, arr]) => {
-      if (arr.some((v) => v > 0) || netName === "coupang") {
+      if (arr.some((v) => v > 0) || netName === "쿠팡 셀러" || netName === "쿠팡 파트너스") {
         netDaily[netName] = arr;
       }
     });

@@ -1,7 +1,28 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Info, PieChart as PieChartIcon, BarChart3, Users, CheckCircle2, Layers, TrendingUp, Calendar, Grid, ArrowUp, ArrowDown, Gift } from "lucide-react";
+import {
+  Info,
+  PieChart as PieChartIcon,
+  BarChart3,
+  Users,
+  CheckCircle2,
+  Layers,
+  TrendingUp,
+  Calendar,
+  Grid,
+  ArrowUp,
+  ArrowDown,
+  Gift,
+  Download,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  Coins,
+  Table as TableIcon,
+  Eye,
+  SlidersHorizontal,
+} from "lucide-react";
 import { Doughnut, Bar, Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -72,6 +93,8 @@ const MISSION_LABEL_MAP: Record<string, string> = {
   TIP: "팁",
   SCROLL: "스크롤",
   RC: "RC",
+  "RC-SNACK": "간식",
+  "RC-DRINK": "음료",
 };
 
 const SPECIFIC_MISSION_NAME_MAP: Record<string, string> = {
@@ -82,6 +105,8 @@ const SPECIFIC_MISSION_NAME_MAP: Record<string, string> = {
   TIP: "팁",
   SCROLL: "스크롤",
   RC: "RC",
+  "RC-SNACK": "간식",
+  "RC-DRINK": "음료",
   cleaning_book: "책 정리",
   snack_ad: "간식",
   drink_ad: "음료",
@@ -99,7 +124,16 @@ const SPECIFIC_MISSION_NAME_MAP: Record<string, string> = {
   reward_tip_confirm_click: "팁",
 };
 
+const normalizeMissionKey = (key: string): string => {
+  const upper = (key || "").toUpperCase();
+  if (upper === "RC-SNACK") return "SNACK";
+  if (upper === "RC-DRINK") return "DRINK";
+  return key;
+};
+
 const getMissionName = (label: string, rawName?: string): string => {
+  const normalized = normalizeMissionKey(label);
+  if (SPECIFIC_MISSION_NAME_MAP[normalized]) return SPECIFIC_MISSION_NAME_MAP[normalized];
   if (SPECIFIC_MISSION_NAME_MAP[label]) return SPECIFIC_MISSION_NAME_MAP[label];
   if (rawName && rawName.trim() && rawName !== label && !rawName.startsWith("미션 #")) return rawName;
   return label
@@ -176,6 +210,79 @@ const addDaysToStr = (dateStr: string, days: number): string => {
   return `${y}-${m}-${day}`;
 };
 
+// Korean Day-of-week helper (Avoids timezone offset by parsing Y, M, D)
+const getDayOfWeekKr = (dateStr: string): string => {
+  if (!dateStr || dateStr.length < 10) return "";
+  const parts = dateStr.slice(0, 10).split("-").map(Number);
+  if (parts.length < 3 || !parts[0] || !parts[1] || !parts[2]) return "";
+  const days = ["일", "월", "화", "수", "목", "금", "토"];
+  const d = new Date(parts[0], parts[1] - 1, parts[2]);
+  return days[d.getDay()] || "";
+};
+
+// Reward Mission Visual Configuration & Palette
+const REWARD_MISSION_CONFIG: Record<
+  string,
+  { name: string; color: string; bg: string; text: string; border: string; lightBg: string }
+> = {
+  CLEANING: {
+    name: "책 정리",
+    color: "#3182f6",
+    bg: "bg-[#ecf4fe]",
+    text: "text-[#3182f6]",
+    border: "border-[#3182f6]/20",
+    lightBg: "rgba(49, 130, 246, 0.08)",
+  },
+  SNACK: {
+    name: "간식",
+    color: "#ff763b",
+    bg: "bg-[#fff2eb]",
+    text: "text-[#ff763b]",
+    border: "border-[#ff763b]/20",
+    lightBg: "rgba(255, 118, 59, 0.08)",
+  },
+  DRINK: {
+    name: "음료",
+    color: "#00c980",
+    bg: "bg-[#e6f9f2]",
+    text: "text-[#00c980]",
+    border: "border-[#00c980]/20",
+    lightBg: "rgba(0, 201, 128, 0.08)",
+  },
+  RECOMMENDATION: {
+    name: "추천작",
+    color: "#8b5cf6",
+    bg: "bg-[#f3f0ff]",
+    text: "text-[#8b5cf6]",
+    border: "border-[#8b5cf6]/20",
+    lightBg: "rgba(139, 92, 246, 0.08)",
+  },
+  TIP: {
+    name: "팁",
+    color: "#f59e0b",
+    bg: "bg-[#fef8eb]",
+    text: "text-[#f59e0b]",
+    border: "border-[#f59e0b]/20",
+    lightBg: "rgba(245, 158, 11, 0.08)",
+  },
+  SCROLL: {
+    name: "스크롤",
+    color: "#ec4899",
+    bg: "bg-[#fdf2f8]",
+    text: "text-[#ec4899]",
+    border: "border-[#ec4899]/20",
+    lightBg: "rgba(236, 72, 153, 0.08)",
+  },
+  RC: {
+    name: "RC",
+    color: "#6366f1",
+    bg: "bg-[#eef2ff]",
+    text: "text-[#6366f1]",
+    border: "border-[#6366f1]/20",
+    lightBg: "rgba(99, 102, 241, 0.08)",
+  },
+};
+
 export const MissionDashboard: React.FC<MissionDashboardProps> = ({
   loading,
   subTab: subTabProp,
@@ -238,6 +345,14 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
   const [dailyRewardMissionFilter, setDailyRewardMissionFilter] = useState<string>("ALL");
   const [dailyRewardSortOrder, setDailyRewardSortOrder] = useState<"desc" | "asc">("desc");
 
+  // Revamped Daily Reward Focus States (Average Reward & Trend Line Focus)
+  const [rewardViewMode, setRewardViewMode] = useState<"matrix" | "daily_log" | "ranking">("matrix");
+  const [dailyRewardChartMetric, setDailyRewardChartMetric] = useState<"perUser" | "perComplete" | "totalP">("perUser");
+  const [dailyRewardMatrixMetric, setDailyRewardMatrixMetric] = useState<"perUser" | "perComplete" | "totalP" | "count">("perUser");
+  const [dailyRewardMatrixSort, setDailyRewardMatrixSort] = useState<"desc" | "asc">("desc");
+  const [expandedRewardDate, setExpandedRewardDate] = useState<string | null>(null);
+  const [selectedRewardChartMission, setSelectedRewardChartMission] = useState<string>("ALL");
+
   // ── 1. GENERAL MISSIONS DATA PROCESSING ──
   const generalMissionsData = useMemo(() => {
     let completeCountSum = 0;
@@ -254,8 +369,9 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
 
     if (summarySource.length > 0) {
       summarySource.forEach((row: any) => {
-        const typeKey = row.missionType || row.label || "기타";
-        if (typeKey === "ATTENDANCE") return;
+        const rawKey = row.missionType || row.label || "기타";
+        if (rawKey === "ATTENDANCE") return;
+        const typeKey = normalizeMissionKey(rawKey);
 
         const cCount = Number(row.completeCount) || 0;
         const rP = Number(row.rewardAmount ?? row.rewardP) || 0;
@@ -269,14 +385,15 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
         }
         typeGroupMap[typeKey].completeCount += cCount;
         typeGroupMap[typeKey].rewardP += rP;
-        typeGroupMap[typeKey].uuSum = uuVal;
+        typeGroupMap[typeKey].uuSum = Math.max(typeGroupMap[typeKey].uuSum, uuVal);
       });
     }
 
     if (missionDailyTrendRaw && missionDailyTrendRaw.length > 0) {
       missionDailyTrendRaw.forEach((row: any) => {
-        const typeKey = row.missionType || row.label || "기타";
-        if (typeKey === "ATTENDANCE") return;
+        const rawKey = row.missionType || row.label || "기타";
+        if (rawKey === "ATTENDANCE") return;
+        const typeKey = normalizeMissionKey(rawKey);
 
         const cCount = Number(row.completeCount) || 0;
         const rP = Number(row.rewardAmount ?? row.rewardP) || 0;
@@ -401,7 +518,7 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
       if (!dt) return;
       datesSet.add(dt);
 
-      const mKey = row.label || row.missionType || "기타";
+      const mKey = normalizeMissionKey(row.label || row.missionType || "기타");
       const mName = getMissionName(mKey, row.missionName);
       missionNameMap[mKey] = mName;
 
@@ -487,7 +604,7 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
       if (!dt) return;
       datesSet.add(dt);
 
-      const mKey = row.label || row.missionType || "기타";
+      const mKey = normalizeMissionKey(row.label || row.missionType || "기타");
       const mName = getMissionName(mKey, row.missionName);
       missionNameMap[mKey] = mName;
 
@@ -612,8 +729,9 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
       const dtStr = row.dt ? String(row.dt).slice(0, 10) : "";
       if (dtStr !== selectedRankingDate) return;
 
-      const key = row.label || row.missionType || "기타";
-      if (key === "ATTENDANCE") return;
+      const rawKey = row.label || row.missionType || "기타";
+      if (rawKey === "ATTENDANCE") return;
+      const key = normalizeMissionKey(rawKey);
 
       const cCount = Number(row.completeCount) || 0;
       const rP = Number(row.rewardAmount ?? row.rewardP) || 0;
@@ -624,7 +742,7 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
       }
       dateGroupMap[key].completeCount += cCount;
       dateGroupMap[key].rewardP += rP;
-      dateGroupMap[key].uuSum += uuVal;
+      dateGroupMap[key].uuSum = Math.max(dateGroupMap[key].uuSum, uuVal);
       dateTotalP += rP;
     });
 
@@ -822,6 +940,484 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
       return b.rewardP - a.rewardP;
     });
   }, [missionDailyTrendRaw, dailyRewardMissionFilter, dailyRewardSortOrder]);
+
+  // ── REVAMPED DAILY REWARD MATRIX DATA (PIVOT TABLE BY DT & MISSIONS) ──
+  const dailyRewardMatrixData = useMemo(() => {
+    if (!missionDailyTrendRaw || missionDailyTrendRaw.length === 0) {
+      return {
+        orderedMissions: [] as Array<{ key: string; name: string; color: string; bg: string; text: string; border: string }>,
+        dates: [] as string[],
+        rows: [] as Array<{
+          dt: string;
+          dayOfWeek: string;
+          totalRewardP: number;
+          totalCompleteCount: number;
+          totalUu: number;
+          rewardPerComplete: number;
+          rewardPerUser: number;
+          topMissionKey: string;
+          topMissionName: string;
+          topMissionP: number;
+          missions: Record<
+            string,
+            {
+              rewardP: number;
+              completeCount: number;
+              uu: number;
+              rewardPerComplete: number;
+              rewardPerUser: number;
+              shareRate: number;
+            }
+          >;
+        }>,
+        totals: {
+          totalRewardP: 0,
+          totalCompleteCount: 0,
+          totalUuSum: 0,
+          avgDailyRewardP: 0,
+          avgDailyCompleteCount: 0,
+          avgDailyUu: 0,
+          overallRewardPerUser: 0,
+          overallRewardPerComplete: 0,
+          avgCompletionsPerUser: 0,
+          peakDay: { dt: "-", rewardP: 0, completeCount: 0, rewardPerUser: 0 },
+          missions: {} as Record<
+            string,
+            {
+              totalRewardP: number;
+              totalCompleteCount: number;
+              totalUuSum: number;
+              avgDailyRewardP: number;
+              avgDailyCompleteCount: number;
+              rewardPerUser: number;
+              rewardPerComplete: number;
+              periodShareRate: number;
+            }
+          >,
+        },
+      };
+    }
+
+    const canonicalOrder = ["CLEANING", "SNACK", "DRINK", "RECOMMENDATION", "TIP", "SCROLL", "RC"];
+    const foundKeysSet = new Set<string>();
+    const missionNameMap: Record<string, string> = {};
+
+    // Map unique earning participants per day from missionTotalRaw or earningActivityRaw
+    const trueDailyUuMap: Record<string, number> = {};
+    if (missionTotalRaw && missionTotalRaw.length > 0) {
+      missionTotalRaw.forEach((row: any) => {
+        const dt = row.dt ? String(row.dt).slice(0, 10) : "";
+        if (dt) {
+          trueDailyUuMap[dt] = Number(row.totalParticipantUu || row.earningUu) || 0;
+        }
+      });
+    } else if (earningActivityRaw && earningActivityRaw.length > 0) {
+      earningActivityRaw.forEach((row: any) => {
+        const dt = row.dt || row.eventDateKst ? String(row.dt || row.eventDateKst).slice(0, 10) : "";
+        if (dt) {
+          trueDailyUuMap[dt] = Number(row.earningUu) || 0;
+        }
+      });
+    }
+
+    const dateMap: Record<
+      string,
+      {
+        dt: string;
+        totalRewardP: number;
+        totalCompleteCount: number;
+        uuMax: number;
+        missions: Record<
+          string,
+          {
+            rewardP: number;
+            completeCount: number;
+            uu: number;
+            rewardPerComplete: number;
+            rewardPerUser: number;
+            shareRate: number;
+          }
+        >;
+      }
+    > = {};
+
+    missionDailyTrendRaw.forEach((row: any) => {
+      const dt = row.dt ? String(row.dt).slice(0, 10) : "";
+      if (!dt) return;
+
+      const rawKey = row.label || row.missionType || "기타";
+      if (rawKey === "ATTENDANCE") return;
+      const key = normalizeMissionKey(rawKey);
+      foundKeysSet.add(key);
+
+      const mName = getMissionName(key, row.missionName);
+      missionNameMap[key] = mName;
+
+      const cCount = Number(row.completeCount) || 0;
+      const rP = Number(row.rewardAmount ?? row.rewardP) || 0;
+      const uuVal = Number(row.uu) || 0;
+
+      if (!dateMap[dt]) {
+        dateMap[dt] = {
+          dt,
+          totalRewardP: 0,
+          totalCompleteCount: 0,
+          uuMax: 0,
+          missions: {},
+        };
+      }
+
+      dateMap[dt].totalRewardP += rP;
+      dateMap[dt].totalCompleteCount += cCount;
+      dateMap[dt].uuMax = Math.max(dateMap[dt].uuMax, uuVal);
+
+      if (!dateMap[dt].missions[key]) {
+        dateMap[dt].missions[key] = {
+          rewardP: 0,
+          completeCount: 0,
+          uu: 0,
+          rewardPerComplete: 0,
+          rewardPerUser: 0,
+          shareRate: 0,
+        };
+      }
+      dateMap[dt].missions[key].rewardP += rP;
+      dateMap[dt].missions[key].completeCount += cCount;
+      dateMap[dt].missions[key].uu = Math.max(dateMap[dt].missions[key].uu, uuVal);
+    });
+
+    const orderedKeys = Array.from(foundKeysSet).sort((a, b) => {
+      const idxA = canonicalOrder.indexOf(a);
+      const idxB = canonicalOrder.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    const orderedMissions = orderedKeys.map((key) => {
+      const config = REWARD_MISSION_CONFIG[key];
+      return {
+        key,
+        name: config?.name || missionNameMap[key] || key,
+        color: config?.color || "#64748b",
+        bg: config?.bg || "bg-[#f1f5f9]",
+        text: config?.text || "text-[#64748b]",
+        border: config?.border || "border-[#64748b]/20",
+      };
+    });
+
+    let periodTotalRewardP = 0;
+    let periodTotalCompleteCount = 0;
+    let periodTotalUuSum = 0;
+    let peakDay = { dt: "-", rewardP: 0, completeCount: 0, rewardPerUser: 0 };
+
+    const missionPeriodTotals: Record<
+      string,
+      {
+        totalRewardP: number;
+        totalCompleteCount: number;
+        totalUuSum: number;
+        avgDailyRewardP: number;
+        avgDailyCompleteCount: number;
+        rewardPerUser: number;
+        rewardPerComplete: number;
+        periodShareRate: number;
+      }
+    > = {};
+
+    orderedKeys.forEach((key) => {
+      missionPeriodTotals[key] = {
+        totalRewardP: 0,
+        totalCompleteCount: 0,
+        totalUuSum: 0,
+        avgDailyRewardP: 0,
+        avgDailyCompleteCount: 0,
+        rewardPerUser: 0,
+        rewardPerComplete: 0,
+        periodShareRate: 0,
+      };
+    });
+
+    const datesList = Object.keys(dateMap).sort();
+
+    datesList.forEach((dt) => {
+      const d = dateMap[dt];
+      const dayUu = trueDailyUuMap[dt] || d.uuMax || 1;
+      periodTotalRewardP += d.totalRewardP;
+      periodTotalCompleteCount += d.totalCompleteCount;
+      periodTotalUuSum += dayUu;
+
+      const dayRewardPerUser = dayUu > 0 ? Math.round((d.totalRewardP / dayUu) * 10) / 10 : 0;
+      if (d.totalRewardP > peakDay.rewardP) {
+        peakDay = {
+          dt,
+          rewardP: d.totalRewardP,
+          completeCount: d.totalCompleteCount,
+          rewardPerUser: dayRewardPerUser,
+        };
+      }
+
+      orderedKeys.forEach((key) => {
+        const m = d.missions[key];
+        if (m) {
+          m.rewardPerComplete = m.completeCount > 0 ? Math.round((m.rewardP / m.completeCount) * 100) / 100 : 0;
+          m.rewardPerUser = m.uu > 0 ? Math.round((m.rewardP / m.uu) * 10) / 10 : 0;
+          m.shareRate = d.totalRewardP > 0 ? Math.round((m.rewardP / d.totalRewardP) * 1000) / 10 : 0;
+
+          missionPeriodTotals[key].totalRewardP += m.rewardP;
+          missionPeriodTotals[key].totalCompleteCount += m.completeCount;
+          missionPeriodTotals[key].totalUuSum += m.uu;
+        }
+      });
+    });
+
+    const daysCount = Math.max(1, datesList.length);
+    const avgDailyRewardP = Math.round(periodTotalRewardP / daysCount);
+    const avgDailyCompleteCount = Math.round(periodTotalCompleteCount / daysCount);
+    const avgDailyUu = Math.round(periodTotalUuSum / daysCount);
+    const overallRewardPerComplete = periodTotalCompleteCount > 0
+      ? Math.round((periodTotalRewardP / periodTotalCompleteCount) * 100) / 100
+      : 0;
+    const overallRewardPerUser = periodTotalUuSum > 0
+      ? Math.round((periodTotalRewardP / periodTotalUuSum) * 10) / 10
+      : 0;
+    const avgCompletionsPerUser = periodTotalUuSum > 0
+      ? Math.round((periodTotalCompleteCount / periodTotalUuSum) * 10) / 10
+      : 0;
+
+    orderedKeys.forEach((key) => {
+      const mt = missionPeriodTotals[key];
+      mt.avgDailyRewardP = Math.round(mt.totalRewardP / daysCount);
+      mt.avgDailyCompleteCount = Math.round(mt.totalCompleteCount / daysCount);
+      mt.rewardPerComplete = mt.totalCompleteCount > 0 ? Math.round((mt.totalRewardP / mt.totalCompleteCount) * 100) / 100 : 0;
+      mt.rewardPerUser = mt.totalUuSum > 0 ? Math.round((mt.totalRewardP / mt.totalUuSum) * 10) / 10 : 0;
+      mt.periodShareRate = periodTotalRewardP > 0 ? Math.round((mt.totalRewardP / periodTotalRewardP) * 1000) / 10 : 0;
+    });
+
+    const rows = datesList.map((dt) => {
+      const d = dateMap[dt];
+      const dayUu = trueDailyUuMap[dt] || d.uuMax || 1;
+      let topMissionKey = "";
+      let topMissionName = "-";
+      let topMissionP = 0;
+
+      orderedKeys.forEach((key) => {
+        const m = d.missions[key];
+        if (m && m.rewardP > topMissionP) {
+          topMissionP = m.rewardP;
+          topMissionKey = key;
+          topMissionName = missionNameMap[key] || key;
+        }
+      });
+
+      return {
+        dt,
+        dayOfWeek: getDayOfWeekKr(dt),
+        totalRewardP: d.totalRewardP,
+        totalCompleteCount: d.totalCompleteCount,
+        totalUu: dayUu,
+        rewardPerComplete: d.totalCompleteCount > 0 ? Math.round((d.totalRewardP / d.totalCompleteCount) * 100) / 100 : 0,
+        rewardPerUser: dayUu > 0 ? Math.round((d.totalRewardP / dayUu) * 10) / 10 : 0,
+        topMissionKey,
+        topMissionName,
+        topMissionP,
+        missions: d.missions,
+      };
+    });
+
+    const sortedRows = [...rows].sort((a, b) =>
+      dailyRewardMatrixSort === "desc" ? b.dt.localeCompare(a.dt) : a.dt.localeCompare(b.dt)
+    );
+
+    return {
+      orderedMissions,
+      dates: datesList,
+      rows: sortedRows,
+      totals: {
+        totalRewardP: periodTotalRewardP,
+        totalCompleteCount: periodTotalCompleteCount,
+        totalUuSum: periodTotalUuSum,
+        avgDailyRewardP,
+        avgDailyCompleteCount,
+        avgDailyUu,
+        overallRewardPerUser,
+        overallRewardPerComplete,
+        avgCompletionsPerUser,
+        peakDay,
+        missions: missionPeriodTotals,
+      },
+    };
+  }, [missionDailyTrendRaw, missionTotalRaw, earningActivityRaw, dailyRewardMatrixSort]);
+
+  // ── REVAMPED INTERACTIVE DAILY REWARD LINE CHART DATA ──
+  const dailyRewardInteractiveChartData = useMemo(() => {
+    if (!dailyRewardMatrixData || dailyRewardMatrixData.dates.length === 0) {
+      return { labels: [], datasets: [] };
+    }
+
+    const { orderedMissions, rows } = dailyRewardMatrixData;
+    const chronologicalRows = [...rows].sort((a, b) => a.dt.localeCompare(b.dt));
+    const labels = chronologicalRows.map((r) => `${r.dt.slice(5).replace("-", "/")} (${r.dayOfWeek})`);
+
+    if (selectedRewardChartMission === "ALL") {
+      const overallLabel =
+        dailyRewardChartMetric === "perUser"
+          ? "전체 통합 1인당 평균 (P/명)"
+          : dailyRewardChartMetric === "perComplete"
+          ? "전체 통합 1건당 단가 (P/회)"
+          : "전체 통합 총 지급액 (P)";
+
+      const overallData = chronologicalRows.map((r) => {
+        if (dailyRewardChartMetric === "perUser") return r.rewardPerUser;
+        if (dailyRewardChartMetric === "perComplete") return r.rewardPerComplete;
+        return r.totalRewardP;
+      });
+
+      const datasets: any[] = [
+        {
+          label: overallLabel,
+          data: overallData,
+          borderColor: "#3182f6",
+          backgroundColor: "rgba(49, 130, 246, 0.08)",
+          fill: true,
+          tension: 0.35,
+          borderWidth: 3,
+          pointRadius: labels.length > 30 ? 0 : 3.5,
+          pointHoverRadius: 6,
+          pointBackgroundColor: "#ffffff",
+          pointBorderColor: "#3182f6",
+          pointBorderWidth: 2,
+        },
+      ];
+
+      // Add thin line for each individual mission to compare average payment
+      orderedMissions.forEach((m) => {
+        const mDataPoints = chronologicalRows.map((r) => {
+          const mData = r.missions[m.key];
+          if (!mData) return 0;
+          if (dailyRewardChartMetric === "perUser") return mData.rewardPerUser;
+          if (dailyRewardChartMetric === "perComplete") return mData.rewardPerComplete;
+          return mData.rewardP;
+        });
+
+        const hasAnyVal = mDataPoints.some((v) => v > 0);
+        if (hasAnyVal) {
+          datasets.push({
+            label: `${m.name}`,
+            data: mDataPoints,
+            borderColor: m.color,
+            backgroundColor: "transparent",
+            fill: false,
+            tension: 0.35,
+            borderWidth: 1.5,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+          });
+        }
+      });
+
+      return { labels, datasets };
+    } else {
+      const selectedM = orderedMissions.find((m) => m.key === selectedRewardChartMission);
+      const data = chronologicalRows.map((r) => {
+        const mData = r.missions[selectedRewardChartMission];
+        if (!mData) return 0;
+        if (dailyRewardChartMetric === "perUser") return mData.rewardPerUser;
+        if (dailyRewardChartMetric === "perComplete") return mData.rewardPerComplete;
+        return mData.rewardP;
+      });
+
+      const unitText =
+        dailyRewardChartMetric === "perUser"
+          ? "(P/명)"
+          : dailyRewardChartMetric === "perComplete"
+          ? "(P/회)"
+          : "(P)";
+
+      return {
+        labels,
+        datasets: [
+          {
+            label: `${selectedM?.name || selectedRewardChartMission} ${unitText}`,
+            data,
+            borderColor: selectedM?.color || "#3182f6",
+            backgroundColor: `${selectedM?.color || "#3182f6"}18`,
+            fill: true,
+            tension: 0.35,
+            borderWidth: 3,
+            pointRadius: labels.length > 30 ? 0 : 4,
+            pointHoverRadius: 7,
+            pointBackgroundColor: "#ffffff",
+            pointBorderColor: selectedM?.color || "#3182f6",
+            pointBorderWidth: 2,
+          },
+        ],
+      };
+    }
+  }, [dailyRewardMatrixData, dailyRewardChartMetric, selectedRewardChartMission]);
+
+  // CSV Export for Daily Reward Matrix (UTF-8 BOM for Excel, Clean without emojis)
+  const handleExportRewardMatrixCSV = () => {
+    if (!dailyRewardMatrixData || dailyRewardMatrixData.rows.length === 0) return;
+
+    const missions = dailyRewardMatrixData.orderedMissions;
+    const missionHeadersPerUser = missions.map((m) => `"${m.name} 1인당평균(P/명)"`).join(",");
+    const missionHeadersPerComplete = missions.map((m) => `"${m.name} 1건당단가(P/회)"`).join(",");
+    const missionHeadersP = missions.map((m) => `"${m.name} 총지급액(P)"`).join(",");
+
+    const header = `"일자","요일","전체 1인당 평균(P/명)","전체 건당 단가(P/회)","참여 유저수(명)","총 완료건수(회)","총 지급 리워드(P)",${missionHeadersPerUser},${missionHeadersPerComplete},${missionHeadersP}\n`;
+
+    const total = dailyRewardMatrixData.totals;
+    const totalMissionPerUser = missions.map((m) => (total.missions[m.key]?.rewardPerUser || 0).toFixed(1)).join(",");
+    const totalMissionPerComplete = missions.map((m) => (total.missions[m.key]?.rewardPerComplete || 0).toFixed(2)).join(",");
+    const totalMissionP = missions.map((m) => total.missions[m.key]?.totalRewardP || 0).join(",");
+    const totalRow = `"기간 전체 합계","-",${total.overallRewardPerUser.toFixed(1)},${total.overallRewardPerComplete.toFixed(2)},${total.totalUuSum},${total.totalCompleteCount},${total.totalRewardP},${totalMissionPerUser},${totalMissionPerComplete},${totalMissionP}\n`;
+
+    const avgMissionPerUser = missions.map((m) => (total.missions[m.key]?.rewardPerUser || 0).toFixed(1)).join(",");
+    const avgMissionPerComplete = missions.map((m) => (total.missions[m.key]?.rewardPerComplete || 0).toFixed(2)).join(",");
+    const avgMissionP = missions.map((m) => Math.round(total.missions[m.key]?.avgDailyRewardP || 0)).join(",");
+    const avgRow = `"일평균 요약","-",${total.overallRewardPerUser.toFixed(1)},${total.overallRewardPerComplete.toFixed(2)},${total.avgDailyUu},${total.avgDailyCompleteCount},${Math.round(total.avgDailyRewardP)},${avgMissionPerUser},${avgMissionPerComplete},${avgMissionP}\n`;
+
+    const dailyRows = dailyRewardMatrixData.rows
+      .map((r) => {
+        const mPerUser = missions.map((m) => (r.missions[m.key]?.rewardPerUser || 0).toFixed(1)).join(",");
+        const mPerComplete = missions.map((m) => (r.missions[m.key]?.rewardPerComplete || 0).toFixed(2)).join(",");
+        const mP = missions.map((m) => r.missions[m.key]?.rewardP || 0).join(",");
+        return `"${r.dt}","${r.dayOfWeek}",${r.rewardPerUser.toFixed(1)},${r.rewardPerComplete.toFixed(2)},${r.totalUu},${r.totalCompleteCount},${r.totalRewardP},${mPerUser},${mPerComplete},${mP}`;
+      })
+      .join("\n");
+
+    const csvContent = "\uFEFF" + header + totalRow + avgRow + dailyRows;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `미션_평균_리워드_일별_현황_${fromDate || "전체"}_${toDate || "전체"}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Helper for drilldown row donut chart
+  const getExpandedDayDonutData = (row: any) => {
+    if (!row || !dailyRewardMatrixData) return { labels: [], datasets: [] };
+    const { orderedMissions } = dailyRewardMatrixData;
+    const activeMissions = orderedMissions.filter((m) => (row.missions[m.key]?.rewardP || 0) > 0);
+
+    return {
+      labels: activeMissions.map((m) => m.name),
+      datasets: [
+        {
+          data: activeMissions.map((m) => row.missions[m.key]?.rewardP || 0),
+          backgroundColor: activeMissions.map((m) => m.color),
+          borderWidth: 2,
+          borderColor: "#ffffff",
+        },
+      ],
+    };
+  };
 
   // ── 2. ATTENDANCE CONSECUTIVE COHORT MATRIX & VISUAL CHARTS ──
   const attendanceData = useMemo(() => {
@@ -1110,16 +1706,25 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
     let sourceList: Array<{ label: string; missionName?: string; completeCount: number; uu: number }> = [];
 
     if (missionsDetailRaw && missionsDetailRaw.length > 0) {
-      sourceList = missionsDetailRaw.map((item) => ({
-        label: item.label,
-        missionName: item.missionName,
-        completeCount: Number(item.completeCount) || 0,
-        uu: Number(item.uu) || 0,
-      }));
+      const map: Record<string, { label: string; missionName?: string; completeCount: number; uu: number }> = {};
+      missionsDetailRaw.forEach((item) => {
+        const key = normalizeMissionKey(item.label);
+        if (!map[key]) {
+          map[key] = {
+            label: key,
+            missionName: item.missionName,
+            completeCount: 0,
+            uu: 0,
+          };
+        }
+        map[key].completeCount += Number(item.completeCount) || 0;
+        map[key].uu = Math.max(map[key].uu, Number(item.uu) || 0);
+      });
+      sourceList = Object.values(map);
     } else if (missionDailyTrendRaw && missionDailyTrendRaw.length > 0) {
       const map: Record<string, { label: string; missionName?: string; completeCount: number; uuMax: number }> = {};
       missionDailyTrendRaw.forEach((row: any) => {
-        const key = row.label || row.missionType || "기타";
+        const key = normalizeMissionKey(row.label || row.missionType || "기타");
         if (!map[key]) {
           map[key] = {
             label: key,
@@ -1198,16 +1803,22 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
       if (!dt) return;
       datesSet.add(dt);
 
-      const mKey = row.label || row.missionType || "기타";
+      const mKey = normalizeMissionKey(row.label || row.missionType || "기타");
       const mName = getMissionName(mKey, row.missionName);
       missionNameMap[mKey] = mName;
 
       const cCount = Number(row.completeCount) || 0;
       const uuVal = Number(row.uu) || 0;
-      const avgVal = Number(row.avgPerUser) || (uuVal > 0 ? cCount / uuVal : 0);
 
       if (!dateMissionMap[dt]) dateMissionMap[dt] = {};
-      dateMissionMap[dt][mKey] = { completeCount: cCount, uu: uuVal, avgPerUser: avgVal };
+      if (!dateMissionMap[dt][mKey]) {
+        dateMissionMap[dt][mKey] = { completeCount: 0, uu: 0, avgPerUser: 0 };
+      }
+      dateMissionMap[dt][mKey].completeCount += cCount;
+      dateMissionMap[dt][mKey].uu = Math.max(dateMissionMap[dt][mKey].uu, uuVal);
+      dateMissionMap[dt][mKey].avgPerUser = dateMissionMap[dt][mKey].uu > 0
+        ? Math.round((dateMissionMap[dt][mKey].completeCount / dateMissionMap[dt][mKey].uu) * 10) / 10
+        : 0;
 
       if (!dateOverallMap[dt]) {
         dateOverallMap[dt] = { totalCompleteCount: 0, totalUu: 0 };
@@ -1989,521 +2600,999 @@ export const MissionDashboard: React.FC<MissionDashboardProps> = ({
       {/* ════════════════════════════════════════════════════════════════ */}
       {subTab === "reward" && (
         <div className="space-y-6">
-          {/* SECTION: CATEGORY SHARE & INDIVIDUAL MISSION PERFORMANCE RANKINGS */}
-          <div className="bg-white rounded-3xl border border-[#e5e8eb] shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6 space-y-6">
-            <div className="flex items-center justify-between pb-3 border-b border-[#f2f4f6]">
-              <div className="flex items-center gap-2">
-                <div>
-                </div>
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* SECTION 1: 5-KPI RIBBON FOR DAILY AVERAGE MISSION REWARDS */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 bg-white rounded-3xl border border-[#e5e8eb] shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6">
+            {/* Card 1: 1인당 평균 지급 리워드 (핵심 지표) */}
+            <div className="space-y-2 sm:pr-4">
+              <div className="text-[13px] font-semibold text-[#8b95a1] flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-[#191f28] font-bold">
+                  <Users className="w-4 h-4 text-[#3182f6]" />
+                  1인당 평균 지급액
+                </span>
+                <InfoTooltip text="조회 기간 동안 미션에 참여한 유저 1인이 하루 평균 획득한 리워드 포인트(P)입니다. (총 리워드 / 일자별 참여 유저 연인원)" />
               </div>
-              <span className="text-xs font-semibold text-[#3182f6] bg-[#ecf4fe] px-3 py-1 rounded-full shrink-0">
-                총 {processedMissionsDetail.length}개 미션 집계됨
-              </span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-extrabold text-[#3182f6] tracking-tight">
+                  {dailyRewardMatrixData.totals.overallRewardPerUser.toFixed(1)}
+                </span>
+                <span className="text-sm font-bold text-[#3182f6]">P / 명</span>
+              </div>
+              <div className="text-xs text-[#8b95a1] font-medium">
+                참여 유저 1인의 일평균 수령액
+              </div>
             </div>
 
-            {/* ELEGANT FULL-WIDTH REWARD TREND CARD (WITH METRIC TOGGLE: TOTAL P vs PER COMPLETE) */}
-            <div className="bg-[#f8f9fa] rounded-2xl border border-[#f2f4f6] p-5 space-y-4">
-              {/* HEADER WITH METRIC TOGGLE TABS & MISSION PILL FILTERS */}
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-[#e5e8eb]">
-                {/* METRIC SWITCHER TABS */}
-                <div className="flex items-center gap-1.5 bg-[#e5e8eb] p-1 rounded-2xl shrink-0">
+            {/* Card 2: 1건당 평균 지급 단가 */}
+            <div className="space-y-2 sm:px-4 sm:border-l border-[#f2f4f6]">
+              <div className="text-[13px] font-semibold text-[#8b95a1] flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-[#191f28] font-bold">
+                  <CheckCircle2 className="w-4 h-4 text-[#00c980]" />
+                  1건당 평균 단가
+                </span>
+                <InfoTooltip text="미션 1회 완료 시 유저에게 지급된 평균 리워드 포인트(P)입니다. (총 리워드 / 총 완료건수)" />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-extrabold text-[#00c980] tracking-tight">
+                  {dailyRewardMatrixData.totals.overallRewardPerComplete.toFixed(1)}
+                </span>
+                <span className="text-sm font-semibold text-[#00c980]">P / 회</span>
+              </div>
+              <div className="text-xs text-[#8b95a1] font-medium">
+                미션 완료 1건당 평균 지급 단가
+              </div>
+            </div>
+
+            {/* Card 3: 1일 평균 총 지급 리워드 */}
+            <div className="space-y-2 sm:px-4 sm:border-l border-[#f2f4f6]">
+              <div className="text-[13px] font-semibold text-[#8b95a1] flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <TrendingUp className="w-4 h-4 text-[#4e5968]" />
+                  일평균 총 리워드
+                </span>
+                <InfoTooltip text="조회 기간 동안 1일 평균 지급된 총 리워드 포인트(P)입니다." />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-extrabold text-[#191f28] tracking-tight">
+                  {dailyRewardMatrixData.totals.avgDailyRewardP.toLocaleString()}
+                </span>
+                <span className="text-sm font-semibold text-[#8b95a1]">P / 일</span>
+              </div>
+              <div className="text-xs text-[#8b95a1] font-medium">
+                일평균 {dailyRewardMatrixData.totals.avgDailyUu.toLocaleString()}명 참여
+              </div>
+            </div>
+
+            {/* Card 4: 1인당 평균 완료 횟수 */}
+            <div className="space-y-2 sm:px-4 sm:border-l border-[#f2f4f6]">
+              <div className="text-[13px] font-semibold text-[#8b95a1] flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-[#8b5cf6]" />
+                  1인당 평균 완료수
+                </span>
+                <InfoTooltip text="참여 유저 1인이 하루 동안 완료한 평균 미션 건수입니다." />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-extrabold text-[#191f28] tracking-tight">
+                  {dailyRewardMatrixData.totals.avgCompletionsPerUser.toFixed(1)}
+                </span>
+                <span className="text-sm font-semibold text-[#8b95a1]">회 / 명</span>
+              </div>
+              <div className="text-xs text-[#8b95a1] font-medium">
+                유저 1인당 일평균 참여 볼륨
+              </div>
+            </div>
+
+            {/* Card 5: 기간 총 지급 리워드 */}
+            <div className="space-y-2 sm:pl-4 sm:border-l border-[#f2f4f6]">
+              <div className="text-[13px] font-semibold text-[#8b95a1] flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Coins className="w-4 h-4 text-[#8b95a1]" />
+                  기간 총 지급액
+                </span>
+                <InfoTooltip text="조회 기간 동안 지급된 총 리워드 포인트(P)와 완료 건수입니다." />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-extrabold text-[#191f28] tracking-tight">
+                  {dailyRewardMatrixData.totals.totalRewardP.toLocaleString()}
+                </span>
+                <span className="text-sm font-semibold text-[#8b95a1]">P</span>
+              </div>
+              <div className="text-xs text-[#8b95a1] font-medium">
+                총 {dailyRewardMatrixData.totals.totalCompleteCount.toLocaleString()}건 완료
+              </div>
+            </div>
+          </div>
+
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* SECTION 2: INTERACTIVE DAILY TREND LINE CHART (FOCUS ON AVERAGES) */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          <div className="bg-white rounded-3xl border border-[#e5e8eb] shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6 space-y-5">
+            {/* Chart Header & Controls */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#f2f4f6]">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-[#3182f6]" />
+                  <h3 className="text-base font-bold text-[#191f28]">
+                    일별 평균 리워드 지급 추세선
+                  </h3>
+                  <span className="text-xs font-semibold text-[#3182f6] bg-[#ecf4fe] px-2.5 py-0.5 rounded-full">
+                    {dailyRewardChartMetric === "perUser"
+                      ? "1인당 평균 지급 추이"
+                      : dailyRewardChartMetric === "perComplete"
+                      ? "건당 단가 변동 추이"
+                      : "일별 총 지급 추이"}
+                  </span>
+                </div>
+                <p className="text-xs text-[#8b95a1]">
+                  일자별로 유저 1인이 평균 얼마의 리워드를 수령했는지(P/명)와 미션 1회당 지급 단가(P/회)의 변동 추세를 분석합니다.
+                </p>
+              </div>
+
+              {/* Metric Selector Pills (Line Chart Only) */}
+              <div className="flex items-center bg-[#f2f4f6] p-1 rounded-xl text-xs shrink-0">
+                <button
+                  onClick={() => setDailyRewardChartMetric("perUser")}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    dailyRewardChartMetric === "perUser"
+                      ? "bg-white text-[#3182f6] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+                      : "text-[#6b7684] font-medium hover:text-[#191f28]"
+                  }`}
+                >
+                  1인당 평균 지급액 (P/명)
+                </button>
+                <button
+                  onClick={() => setDailyRewardChartMetric("perComplete")}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    dailyRewardChartMetric === "perComplete"
+                      ? "bg-white text-[#00c980] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+                      : "text-[#6b7684] font-medium hover:text-[#191f28]"
+                  }`}
+                >
+                  1건당 평균 단가 (P/회)
+                </button>
+                <button
+                  onClick={() => setDailyRewardChartMetric("totalP")}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    dailyRewardChartMetric === "totalP"
+                      ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+                      : "text-[#6b7684] font-medium hover:text-[#191f28]"
+                  }`}
+                >
+                  일별 총 지급액 (P)
+                </button>
+              </div>
+            </div>
+
+            {/* Mission Filter Chips */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-xs font-semibold text-[#8b95a1] mr-1">미션 선택:</span>
+              <button
+                onClick={() => setSelectedRewardChartMission("ALL")}
+                className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  selectedRewardChartMission === "ALL"
+                    ? "bg-[#3182f6] text-white shadow-sm font-bold"
+                    : "bg-[#f8f9fa] text-[#4e5968] border border-[#e5e8eb] hover:bg-[#f2f4f6]"
+                }`}
+              >
+                전체 통합 추세선
+              </button>
+              {dailyRewardMatrixData.orderedMissions.map((m) => {
+                const isSelected = selectedRewardChartMission === m.key;
+                return (
                   <button
-                    onClick={() => setRewardTrendMetric("totalP")}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      rewardTrendMetric === "totalP"
-                        ? "bg-white text-[#3182f6] shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
-                        : "text-[#4e5968] hover:text-[#191f28]"
+                    key={m.key}
+                    onClick={() => setSelectedRewardChartMission(m.key)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-[#191f28] text-white shadow-sm font-bold"
+                        : "bg-[#f8f9fa] text-[#4e5968] border border-[#e5e8eb] hover:bg-[#f2f4f6]"
                     }`}
                   >
-                    총 지급 리워드
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: m.color }}
+                    />
+                    <span>{m.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Chart Canvas */}
+            <div className="h-[360px] pt-2">
+              {dailyRewardInteractiveChartData.labels.length > 0 ? (
+                <Line
+                  data={dailyRewardInteractiveChartData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: "index", intersect: false },
+                    plugins: {
+                      legend: {
+                        position: "top" as const,
+                        align: "end" as const,
+                        labels: {
+                          boxWidth: 8,
+                          boxHeight: 8,
+                          usePointStyle: true,
+                          pointStyle: "circle",
+                          padding: 10,
+                          color: "#4e5968",
+                          font: { family: "Pretendard, sans-serif", size: 11, weight: 600 },
+                        },
+                      },
+                      tooltip: {
+                        enabled: false,
+                        external: externalGlassTooltip,
+                        callbacks: {
+                          title: (items: any[]) => {
+                            if (!items.length) return "";
+                            return `날짜: ${items[0].label}`;
+                          },
+                          label: (context: any) => {
+                            const v = Number(context.raw) || 0;
+                            if (dailyRewardChartMetric === "perUser") {
+                              return ` ${context.dataset.label}: ${v.toFixed(1)} P/명`;
+                            }
+                            if (dailyRewardChartMetric === "perComplete") {
+                              return ` ${context.dataset.label}: ${v.toFixed(1)} P/회`;
+                            }
+                            return ` ${context.dataset.label}: ${v.toLocaleString()} P`;
+                          },
+                        },
+                      },
+                    },
+                    scales: {
+                      x: {
+                        border: { display: false },
+                        grid: { display: false },
+                        ticks: { color: "#8b95a1", font: { family: "Pretendard, sans-serif", size: 11, weight: 500 } },
+                      },
+                      y: {
+                        border: { display: false },
+                        grid: { color: "#f2f4f6", drawTicks: false },
+                        ticks: {
+                          color: "#8b95a1",
+                          font: { family: "Pretendard, sans-serif", size: 11, weight: 500 },
+                          callback: (v: any) => {
+                            if (dailyRewardChartMetric === "perUser") return `${Number(v).toFixed(1)} P/명`;
+                            if (dailyRewardChartMetric === "perComplete") return `${Number(v).toFixed(1)} P/회`;
+                            return `${Number(v).toLocaleString()} P`;
+                          },
+                        },
+                      },
+                    },
+                  }}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs text-[#8b95a1] font-medium">
+                  조회된 일별 리워드 추이 데이터가 없습니다.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* SECTION 3: THE MAIN HIGHLIGHT - DAILY MISSION REWARD PIVOT MATRIX */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          <div className="bg-white rounded-3xl border border-[#e5e8eb] shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6 space-y-5">
+            {/* Table Header: View Mode Switcher + Table Controls (NO EMOJIS) */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-[#f2f4f6]">
+              {/* Main View Mode Switcher */}
+              <div className="flex items-center gap-1.5 bg-[#e5e8eb]/70 p-1 rounded-2xl shrink-0">
+                <button
+                  onClick={() => setRewardViewMode("matrix")}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    rewardViewMode === "matrix"
+                      ? "bg-white text-[#3182f6] shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
+                      : "text-[#4e5968] hover:text-[#191f28]"
+                  }`}
+                >
+                  <TableIcon className="w-3.5 h-3.5 text-[#3182f6]" />
+                  <span>일자별 종합 매트릭스</span>
+                </button>
+
+                <button
+                  onClick={() => setRewardViewMode("daily_log")}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    rewardViewMode === "daily_log"
+                      ? "bg-white text-[#3182f6] shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
+                      : "text-[#4e5968] hover:text-[#191f28]"
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>일별 상세 로그</span>
+                </button>
+
+                <button
+                  onClick={() => setRewardViewMode("ranking")}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    rewardViewMode === "ranking"
+                      ? "bg-white text-[#3182f6] shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
+                      : "text-[#4e5968] hover:text-[#191f28]"
+                  }`}
+                >
+                  <Gift className="w-3.5 h-3.5" />
+                  <span>미션별 성과 랭킹</span>
+                </button>
+              </div>
+
+              {/* Controls specific to Matrix Mode */}
+              {rewardViewMode === "matrix" && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Metric Display Mode Pills for Matrix */}
+                  <div className="flex items-center bg-[#f2f4f6] p-1 rounded-xl text-xs shrink-0">
+                    <button
+                      onClick={() => setDailyRewardMatrixMetric("perUser")}
+                      className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        dailyRewardMatrixMetric === "perUser"
+                          ? "bg-white text-[#3182f6] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+                          : "text-[#6b7684] font-medium hover:text-[#191f28]"
+                      }`}
+                    >
+                      1인당 평균 (P/명)
+                    </button>
+                    <button
+                      onClick={() => setDailyRewardMatrixMetric("perComplete")}
+                      className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        dailyRewardMatrixMetric === "perComplete"
+                          ? "bg-white text-[#00c980] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+                          : "text-[#6b7684] font-medium hover:text-[#191f28]"
+                      }`}
+                    >
+                      건당 단가 (P/회)
+                    </button>
+                    <button
+                      onClick={() => setDailyRewardMatrixMetric("totalP")}
+                      className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        dailyRewardMatrixMetric === "totalP"
+                          ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+                          : "text-[#6b7684] font-medium hover:text-[#191f28]"
+                      }`}
+                    >
+                      총 리워드 (P)
+                    </button>
+                    <button
+                      onClick={() => setDailyRewardMatrixMetric("count")}
+                      className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        dailyRewardMatrixMetric === "count"
+                          ? "bg-white text-[#191f28] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+                          : "text-[#6b7684] font-medium hover:text-[#191f28]"
+                      }`}
+                    >
+                      완료 건수 (회)
+                    </button>
+                  </div>
+
+                  {/* Sort Order Toggle */}
+                  <button
+                    onClick={() => setDailyRewardMatrixSort((prev) => (prev === "desc" ? "asc" : "desc"))}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#e5e8eb] bg-[#f8f9fa] text-xs font-semibold text-[#4e5968] hover:bg-[#f2f4f6] transition-all cursor-pointer shrink-0"
+                    title="일자 정렬 변경"
+                  >
+                    {dailyRewardMatrixSort === "desc" ? (
+                      <>
+                        <ArrowDown className="w-3.5 h-3.5 text-[#3182f6]" />
+                        <span>최신순</span>
+                      </>
+                    ) : (
+                      <>
+                        <ArrowUp className="w-3.5 h-3.5 text-[#3182f6]" />
+                        <span>오래된순</span>
+                      </>
+                    )}
                   </button>
 
+                  {/* CSV Export Button */}
                   <button
-                    onClick={() => setRewardTrendMetric("perComplete")}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      rewardTrendMetric === "perComplete"
-                        ? "bg-white text-[#00c980] shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
-                        : "text-[#4e5968] hover:text-[#191f28]"
-                    }`}
+                    onClick={handleExportRewardMatrixCSV}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#ecf4fe] text-[#3182f6] border border-[#3182f6]/20 text-xs font-bold hover:bg-[#dbe9fd] transition-all cursor-pointer shrink-0"
+                    title="일별 미션 리워드 매트릭스 엑셀/CSV 다운로드"
                   >
-                    1회당 평균 지급 리워드
+                    <Download className="w-3.5 h-3.5" />
+                    <span>CSV 다운로드</span>
                   </button>
                 </div>
+              )}
 
-                {/* MISSION PILL FILTER BUTTONS */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <button
-                    onClick={() => {
-                      if (rewardTrendMetric === "totalP") setSelectedRewardMission("ALL");
-                      else setSelectedRewardPerCompleteMission("ALL");
-                    }}
-                    className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                      (rewardTrendMetric === "totalP" ? selectedRewardMission === "ALL" : selectedRewardPerCompleteMission === "ALL")
-                        ? rewardTrendMetric === "totalP"
-                          ? "bg-[#3182f6] text-white shadow-sm font-bold"
-                          : "bg-[#00c980] text-white shadow-sm font-bold"
-                        : "bg-white text-[#4e5968] border border-[#e5e8eb] hover:bg-[#f2f4f6]"
-                    }`}
+              {/* Controls specific to Daily Log Mode */}
+              {rewardViewMode === "daily_log" && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-[#8b95a1]">미션:</span>
+                  <select
+                    value={dailyRewardMissionFilter}
+                    onChange={(e) => setDailyRewardMissionFilter(e.target.value)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#f8f9fa] border border-[#e5e8eb] text-[#191f28] focus:outline-none focus:border-[#3182f6] cursor-pointer"
                   >
-                    전체 통합
-                  </button>
-                  {dailyTrendsData.distinctMissions.map((m) => {
-                    const isSelected = rewardTrendMetric === "totalP"
-                      ? selectedRewardMission === m.key
-                      : selectedRewardPerCompleteMission === m.key;
-
-                    return (
-                      <button
-                        key={m.key}
-                        onClick={() => {
-                          if (rewardTrendMetric === "totalP") setSelectedRewardMission(m.key);
-                          else setSelectedRewardPerCompleteMission(m.key);
-                        }}
-                        className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                          isSelected
-                            ? rewardTrendMetric === "totalP"
-                              ? "bg-[#3182f6] text-white shadow-sm font-bold"
-                              : "bg-[#00c980] text-white shadow-sm font-bold"
-                            : "bg-white text-[#4e5968] border border-[#e5e8eb] hover:bg-[#f2f4f6]"
-                        }`}
-                      >
+                    <option value="ALL">전체 미션</option>
+                    {dailyRewardMatrixData.orderedMissions.map((m) => (
+                      <option key={m.key} value={m.key}>
                         {m.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                      </option>
+                    ))}
+                  </select>
 
-              {/* FULL-WIDTH LINE CHART CANVAS */}
-              <div className="h-[380px] pt-1">
-                {rewardTrendMetric === "totalP" ? (
-                  rewardTrendChartData.labels && rewardTrendChartData.labels.length > 0 ? (
-                    <Line
-                      data={rewardTrendChartData}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: { mode: "index", intersect: false },
-                        plugins: {
-                          legend: {
-                            position: "top" as const,
-                            align: "end" as const,
-                            labels: {
-                              boxWidth: 8,
-                              boxHeight: 8,
-                              usePointStyle: true,
-                              pointStyle: "circle",
-                              padding: 12,
-                              color: "#4e5968",
-                              font: { family: "Pretendard, sans-serif", size: 11, weight: 600 },
-                            },
-                          },
-                          tooltip: {
-                            enabled: false,
-                            external: externalGlassTooltip,
-                            callbacks: {
-                              title: (items: any[]) => {
-                                if (!items.length) return "";
-                                const idx = items[0].dataIndex;
-                                const fullDt = rewardTrendChartData.datesList?.[idx];
-                                return fullDt ? `날짜: ${fullDt}` : items[0].label;
-                              },
-                              label: (context: any) => ` ${context.dataset.label}: ${Number(context.raw).toLocaleString()} P`,
-                            },
-                          },
-                        },
-                        scales: {
-                          x: {
-                            border: { display: false },
-                            grid: { display: false },
-                            ticks: { color: "#8b95a1", font: { family: "Pretendard, sans-serif", size: 11, weight: 500 } },
-                          },
-                          y: {
-                            border: { display: false },
-                            grid: { color: "#f2f4f6", drawTicks: false },
-                            ticks: {
-                              color: "#8b95a1",
-                              font: { family: "Pretendard, sans-serif", size: 11, weight: 500 },
-                              callback: (v: any) => `${Number(v).toLocaleString()} P`,
-                            },
-                          },
-                        },
-                      }}
-                    />
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-xs text-[#8b95a1] font-medium">
-                      조회된 일별 리워드 추이 데이터가 없습니다.
-                    </div>
-                  )
-                ) : (
-                  rewardPerCompleteTrendChartData.labels && rewardPerCompleteTrendChartData.labels.length > 0 ? (
-                    <Line
-                      data={rewardPerCompleteTrendChartData}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: { mode: "index", intersect: false },
-                        plugins: {
-                          legend: {
-                            position: "top" as const,
-                            align: "end" as const,
-                            labels: {
-                              boxWidth: 8,
-                              boxHeight: 8,
-                              usePointStyle: true,
-                              pointStyle: "circle",
-                              padding: 12,
-                              color: "#4e5968",
-                              font: { family: "Pretendard, sans-serif", size: 11, weight: 600 },
-                            },
-                          },
-                          tooltip: {
-                            enabled: false,
-                            external: externalGlassTooltip,
-                            callbacks: {
-                              title: (items: any[]) => {
-                                if (!items.length) return "";
-                                const idx = items[0].dataIndex;
-                                const fullDt = rewardPerCompleteTrendChartData.datesList?.[idx];
-                                return fullDt ? `날짜: ${fullDt}` : items[0].label;
-                              },
-                              label: (context: any) => ` ${context.dataset.label}: ${Number(context.raw).toLocaleString()} P/회`,
-                            },
-                          },
-                        },
-                        scales: {
-                          x: {
-                            border: { display: false },
-                            grid: { display: false },
-                            ticks: { color: "#8b95a1", font: { family: "Pretendard, sans-serif", size: 11, weight: 500 } },
-                          },
-                          y: {
-                            min: 0,
-                            suggestedMax: 5,
-                            border: { display: false },
-                            grid: { color: "#f2f4f6", drawTicks: false },
-                            ticks: {
-                              color: "#8b95a1",
-                              font: { family: "Pretendard, sans-serif", size: 11, weight: 500 },
-                              callback: (v: any) => `${Number(v).toFixed(1)} P/회`,
-                            },
-                          },
-                        },
-                      }}
-                    />
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-xs text-[#8b95a1] font-medium">
-                      조회된 일별 1회당 평균 리워드 추이 데이터가 없습니다.
-                    </div>
-                  )
-                )}
-              </div>
+                  <button
+                    onClick={() => setDailyRewardSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#e5e8eb] bg-[#f8f9fa] text-xs font-semibold text-[#4e5968] hover:bg-[#f2f4f6] transition-all cursor-pointer shrink-0"
+                  >
+                    {dailyRewardSortOrder === "desc" ? (
+                      <>
+                        <ArrowDown className="w-3.5 h-3.5 text-[#3182f6]" />
+                        <span>최신순</span>
+                      </>
+                    ) : (
+                      <>
+                        <ArrowUp className="w-3.5 h-3.5 text-[#3182f6]" />
+                        <span>오래된순</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Controls specific to Ranking Mode */}
+              {rewardViewMode === "ranking" && (
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-[#8b95a1]">
+                  <span>조회 날짜:</span>
+                  <select
+                    value={selectedRankingDate}
+                    onChange={(e) => setSelectedRankingDate(e.target.value)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#f8f9fa] border border-[#e5e8eb] text-[#191f28] focus:outline-none focus:border-[#3182f6] cursor-pointer"
+                  >
+                    <option value="ALL">전체 기간 통합</option>
+                    {rewardDatesList.map((dt) => (
+                      <option key={dt} value={dt}>
+                        {dt} ({getDayOfWeekKr(dt)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
-
-
-            {/* CONSOLIDATED LOWER SECTION: TABBED MISSION REWARD TABLE CARD */}
-            <div className="space-y-4 pt-2">
-              {/* TOP HEADER WITH MAIN TAB SWITCHER & ACTIVE TAB CONTROLS */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[#f2f4f6]">
-                {/* TAB SWITCHER: RANKING vs DAILY BREAKDOWN */}
-                <div className="flex items-center gap-1.5 bg-[#e5e8eb]/70 p-1 rounded-2xl shrink-0">
-                  <button
-                    onClick={() => setRewardTableTab("ranking")}
-                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      rewardTableTab === "ranking"
-                        ? "bg-white text-[#3182f6] shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
-                        : "text-[#4e5968] hover:text-[#191f28]"
-                    }`}
-                  >
-                    <Gift className="w-3.5 h-3.5" />
-                    <span>미션별 성과 랭킹</span>
-                  </button>
-
-                  <button
-                    onClick={() => setRewardTableTab("daily")}
-                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      rewardTableTab === "daily"
-                        ? "bg-white text-[#3182f6] shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
-                        : "text-[#4e5968] hover:text-[#191f28]"
-                    }`}
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>일별 리워드 세부 현황</span>
-                  </button>
+            {/* ── VIEW 1: DAILY MISSION PIVOT MATRIX ── */}
+            {rewardViewMode === "matrix" && (
+              <div className="space-y-3">
+                <div className="text-xs text-[#8b95a1] flex items-center justify-between px-1">
+                  <span>
+                    행을 클릭하시면 해당 일자의 미션별 상세 성과 카드를 확인하실 수 있습니다.
+                  </span>
+                  <span className="font-semibold text-[#4e5968]">
+                    총 {dailyRewardMatrixData.rows.length}일 집계됨
+                  </span>
                 </div>
 
-                {/* CONTROLS FOR ACTIVE TAB */}
-                {rewardTableTab === "ranking" ? (
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-[#8b95a1]">
-                    <span>조회 날짜:</span>
-                    <select
-                      value={selectedRankingDate}
-                      onChange={(e) => setSelectedRankingDate(e.target.value)}
-                      className="px-3 py-1 rounded-xl text-xs font-semibold bg-[#f8f9fa] border border-[#e5e8eb] text-[#191f28] focus:outline-none focus:border-[#3182f6] cursor-pointer"
-                    >
-                      <option value="ALL">전체 기간 통합</option>
-                      {rewardDatesList.map((dt) => (
-                        <option key={dt} value={dt}>
-                          {dt}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="flex bg-[#f2f4f6] p-1 rounded-xl gap-0.5 text-xs self-start sm:self-auto">
-                    <button
-                      onClick={() => setDailyRewardViewMode("summary")}
-                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                        dailyRewardViewMode === "summary"
-                          ? "bg-white text-[#3182f6] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
-                          : "text-[#6b7684] font-medium hover:text-[#191f28]"
-                      }`}
-                    >
-                      날짜별 통합 요약
-                    </button>
-                    <button
-                      onClick={() => setDailyRewardViewMode("detail")}
-                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                        dailyRewardViewMode === "detail"
-                          ? "bg-white text-[#3182f6] font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
-                          : "text-[#6b7684] font-medium hover:text-[#191f28]"
-                      }`}
-                    >
-                      일별 · 미션별 상세 로그
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* CONTENTS BASED ON ACTIVE TAB */}
-              {rewardTableTab === "ranking" ? (
                 <div className="overflow-x-auto border border-[#f2f4f6] rounded-2xl">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-[#f8f9fa] font-bold text-[#4e5968] border-b border-[#e5e8eb]">
-                        <th className="py-3.5 px-4">미션명</th>
-                        <th className="py-3.5 px-4 text-right">총 지급 리워드 (P)</th>
-                        <th className="py-3.5 px-4 text-right">참여 완료 건수 (회)</th>
-                        <th className="py-3.5 px-4 text-right">1회당 평균 지급 리워드 (P/회)</th>
-                        <th className="py-3.5 px-4 text-right">1인당 평균 획득 리워드 (P/명)</th>
-                        <th className="py-3.5 px-4 text-right">전체 리워드 지급 점유율</th>
+                        <th className="py-3.5 px-4 sticky left-0 bg-[#f8f9fa] z-10 min-w-[120px]">일자 (dt)</th>
+                        <th className="py-3.5 px-4 text-right bg-[#ecf4fe]/60 text-[#3182f6] min-w-[110px]">
+                          1인당 평균 (P/명)
+                        </th>
+                        <th className="py-3.5 px-4 text-right bg-[#e6f9f2]/60 text-[#00c980] min-w-[110px]">
+                          건당 단가 (P/회)
+                        </th>
+                        <th className="py-3.5 px-4 text-right min-w-[90px]">참여 유저</th>
+                        <th className="py-3.5 px-4 text-right min-w-[90px]">완료수</th>
+                        <th className="py-3.5 px-4 text-right min-w-[110px]">총 지급액</th>
+                        {dailyRewardMatrixData.orderedMissions.map((m) => (
+                          <th key={m.key} className="py-3.5 px-4 text-right min-w-[100px]">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: m.color }}
+                              />
+                              <span>{m.name}</span>
+                            </div>
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#f2f4f6] font-medium text-[#4e5968]">
-                      {processedRewardDetail.length > 0 ? (
-                        processedRewardDetail.map((row) => (
-                          <tr key={row.key} className="hover:bg-[#f8f9fa] transition-colors">
-                            <td className="py-3.5 px-4 font-bold text-[#191f28] text-sm">
-                              {row.missionName}
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-bold text-[#3182f6] text-sm">
-                              {row.rewardP.toLocaleString()} P
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-semibold text-[#191f28]">
-                              {row.completeCount.toLocaleString()} 회
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-medium text-[#3182f6]">
-                              {row.rewardPerComplete.toLocaleString()} P/회
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-semibold text-[#4e5968]">
-                              {row.rewardPerUser.toLocaleString()} P/명
-                            </td>
-                            <td className="py-3.5 px-4 text-right">
-                              <div className="flex items-center justify-end gap-2.5">
-                                <div className="w-24 bg-[#f2f4f6] h-2 rounded-full overflow-hidden hidden sm:block">
-                                  <div
-                                    className="bg-[#3182f6] h-full rounded-full transition-all"
-                                    style={{ width: `${Math.min(100, row.shareRate)}%` }}
-                                  />
-                                </div>
-                                <span className="font-semibold text-[#191f28] text-xs w-12 text-right shrink-0">
-                                  {row.shareRate}%
-                                </span>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
+                      {/* Top Summary Row 1: 기간 전체 합계 (Total) */}
+                      {dailyRewardMatrixData.rows.length > 0 && (
+                        <tr className="bg-[#ecf4fe]/40 font-bold border-b-2 border-[#3182f6]/20">
+                          <td className="py-3.5 px-4 sticky left-0 bg-[#ecf4fe]/80 z-10 text-[#191f28] flex items-center gap-1.5">
+                            <span className="text-[11px] bg-[#3182f6] text-white px-2 py-0.5 rounded-md font-bold">
+                              합계
+                            </span>
+                            <span>기간 전체</span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-extrabold text-[#3182f6] text-sm">
+                            {dailyRewardMatrixData.totals.overallRewardPerUser.toFixed(1)} P
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-extrabold text-[#00c980] text-sm">
+                            {dailyRewardMatrixData.totals.overallRewardPerComplete.toFixed(1)} P
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-bold text-[#4e5968]">
+                            {dailyRewardMatrixData.totals.totalUuSum.toLocaleString()} 명
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-bold text-[#191f28]">
+                            {dailyRewardMatrixData.totals.totalCompleteCount.toLocaleString()} 회
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-extrabold text-[#191f28]">
+                            {dailyRewardMatrixData.totals.totalRewardP.toLocaleString()} P
+                          </td>
+                          {dailyRewardMatrixData.orderedMissions.map((m) => {
+                            const mt = dailyRewardMatrixData.totals.missions[m.key];
+                            return (
+                              <td key={m.key} className="py-3.5 px-4 text-right font-bold">
+                                {dailyRewardMatrixMetric === "perUser" && (
+                                  <div className="flex flex-col items-end">
+                                    <span className="text-[#3182f6] text-xs">
+                                      {mt?.rewardPerUser ? `${mt.rewardPerUser.toFixed(1)} P` : "-"}
+                                    </span>
+                                    {mt && mt.totalRewardP > 0 && (
+                                      <span className="text-[10px] text-[#8b95a1]">
+                                        단가 {mt.rewardPerComplete}P
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                {dailyRewardMatrixMetric === "perComplete" && (
+                                  <span className="text-[#00c980] text-xs">
+                                    {mt?.rewardPerComplete ? `${mt.rewardPerComplete.toFixed(1)} P` : "-"}
+                                  </span>
+                                )}
+                                {dailyRewardMatrixMetric === "totalP" && (
+                                  <span className="text-[#191f28] text-xs">
+                                    {mt?.totalRewardP ? `${mt.totalRewardP.toLocaleString()} P` : "-"}
+                                  </span>
+                                )}
+                                {dailyRewardMatrixMetric === "count" && (
+                                  <span className="text-[#191f28] text-xs">
+                                    {mt?.totalCompleteCount ? `${mt.totalCompleteCount.toLocaleString()} 회` : "-"}
+                                  </span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      )}
+
+                      {/* Top Summary Row 2: 일평균 요약 (Daily Average) */}
+                      {dailyRewardMatrixData.rows.length > 0 && (
+                        <tr className="bg-[#f8f9fa] font-bold border-b border-[#e5e8eb]">
+                          <td className="py-3 px-4 sticky left-0 bg-[#f8f9fa] z-10 text-[#4e5968] flex items-center gap-1.5">
+                            <span className="text-[11px] bg-[#64748b] text-white px-2 py-0.5 rounded-md font-semibold">
+                              평균
+                            </span>
+                            <span>일평균 (1일 기준)</span>
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-[#3182f6] text-xs">
+                            {dailyRewardMatrixData.totals.overallRewardPerUser.toFixed(1)} P
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-[#00c980] text-xs">
+                            {dailyRewardMatrixData.totals.overallRewardPerComplete.toFixed(1)} P
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-[#4e5968] text-xs">
+                            {dailyRewardMatrixData.totals.avgDailyUu.toLocaleString()} 명
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-[#191f28] text-xs">
+                            {dailyRewardMatrixData.totals.avgDailyCompleteCount.toLocaleString()} 회
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-[#191f28] text-xs">
+                            {dailyRewardMatrixData.totals.avgDailyRewardP.toLocaleString()} P
+                          </td>
+                          {dailyRewardMatrixData.orderedMissions.map((m) => {
+                            const mt = dailyRewardMatrixData.totals.missions[m.key];
+                            return (
+                              <td key={m.key} className="py-3 px-4 text-right">
+                                {dailyRewardMatrixMetric === "perUser" && (
+                                  <span className="font-bold text-[#3182f6] text-xs">
+                                    {mt?.rewardPerUser ? `${mt.rewardPerUser.toFixed(1)} P` : "-"}
+                                  </span>
+                                )}
+                                {dailyRewardMatrixMetric === "perComplete" && (
+                                  <span className="font-bold text-[#00c980] text-xs">
+                                    {mt?.rewardPerComplete ? `${mt.rewardPerComplete.toFixed(1)} P` : "-"}
+                                  </span>
+                                )}
+                                {dailyRewardMatrixMetric === "totalP" && (
+                                  <span className="font-bold text-[#4e5968] text-xs">
+                                    {mt?.avgDailyRewardP ? `${mt.avgDailyRewardP.toLocaleString()} P` : "-"}
+                                  </span>
+                                )}
+                                {dailyRewardMatrixMetric === "count" && (
+                                  <span className="font-bold text-[#4e5968] text-xs">
+                                    {mt?.avgDailyCompleteCount ? `${mt.avgDailyCompleteCount.toLocaleString()} 회` : "-"}
+                                  </span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      )}
+
+                      {/* Daily Rows */}
+                      {dailyRewardMatrixData.rows.length > 0 ? (
+                        dailyRewardMatrixData.rows.map((row) => {
+                          const isExpanded = expandedRewardDate === row.dt;
+                          const dayColorClass =
+                            row.dayOfWeek === "일"
+                              ? "text-[#f04452]"
+                              : row.dayOfWeek === "토"
+                              ? "text-[#3182f6]"
+                              : "text-[#8b95a1]";
+
+                          return (
+                            <React.Fragment key={row.dt}>
+                              <tr
+                                onClick={() => setExpandedRewardDate(isExpanded ? null : row.dt)}
+                                className={`transition-colors cursor-pointer ${
+                                  isExpanded
+                                    ? "bg-[#ecf4fe]/30 font-semibold"
+                                    : "hover:bg-[#f8f9fa]"
+                                }`}
+                              >
+                                {/* Date Column */}
+                                <td className="py-3.5 px-4 sticky left-0 bg-white group-hover:bg-[#f8f9fa] z-10">
+                                  <div className="flex items-center gap-2">
+                                    {isExpanded ? (
+                                      <ChevronUp className="w-3.5 h-3.5 text-[#3182f6] shrink-0" />
+                                    ) : (
+                                      <ChevronDown className="w-3.5 h-3.5 text-[#8b95a1] shrink-0" />
+                                    )}
+                                    <span className="font-bold text-[#191f28] text-xs">
+                                      {row.dt}
+                                    </span>
+                                    <span className={`text-[11px] font-bold ${dayColorClass}`}>
+                                      ({row.dayOfWeek})
+                                    </span>
+                                  </div>
+                                </td>
+
+                                {/* 1인당 평균 지급액 (강조 컬럼) */}
+                                <td className="py-3.5 px-4 text-right bg-[#ecf4fe]/30">
+                                  <span className="font-extrabold text-[#3182f6] text-xs">
+                                    {row.rewardPerUser.toFixed(1)} P
+                                  </span>
+                                </td>
+
+                                {/* 1건당 평균 단가 (강조 컬럼) */}
+                                <td className="py-3.5 px-4 text-right bg-[#e6f9f2]/30">
+                                  <span className="font-extrabold text-[#00c980] text-xs">
+                                    {row.rewardPerComplete.toFixed(1)} P
+                                  </span>
+                                </td>
+
+                                {/* 참여 유저 (명) */}
+                                <td className="py-3.5 px-4 text-right font-medium text-[#4e5968]">
+                                  {row.totalUu.toLocaleString()} 명
+                                </td>
+
+                                {/* 총 완료 건수 (회) */}
+                                <td className="py-3.5 px-4 text-right font-semibold text-[#191f28]">
+                                  {row.totalCompleteCount.toLocaleString()} 회
+                                </td>
+
+                                {/* 당일 총 리워드 (P) */}
+                                <td className="py-3.5 px-4 text-right font-bold text-[#191f28]">
+                                  {row.totalRewardP.toLocaleString()} P
+                                </td>
+
+                                {/* Mission Columns */}
+                                {dailyRewardMatrixData.orderedMissions.map((m) => {
+                                  const mData = row.missions[m.key];
+                                  const hasData = mData && mData.rewardP > 0;
+
+                                  return (
+                                    <td key={m.key} className="py-3.5 px-4 text-right">
+                                      {hasData ? (
+                                        dailyRewardMatrixMetric === "perUser" ? (
+                                          <div className="flex flex-col items-end">
+                                            <span className="font-bold text-[#3182f6] text-xs">
+                                              {mData.rewardPerUser.toFixed(1)} P
+                                            </span>
+                                            <span className="text-[10px] text-[#8b95a1]">
+                                              단가 {mData.rewardPerComplete.toFixed(1)}P
+                                            </span>
+                                          </div>
+                                        ) : dailyRewardMatrixMetric === "perComplete" ? (
+                                          <span className="font-bold text-[#00c980] text-xs">
+                                            {mData.rewardPerComplete.toFixed(1)} P
+                                          </span>
+                                        ) : dailyRewardMatrixMetric === "totalP" ? (
+                                          <span className="font-bold text-[#191f28] text-xs">
+                                            {mData.rewardP.toLocaleString()} P
+                                          </span>
+                                        ) : (
+                                          <span className="font-semibold text-[#191f28] text-xs">
+                                            {mData.completeCount.toLocaleString()} 회
+                                          </span>
+                                        )
+                                      ) : (
+                                        <span className="text-[#d1d5db] font-normal text-xs">-</span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+
+                              {/* Accordion Expanded Drilldown Row (Clean without emojis) */}
+                              {isExpanded && (
+                                <tr>
+                                  <td
+                                    colSpan={6 + dailyRewardMatrixData.orderedMissions.length}
+                                    className="p-0 bg-[#f8f9fa] border-b border-[#e5e8eb]"
+                                  >
+                                    <div className="p-5 space-y-4">
+                                      {/* Drilldown Header */}
+                                      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#e5e8eb]">
+                                        <div className="flex items-center gap-2">
+                                          <Calendar className="w-4 h-4 text-[#3182f6]" />
+                                          <span className="font-bold text-sm text-[#191f28]">
+                                            {row.dt} ({row.dayOfWeek}) 평균 지급 리포트
+                                          </span>
+                                          <span className="text-xs bg-[#ecf4fe] text-[#3182f6] px-2.5 py-0.5 rounded-full font-bold">
+                                            당일 1인당 평균: {row.rewardPerUser.toFixed(1)} P · 건당 단가: {row.rewardPerComplete.toFixed(1)} P
+                                          </span>
+                                        </div>
+                                        <div className="text-xs text-[#8b95a1] font-medium">
+                                          당일 참여: <span className="font-bold text-[#191f28]">{row.totalUu.toLocaleString()}명</span> · 총 지급:{" "}
+                                          <span className="font-extrabold text-[#3182f6] text-sm">
+                                            {row.totalRewardP.toLocaleString()} P
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      {/* Drilldown Content Grid */}
+                                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                        {/* Donut Chart */}
+                                        <div className="bg-white p-4 rounded-2xl border border-[#e5e8eb] shadow-sm flex flex-col items-center">
+                                          <div className="text-xs font-bold text-[#4e5968] mb-2 self-start flex items-center gap-1.5">
+                                            <PieChartIcon className="w-3.5 h-3.5 text-[#3182f6]" />
+                                            <span>당일 미션별 리워드 점유율</span>
+                                          </div>
+                                          <div className="w-44 h-44 relative my-auto">
+                                            <Doughnut
+                                              data={getExpandedDayDonutData(row)}
+                                              options={{
+                                                responsive: true,
+                                                maintainAspectRatio: false,
+                                                plugins: {
+                                                  legend: {
+                                                    position: "bottom" as const,
+                                                    labels: {
+                                                      boxWidth: 8,
+                                                      boxHeight: 8,
+                                                      usePointStyle: true,
+                                                      pointStyle: "circle",
+                                                      padding: 8,
+                                                      color: "#4e5968",
+                                                      font: { family: "Pretendard, sans-serif", size: 10, weight: 600 },
+                                                    },
+                                                  },
+                                                  tooltip: {
+                                                    enabled: false,
+                                                    external: externalGlassTooltip,
+                                                    callbacks: {
+                                                      label: (context: any) =>
+                                                        ` ${context.label}: ${Number(context.raw).toLocaleString()} P`,
+                                                    },
+                                                  },
+                                                },
+                                                cutout: "68%",
+                                              }}
+                                            />
+                                          </div>
+                                        </div>
+
+                                        {/* Detailed Mission Cards */}
+                                        <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                          {dailyRewardMatrixData.orderedMissions.map((m) => {
+                                            const mData = row.missions[m.key];
+                                            if (!mData || mData.rewardP === 0) return null;
+
+                                            return (
+                                              <div
+                                                key={m.key}
+                                                className="bg-white p-3.5 rounded-2xl border border-[#e5e8eb] shadow-sm space-y-2 hover:border-[#3182f6]/40 transition-all"
+                                              >
+                                                <div className="flex items-center justify-between">
+                                                  <span className="text-xs font-bold text-[#191f28] flex items-center gap-1.5">
+                                                    <span
+                                                      className="w-2.5 h-2.5 rounded-full"
+                                                      style={{ backgroundColor: m.color }}
+                                                    />
+                                                    {m.name}
+                                                  </span>
+                                                  <span className="text-[11px] font-bold text-[#3182f6] bg-[#ecf4fe] px-1.5 py-0.5 rounded-md">
+                                                    {mData.shareRate}%
+                                                  </span>
+                                                </div>
+
+                                                <div className="text-base font-extrabold text-[#3182f6]">
+                                                  {mData.rewardPerUser.toFixed(1)}{" "}
+                                                  <span className="text-xs font-normal text-[#8b95a1]">P/명</span>
+                                                </div>
+
+                                                <div className="space-y-1 text-[11px] text-[#8b95a1] pt-1.5 border-t border-[#f2f4f6]">
+                                                  <div className="flex items-center justify-between">
+                                                    <span>건당 단가:</span>
+                                                    <span className="font-bold text-[#00c980]">
+                                                      {mData.rewardPerComplete.toFixed(1)} P/회
+                                                    </span>
+                                                  </div>
+                                                  <div className="flex items-center justify-between">
+                                                    <span>총 지급액:</span>
+                                                    <span className="font-semibold text-[#191f28]">
+                                                      {mData.rewardP.toLocaleString()} P
+                                                    </span>
+                                                  </div>
+                                                  <div className="flex items-center justify-between">
+                                                    <span>완료 건수:</span>
+                                                    <span className="font-medium text-[#4e5968]">
+                                                      {mData.completeCount.toLocaleString()} 회
+                                                    </span>
+                                                  </div>
+                                                  <div className="flex items-center justify-between">
+                                                    <span>참여 유저:</span>
+                                                    <span className="font-medium text-[#4e5968]">
+                                                      {mData.uu.toLocaleString()} 명
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })
                       ) : (
                         <tr>
-                          <td colSpan={6} className="py-12 text-center text-[#8b95a1] font-medium">
-                            조회 기간 내 리워드 데이터가 없습니다.
+                          <td
+                            colSpan={6 + dailyRewardMatrixData.orderedMissions.length}
+                            className="py-12 text-center text-[#8b95a1] font-medium"
+                          >
+                            조회 기간 내 일별 미션 리워드 데이터가 없습니다.
                           </td>
                         </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* FILTER AND CONTROL BAR FOR DAILY REWARD LOG */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 bg-[#f8f9fa] p-3 rounded-2xl border border-[#f2f4f6]">
-                    {/* MISSION PILL FILTERS */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-xs font-semibold text-[#8b95a1] mr-1">미션 필터:</span>
-                      <button
-                        onClick={() => setDailyRewardMissionFilter("ALL")}
-                        className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                          dailyRewardMissionFilter === "ALL"
-                            ? "bg-[#3182f6] text-white shadow-sm font-bold"
-                            : "bg-white text-[#4e5968] border border-[#e5e8eb] hover:bg-[#f2f4f6]"
-                        }`}
-                      >
-                        전체 미션
-                      </button>
-                      {dailyTrendsData.distinctMissions.map((m) => (
-                        <button
-                          key={m.key}
-                          onClick={() => setDailyRewardMissionFilter(m.key)}
-                          className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                            dailyRewardMissionFilter === m.key
-                              ? "bg-[#3182f6] text-white shadow-sm font-bold"
-                              : "bg-white text-[#4e5968] border border-[#e5e8eb] hover:bg-[#f2f4f6]"
-                          }`}
-                        >
-                          {m.name}
-                        </button>
-                      ))}
-                    </div>
+              </div>
+            )}
 
-                    {/* DATE SORT TOGGLE */}
-                    <button
-                      onClick={() => setDailyRewardSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
-                      className="flex items-center gap-1.5 px-3 py-1 rounded-xl border border-[#e5e8eb] bg-white text-xs font-semibold text-[#4e5968] hover:bg-[#f2f4f6] transition-all cursor-pointer shrink-0"
-                      title="날짜 정렬 변경"
-                    >
-                      {dailyRewardSortOrder === "desc" ? (
-                        <>
-                          <ArrowDown className="w-3.5 h-3.5 text-[#3182f6]" />
-                          <span>최신순 (내림차순)</span>
-                        </>
-                      ) : (
-                        <>
-                          <ArrowUp className="w-3.5 h-3.5 text-[#3182f6]" />
-                          <span>오래된순 (오름차순)</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* TABLE CANVAS BASED ON VIEW MODE */}
-                  <div className="overflow-x-auto border border-[#f2f4f6] rounded-2xl">
-                    {dailyRewardViewMode === "summary" ? (
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                          <tr className="bg-[#f8f9fa] font-bold text-[#4e5968] border-b border-[#e5e8eb]">
-                            <th className="py-3.5 px-4">날짜 (dt)</th>
-                            <th className="py-3.5 px-4 text-right">당일 총 지급 리워드 (P)</th>
-                            <th className="py-3.5 px-4 text-right">총 완료 건수 (회)</th>
-                            <th className="py-3.5 px-4 text-right">참여 유저 수 (명)</th>
-                            <th className="py-3.5 px-4 text-right">1회당 평균 지급 (P/회)</th>
-                            <th className="py-3.5 px-4 text-right">1인당 평균 획득 (P/명)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#f2f4f6] font-medium text-[#4e5968]">
-                          {dailyRewardSummaryRows.length > 0 ? (
-                            dailyRewardSummaryRows.map((row) => (
-                              <tr key={row.dt} className="hover:bg-[#f8f9fa] transition-colors">
-                                <td className="py-3.5 px-4 font-semibold text-[#191f28]">
-                                  {row.dt}
-                                </td>
-                                <td className="py-3.5 px-4 text-right font-bold text-[#3182f6] text-sm">
-                                  {row.totalRewardP.toLocaleString()} P
-                                </td>
-                                <td className="py-3.5 px-4 text-right font-semibold text-[#191f28]">
-                                  {row.totalCompleteCount.toLocaleString()} 회
-                                </td>
-                                <td className="py-3.5 px-4 text-right font-medium text-[#4e5968]">
-                                  {row.uu.toLocaleString()} 명
-                                </td>
-                                <td className="py-3.5 px-4 text-right font-medium text-[#3182f6]">
-                                  {row.rewardPerComplete.toLocaleString()} P/회
-                                </td>
-                                <td className="py-3.5 px-4 text-right font-semibold text-[#4e5968]">
-                                  {row.rewardPerUser.toLocaleString()} P/명
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan={6} className="py-12 text-center text-[#8b95a1] font-medium">
-                                조회 기간 내 일별 리워드 요약 데이터가 없습니다.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
+            {/* ── VIEW 2: DAILY RAW LOGS TABLE (CLEAN WITHOUT EMOJIS) ── */}
+            {rewardViewMode === "daily_log" && (
+              <div className="overflow-x-auto border border-[#f2f4f6] rounded-2xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[#f8f9fa] font-bold text-[#4e5968] border-b border-[#e5e8eb]">
+                      <th className="py-3.5 px-4">날짜 (dt)</th>
+                      <th className="py-3.5 px-4">미션명</th>
+                      <th className="py-3.5 px-4 text-right bg-[#ecf4fe]/60 text-[#3182f6]">1인당 평균 지급 (P/명)</th>
+                      <th className="py-3.5 px-4 text-right bg-[#e6f9f2]/60 text-[#00c980]">1건당 평균 지급 (P/회)</th>
+                      <th className="py-3.5 px-4 text-right">총 지급 리워드 (P)</th>
+                      <th className="py-3.5 px-4 text-right">완료 건수 (회)</th>
+                      <th className="py-3.5 px-4 text-right">참여 유저 (명)</th>
+                      <th className="py-3.5 px-4 text-right">당일 점유율</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#f2f4f6] font-medium text-[#4e5968]">
+                    {dailyRewardDetailRows.length > 0 ? (
+                      dailyRewardDetailRows.map((row, idx) => (
+                        <tr key={`${row.dt}-${row.key}-${idx}`} className="hover:bg-[#f8f9fa] transition-colors">
+                          <td className="py-3.5 px-4 font-semibold text-[#191f28]">
+                            {row.dt} ({getDayOfWeekKr(row.dt)})
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-[#191f28]">
+                            {row.missionName}
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-bold text-[#3182f6] text-sm bg-[#ecf4fe]/30">
+                            {row.rewardPerUser.toFixed(1)} P/명
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-bold text-[#00c980] bg-[#e6f9f2]/30">
+                            {row.rewardPerComplete.toFixed(1)} P/회
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-semibold text-[#191f28]">
+                            {row.rewardP.toLocaleString()} P
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-medium text-[#191f28]">
+                            {row.completeCount.toLocaleString()} 회
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-medium text-[#4e5968]">
+                            {row.uu.toLocaleString()} 명
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2.5">
+                              <div className="w-20 bg-[#f2f4f6] h-2 rounded-full overflow-hidden hidden sm:block">
+                                <div
+                                  className="bg-[#3182f6] h-full rounded-full transition-all"
+                                  style={{ width: `${Math.min(100, row.shareRate)}%` }}
+                                />
+                              </div>
+                              <span className="font-semibold text-[#191f28] text-xs w-12 text-right shrink-0">
+                                {row.shareRate}%
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
                     ) : (
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                          <tr className="bg-[#f8f9fa] font-bold text-[#4e5968] border-b border-[#e5e8eb]">
-                            <th className="py-3.5 px-4">날짜 (dt)</th>
-                            <th className="py-3.5 px-4">미션명</th>
-                            <th className="py-3.5 px-4 text-right">지급 리워드 (P)</th>
-                            <th className="py-3.5 px-4 text-right">완료 건수 (회)</th>
-                            <th className="py-3.5 px-4 text-right">참여 유저 (명)</th>
-                            <th className="py-3.5 px-4 text-right">1회당 평균 지급 (P/회)</th>
-                            <th className="py-3.5 px-4 text-right">1인당 평균 획득 (P/명)</th>
-                            <th className="py-3.5 px-4 text-right">당일 리워드 점유율</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#f2f4f6] font-medium text-[#4e5968]">
-                          {dailyRewardDetailRows.length > 0 ? (
-                            dailyRewardDetailRows.map((row, idx) => (
-                              <tr key={`${row.dt}-${row.key}-${idx}`} className="hover:bg-[#f8f9fa] transition-colors">
-                                <td className="py-3.5 px-4 font-semibold text-[#191f28]">
-                                  {row.dt}
-                                </td>
-                                <td className="py-3.5 px-4 font-bold text-[#191f28]">
-                                  {row.missionName}
-                                </td>
-                                <td className="py-3.5 px-4 text-right font-bold text-[#3182f6] text-sm">
-                                  {row.rewardP.toLocaleString()} P
-                                </td>
-                                <td className="py-3.5 px-4 text-right font-semibold text-[#191f28]">
-                                  {row.completeCount.toLocaleString()} 회
-                                </td>
-                                <td className="py-3.5 px-4 text-right font-medium text-[#4e5968]">
-                                  {row.uu.toLocaleString()} 명
-                                </td>
-                                <td className="py-3.5 px-4 text-right font-medium text-[#3182f6]">
-                                  {row.rewardPerComplete.toLocaleString()} P/회
-                                </td>
-                                <td className="py-3.5 px-4 text-right font-semibold text-[#4e5968]">
-                                  {row.rewardPerUser.toLocaleString()} P/명
-                                </td>
-                                <td className="py-3.5 px-4 text-right">
-                                  <div className="flex items-center justify-end gap-2.5">
-                                    <div className="w-20 bg-[#f2f4f6] h-2 rounded-full overflow-hidden hidden sm:block">
-                                      <div
-                                        className="bg-[#3182f6] h-full rounded-full transition-all"
-                                        style={{ width: `${Math.min(100, row.shareRate)}%` }}
-                                      />
-                                    </div>
-                                    <span className="font-semibold text-[#191f28] text-xs w-12 text-right shrink-0">
-                                      {row.shareRate}%
-                                    </span>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan={8} className="py-12 text-center text-[#8b95a1] font-medium">
-                                조회 기간 내 일별·미션별 상세 리워드 로그 데이터가 없습니다.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
+                      <tr>
+                        <td colSpan={8} className="py-12 text-center text-[#8b95a1] font-medium">
+                          조회 기간 내 일별·미션별 상세 리워드 로그 데이터가 없습니다.
+                        </td>
+                      </tr>
                     )}
-                  </div>
-                </div>
-              )}
-            </div>
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* ── VIEW 3: CUMULATIVE MISSION RANKING TABLE (CLEAN WITHOUT EMOJIS) ── */}
+            {rewardViewMode === "ranking" && (
+              <div className="overflow-x-auto border border-[#f2f4f6] rounded-2xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[#f8f9fa] font-bold text-[#4e5968] border-b border-[#e5e8eb]">
+                      <th className="py-3.5 px-4">미션명</th>
+                      <th className="py-3.5 px-4 text-right bg-[#ecf4fe]/60 text-[#3182f6]">1인당 평균 획득 (P/명)</th>
+                      <th className="py-3.5 px-4 text-right bg-[#e6f9f2]/60 text-[#00c980]">1회당 평균 단가 (P/회)</th>
+                      <th className="py-3.5 px-4 text-right">총 지급 리워드 (P)</th>
+                      <th className="py-3.5 px-4 text-right">참여 완료 건수 (회)</th>
+                      <th className="py-3.5 px-4 text-right">전체 점유율</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#f2f4f6] font-medium text-[#4e5968]">
+                    {processedRewardDetail.length > 0 ? (
+                      processedRewardDetail.map((row) => (
+                        <tr key={row.key} className="hover:bg-[#f8f9fa] transition-colors">
+                          <td className="py-3.5 px-4 font-bold text-[#191f28] text-sm">
+                            {row.missionName}
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-bold text-[#3182f6] text-sm bg-[#ecf4fe]/30">
+                            {row.rewardPerUser.toFixed(1)} P/명
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-bold text-[#00c980] bg-[#e6f9f2]/30">
+                            {row.rewardPerComplete.toFixed(1)} P/회
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-bold text-[#191f28] text-sm">
+                            {row.rewardP.toLocaleString()} P
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-semibold text-[#191f28]">
+                            {row.completeCount.toLocaleString()} 회
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2.5">
+                              <div className="w-24 bg-[#f2f4f6] h-2 rounded-full overflow-hidden hidden sm:block">
+                                <div
+                                  className="bg-[#3182f6] h-full rounded-full transition-all"
+                                  style={{ width: `${Math.min(100, row.shareRate)}%` }}
+                                />
+                              </div>
+                              <span className="font-semibold text-[#191f28] text-xs w-12 text-right shrink-0">
+                                {row.shareRate}%
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-[#8b95a1] font-medium">
+                          조회 기간 내 리워드 데이터가 없습니다.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-
-
         </div>
       )}
 

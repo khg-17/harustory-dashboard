@@ -139,10 +139,10 @@ export const AdNetworkTab: React.FC<AdNetworkTabProps> = ({ revenueSummary }) =>
                 <th className="py-3.5 px-4 whitespace-nowrap">날짜 (dt)</th>
                 {Object.keys(networks).map((netName) => (
                   <th key={netName} className="py-3.5 px-4 text-right whitespace-nowrap">
-                    {netName} (원)
+                    {netName}
                   </th>
                 ))}
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">일별 합계 (원)</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">일별 합계</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#f2f4f6] font-medium text-[#4e5968]">

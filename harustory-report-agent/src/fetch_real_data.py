@@ -106,7 +106,7 @@ def fetch_daily_timeseries_data(target_date_str: str = None, app_code: str = "tc
     from_str = from_dt.strftime("%Y-%m-%d")
     to_str = target_dt.strftime("%Y-%m-%d")
 
-    app_cond = "1=1" if app_code in ["tc", "general_all", "ph_all"] else f"appID = '{app_code}'"
+    app_cond = "match(appID, '^[0-9]+$') = 0" if app_code in ["tc", "general_all", "ph_all"] else f"appID = '{app_code}'"
 
     # 일별 DAU
     dau_sql = f"""
@@ -128,7 +128,7 @@ def fetch_daily_timeseries_data(target_date_str: str = None, app_code: str = "tc
       count() AS newUserCount
     FROM Log.UserFirstSeen_V AS fs
     LEFT JOIN Log.AppNewUserWatermark_V AS w ON w.appID = fs.appID
-    WHERE (toInt64OrZero(fs.accountSN) > ifNull(w.watermark, 0)) AND fs.firstEventDateKst >= '{from_str}' AND fs.firstEventDateKst <= '{to_str}'
+    WHERE (toInt64OrZero(fs.accountSN) > ifNull(w.watermark, 0)) AND match(fs.appID, '^[0-9]+$') = 0 AND fs.firstEventDateKst >= '{from_str}' AND fs.firstEventDateKst <= '{to_str}'
     GROUP BY eventDateKst
     ORDER BY eventDateKst ASC
     SETTINGS max_threads = 2

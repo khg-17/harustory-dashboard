@@ -151,10 +151,10 @@ export const AdCategoryTab: React.FC<AdCategoryTabProps> = ({ revenueSummary }) 
                 <th className="py-3.5 px-4 whitespace-nowrap">날짜 (dt)</th>
                 {displayCategories.map((cfg) => (
                   <th key={cfg.key} className="py-3.5 px-4 text-right whitespace-nowrap">
-                    {cfg.label} (원)
+                    {cfg.label}
                   </th>
                 ))}
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">일별 합계 (원)</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">일별 합계</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#f2f4f6] font-medium text-[#4e5968]">
