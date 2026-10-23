@@ -553,6 +553,153 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, message: "Server response cache and global store cleared" });
   }
 
+  if (type === 'apps_overview') {
+    let from = searchParams.get('from') || '';
+    let to = searchParams.get('to') || '';
+    if (!DATE_REGEX.test(from) || !DATE_REGEX.test(to)) {
+      const now = new Date();
+      const end = new Date(now.getTime() - 86400000);
+      const start = new Date(now.getTime() - 7 * 86400000);
+      const fmt = (d: Date) => d.toISOString().slice(0, 10);
+      from = fmt(start);
+      to = fmt(end);
+    }
+    if (from > to) {
+      const tmp = from;
+      from = to;
+      to = tmp;
+    }
+
+    const d1 = new Date(from);
+    const d2 = new Date(to);
+    const numDays = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 3600 * 24)) + 1);
+    const ufsExpr = getUserFirstSeenExpr(to);
+
+    try {
+      const [missionRows, dauRows, newUserRows] = await Promise.all([
+        queryClickHouse(`
+          SELECT rawApp, sum(cnt) AS completeCount
+          FROM (
+            SELECT 
+              ifNull(ac.appID, toString(mp.appSN)) AS rawApp,
+              count() AS cnt
+            FROM Performance.MissionParticipation_Raw AS mp
+            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
+            WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
+              AND mp.status = 'COMPLETED'
+              AND mp.rewardType IN ('POINT', 'DIRECT')
+              AND mp.missionSN > 0
+            GROUP BY rawApp
+
+            UNION ALL
+
+            SELECT 
+              ifNull(ac.appID, toString(rc.appSN)) AS rawApp,
+              count() AS cnt
+            FROM Performance.RCPayload_Raw AS rc
+            LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
+            WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
+              AND rc.status = 2
+              AND rc.subType BETWEEN 101 AND 115
+            GROUP BY rawApp
+          )
+          GROUP BY rawApp
+        `),
+        queryClickHouse(`
+          SELECT 
+            rawApp,
+            round(count() / ${numDays}) AS avgDau
+          FROM (
+            SELECT dt, rawApp, accountSN
+            FROM (
+              SELECT eventDateKst AS dt, appID AS rawApp, toInt64OrZero(accountSN) AS accountSN
+              FROM Log.UserDailyActivity
+              WHERE match(appID, '^[0-9]+$') = 0 AND eventDateKst >= '${from}' AND eventDateKst <= '${to}'
+
+              UNION ALL
+
+              SELECT toDate(toTimeZone(ts, 'Asia/Seoul')) AS dt, appID AS rawApp, toInt64OrZero(accountSN) AS accountSN
+              FROM Log.UserActionLog
+              WHERE env = 'prod' AND match(appID, '^[0-9]+$') = 0 AND ts >= '2026-10-18 00:00:00' AND toDate(toTimeZone(ts, 'Asia/Seoul')) <= '${to}'
+
+              UNION ALL
+
+              SELECT mp.dt AS dt, ifNull(ac.appID, toString(mp.appSN)) AS rawApp, mp.accountSN AS accountSN
+              FROM Performance.MissionParticipation_Raw AS mp
+              LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = mp.appSN
+              WHERE mp.dt >= '${from}' AND mp.dt <= '${to}'
+                AND mp.status = 'COMPLETED'
+                AND mp.rewardType IN ('POINT', 'DIRECT')
+                AND mp.missionSN > 0
+
+              UNION ALL
+
+              SELECT rc.dt AS dt, ifNull(ac.appID, toString(rc.appSN)) AS rawApp, rc.accountSN AS accountSN
+              FROM Performance.RCPayload_Raw AS rc
+              LEFT JOIN Performance.AppChannel_V AS ac ON ac.appSN = rc.appSN
+              WHERE rc.dt >= '${from}' AND rc.dt <= '${to}'
+                AND rc.status = 2
+                AND rc.subType BETWEEN 101 AND 115
+            )
+            GROUP BY dt, rawApp, accountSN
+          )
+          GROUP BY rawApp
+        `),
+        queryClickHouse(`
+          SELECT 
+            fs.appID AS rawApp,
+            count() AS newUserCount
+          FROM ${ufsExpr} AS fs
+          LEFT JOIN Log.AppNewUserWatermark_V AS w ON w.appID = fs.appID
+          WHERE match(fs.appID, '^[0-9]+$') = 0
+            AND (toInt64OrZero(fs.accountSN) > ifNull(w.watermark, 0))
+            AND fs.firstEventDateKst >= '${from}' AND fs.firstEventDateKst <= '${to}'
+          GROUP BY rawApp
+        `),
+      ]);
+
+      const normalizeApp = (raw: string) => {
+        if (!raw) return '';
+        const trimmed = String(raw).trim().toLowerCase();
+        return SN_TO_APP_CODE_MAP[trimmed] || trimmed;
+      };
+
+      const appMap = new Map<string, { app: string; dau: number; newUser: number; missionCompleteCount: number }>();
+
+      dauRows.forEach((r: any) => {
+        const app = normalizeApp(r.rawApp);
+        if (!app) return;
+        const ex = appMap.get(app) || { app, dau: 0, newUser: 0, missionCompleteCount: 0 };
+        ex.dau += Number(r.avgDau || 0);
+        appMap.set(app, ex);
+      });
+
+      newUserRows.forEach((r: any) => {
+        const app = normalizeApp(r.rawApp);
+        if (!app) return;
+        const ex = appMap.get(app) || { app, dau: 0, newUser: 0, missionCompleteCount: 0 };
+        ex.newUser += Number(r.newUserCount || 0);
+        appMap.set(app, ex);
+      });
+
+      missionRows.forEach((r: any) => {
+        const app = normalizeApp(r.rawApp);
+        if (!app) return;
+        const ex = appMap.get(app) || { app, dau: 0, newUser: 0, missionCompleteCount: 0 };
+        ex.missionCompleteCount += Number(r.completeCount || 0);
+        appMap.set(app, ex);
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: Array.from(appMap.values()),
+      });
+    } catch (err: any) {
+      console.error('Failed to query apps_overview:', err);
+      return NextResponse.json({ success: false, error: err.message, data: [] });
+    }
+  }
+
   let app = searchParams.get('app') || 'tc';
   let from = searchParams.get('from') || '2026-07-03';
   let to = searchParams.get('to') || '2026-07-22';

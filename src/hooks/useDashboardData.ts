@@ -68,6 +68,9 @@ export function useDashboardData({
   const [attendanceCompletionRaw, setAttendanceCompletionRaw] = useState<AttendanceCompletionItem[]>([]);
   const [attendanceStepsRaw, setAttendanceStepsRaw] = useState<AttendanceStepItem[]>([]);
 
+  // Summary Apps Overview Live State
+  const [appsOverviewRaw, setAppsOverviewRaw] = useState<any[]>([]);
+
   const fetchDashboardData = useCallback(async () => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate)) {
       return;
@@ -78,7 +81,75 @@ export function useDashboardData({
     const fetchOpts = { cache: "no-store" as RequestCache };
 
     try {
-      if (activeTab === "users") {
+      if (activeTab === "summary") {
+        setOverviewData([]);
+        setMissionTotalRaw([]);
+        setMissionDailyTrendRaw([]);
+        setSettlementRaw([]);
+        setContentRevenueRaw([]);
+        setServiceRevenueRaw([]);
+        setAdRevenueRaw([]);
+        setEarningRaw([]);
+        setAppsOverviewRaw([]);
+
+        const [
+          overviewRes,
+          missionTotalRes,
+          missionDailyTrendRes,
+          settlementRes,
+          contentRevRes,
+          adRevRes,
+          earningRes,
+          appsOverviewRes,
+        ] = await Promise.all([
+          fetch(`/api/clickhouse?type=overview&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
+          fetch(`/api/clickhouse?type=mission_total&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
+          fetch(`/api/clickhouse?type=mission_daily_trend&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
+          fetch(`/api/settlement?from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
+          fetch(`/api/clickhouse?type=content_revenue&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
+          fetch(`/api/clickhouse?type=ad_revenue&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
+          fetch(`/api/clickhouse?type=earning&app=${selectedApp}&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
+          fetch(`/api/clickhouse?type=apps_overview&from=${fromDate}&to=${toDate}&_t=${timestamp}`, fetchOpts).catch(() => null),
+        ]);
+
+        if (overviewRes) {
+          const json = await overviewRes.json().catch(() => null);
+          if (json && json.success && Array.isArray(json.data)) setOverviewData(json.data);
+        }
+        if (missionTotalRes) {
+          const json = await missionTotalRes.json().catch(() => null);
+          if (json && json.success && Array.isArray(json.data)) setMissionTotalRaw(json.data);
+        }
+        if (missionDailyTrendRes) {
+          const json = await missionDailyTrendRes.json().catch(() => null);
+          if (json && json.success && Array.isArray(json.data)) setMissionDailyTrendRaw(json.data);
+        }
+        if (settlementRes) {
+          const json = await settlementRes.json().catch(() => null);
+          if (json && json.success && Array.isArray(json.data)) {
+            setSettlementRaw(json.data);
+          }
+        }
+        if (contentRevRes) {
+          const json = await contentRevRes.json().catch(() => null);
+          if (json && json.success && Array.isArray(json.data)) {
+            setContentRevenueRaw(json.data);
+            setServiceRevenueRaw(json.data);
+          }
+        }
+        if (adRevRes) {
+          const json = await adRevRes.json().catch(() => null);
+          if (json && json.success && Array.isArray(json.data)) setAdRevenueRaw(json.data);
+        }
+        if (earningRes) {
+          const json = await earningRes.json().catch(() => null);
+          if (json && json.success && Array.isArray(json.data)) setEarningRaw(json.data);
+        }
+        if (appsOverviewRes) {
+          const json = await appsOverviewRes.json().catch(() => null);
+          if (json && json.success && Array.isArray(json.data)) setAppsOverviewRaw(json.data);
+        }
+      } else if (activeTab === "users") {
         setOverviewData([]);
         setVisitRetentionRaw([]);
         setEarningRetentionRaw([]);
@@ -301,6 +372,7 @@ export function useDashboardData({
     earningActivityRaw,
     attendanceCompletionRaw,
     attendanceStepsRaw,
+    appsOverviewRaw,
     fetchDashboardData,
     refetch: fetchDashboardData,
   };

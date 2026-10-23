@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, Users, DollarSign, BarChart2, Award, ShoppingBag, Filter, BookOpen, UserPlus, Layers, ChevronDown, ChevronRight, Gift, Calendar, LogOut, User } from "lucide-react";
+import { LayoutDashboard, Menu, Users, DollarSign, BarChart2, Award, ShoppingBag, Filter, BookOpen, UserPlus, Layers, ChevronDown, ChevronRight, Gift, Calendar, LogOut, User } from "lucide-react";
 import { ActiveTab, RevenueCategoryTab, FunnelCategoryTab, MissionSubTab } from "@/types/dashboard";
 
 interface SidebarProps {
@@ -101,6 +101,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Navigation Sidebar Tabs (Scrollable area) */}
       <div className="flex-1 overflow-y-auto pr-1 space-y-1">
+        {/* 0. 종합 지표 */}
+        <button 
+          onClick={() => setActiveTab("summary")}
+          className={`flex items-center ${isSidebarCollapsed ? "justify-center" : "gap-2.5"} w-full px-3 py-2.5 text-[13px] font-semibold rounded-lg transition-all cursor-pointer ${
+            activeTab === "summary"
+              ? "bg-[#e5e7eb] text-[#191f28] font-bold"
+              : "text-[#4e5968] hover:text-[#191f28] hover:bg-[#f2f4f6]"
+          }`}
+          title="종합 지표"
+        >
+          <LayoutDashboard className={`w-4 h-4 shrink-0 ${activeTab === "summary" ? "text-[#191f28]" : "text-[#8b95a1]"}`} />
+          {!isSidebarCollapsed && <span>종합 지표</span>}
+        </button>
+
         {/* 1. 유저 현황 */}
         <button 
           onClick={() => setActiveTab("users")}

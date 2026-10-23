@@ -1,4 +1,4 @@
-export type ActiveTab = "users" | "revenue" | "funnel" | "mission" | "page";
+export type ActiveTab = "summary" | "users" | "revenue" | "funnel" | "mission" | "page";
 export type RevenueCategoryTab = "overall" | "ad_category" | "ad_network" | "content" | "content_pay" | "content_usage" | "margin" | "ad";
 export type FunnelCategoryTab = "detail" | "new_user";
 export type MissionSubTab = "general" | "reward" | "attendance";
@@ -356,6 +356,37 @@ export interface SettlementDailyItem {
   usedReward?: number;
   receivedReward?: SettlementReceivedReward;
   ad?: SettlementAdData;
+}
+
+export interface DailySummaryRow {
+  dt: string;
+  dau: number;
+  newUser: number;
+  missionCompleteCount: number;
+  contentRevenue: number;
+  adRevenue: number;
+  albaReward: number; // 적립 알바비 (P)
+  exchangeReward: number; // 포인트 환전액 (원)
+  missionProfit: number; // 광고 매출 - 알바비 (원)
+  revPerMission: number; // 광고 매출 / 미션참여수 (원/회)
+  rewardPerMission: number; // 알바비 / 미션참여수 (P/회)
+  missionPerDau: number; // 미션참여수 / DAU (회/명)
+}
+
+export interface AppSummaryRow {
+  app: string;
+  appName: string;
+  dau: number;
+  newUser: number;
+  missionCompleteCount: number;
+  contentRevenue: number;
+  adRevenue: number;
+  albaReward: number; // 적립 알바비 (P)
+  exchangeReward: number; // 포인트 환전액 (원)
+  missionProfit: number; // 광고 매출 - 알바비 (원)
+  revPerMission: number; // 광고 매출 / 미션참여수 (원/회)
+  rewardPerMission: number; // 알바비 / 미션참여수 (P/회)
+  missionPerDau: number; // 미션참여수 / DAU (회/명)
 }
 
 

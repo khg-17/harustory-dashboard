@@ -23,7 +23,7 @@ CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "http://210.97.114.130:60001")
 CLICKHOUSE_USER = os.getenv("CLICKHOUSE_USER", "mcp_user")
 CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "4a475bd1ec3f439e")
 
-SETTLEMENT_API_URL = os.getenv("SETTLEMENT_API_URL", "https://admin.treasurecomics.com/api/internal/v1/settlements/daily")
+SETTLEMENT_API_URL = os.getenv("SETTLEMENT_API_URL", "https://admin.treasurecomics.com/api/internal/v1/revenue")
 SETTLEMENT_API_CHANNEL_ID = os.getenv("SETTLEMENT_API_CHANNEL_ID", "guru")
 SETTLEMENT_API_CHANNEL_SECRET = os.getenv("SETTLEMENT_API_CHANNEL_SECRET", "41697d0dad")
 

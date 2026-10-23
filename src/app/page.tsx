@@ -25,6 +25,7 @@ import { FunnelDashboard } from "@/components/funnel/FunnelDashboard";
 import { NewUserFunnelDashboard } from "@/components/funnel/NewUserFunnelDashboard";
 import { MissionDashboard } from "@/components/mission/MissionDashboard";
 import { PageDashboard } from "@/components/page/PageDashboard";
+import { SummaryDashboard } from "@/components/summary/SummaryDashboard";
 
 import {
   ChartProcessedItem,
@@ -120,6 +121,7 @@ export default function Dashboard() {
     earningActivityRaw,
     attendanceCompletionRaw,
     attendanceStepsRaw,
+    appsOverviewRaw,
     fetchDashboardData,
   } = useDashboardData({
     activeTab,
@@ -664,17 +666,19 @@ export default function Dashboard() {
         {/* Title Row */}
         <div className="flex items-center justify-between">
           <h1 className="text-[26px] font-bold text-[#191f28] tracking-[-0.04em]">
-            {activeTab === "users"
-              ? "유저 현황"
-              : activeTab === "mission"
-                ? "미션 현황"
-                : activeTab === "funnel"
-                  ? funnelCategoryTab === "new_user"
-                    ? "신규 유저 퍼널"
-                    : "퍼널 분석 상세"
-                  : revenueCategoryTab === "margin"
-                    ? "손익 마진율"
-                    : "매출 현황"}
+            {activeTab === "summary"
+              ? "종합 지표"
+              : activeTab === "users"
+                ? "유저 현황"
+                : activeTab === "mission"
+                  ? "미션 현황"
+                  : activeTab === "funnel"
+                    ? funnelCategoryTab === "new_user"
+                      ? "신규 유저 퍼널"
+                      : "퍼널 분석 상세"
+                    : revenueCategoryTab === "margin"
+                      ? "손익 마진율"
+                      : "매출 현황"}
           </h1>
           <button
             onClick={fetchDashboardData}
@@ -700,6 +704,24 @@ export default function Dashboard() {
           handlePeriodChange={handlePeriodChange}
           handleDatePreset={handleDatePreset}
         />
+
+        {/* TAB 0: UNIFIED SUMMARY METRICS ("종합 지표") */}
+        {activeTab === "summary" && (
+          <SummaryDashboard
+            loading={loading}
+            fromDate={fromDate}
+            toDate={toDate}
+            selectedApp={selectedApp}
+            realAppList={realAppList}
+            overviewData={overviewData}
+            missionTotalRaw={missionTotalRaw}
+            missionDailyTrendRaw={missionDailyTrendRaw}
+            settlementRaw={settlementRaw}
+            revenueSummary={revenueSummary}
+            appsOverviewRaw={appsOverviewRaw}
+            onRefreshData={fetchDashboardData}
+          />
+        )}
 
         {/* TAB 1: USER ANALYTICS ("유저 현황") */}
         {activeTab === "users" && (

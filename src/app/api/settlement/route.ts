@@ -134,7 +134,7 @@ export async function GET(req: NextRequest) {
 
     const channelId = process.env.SETTLEMENT_API_CHANNEL_ID || 'guru';
     const channelSecret = process.env.SETTLEMENT_API_CHANNEL_SECRET || '41697d0dad';
-    const apiUrl = process.env.SETTLEMENT_API_URL || 'https://admin.treasurecomics.com/api/internal/v1/settlements/daily';
+    const apiUrl = process.env.SETTLEMENT_API_URL || 'https://admin.treasurecomics.com/api/internal/v1/revenue';
     const authHeader = `Basic ${Buffer.from(`${channelId}:${channelSecret}`).toString('base64')}`;
 
     const chunks = getDateChunks(minMissingYyyyMmDd, maxMissingYyyyMmDd, 3);
