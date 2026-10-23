@@ -50,17 +50,22 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 Minutes TTL: Ensures any live updates o
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const fromParam = searchParams.get('from') || '';
-    const toParam = searchParams.get('to') || '';
+    const fromParam = searchParams.get('from') || searchParams.get('startDate') || '';
+    const toParam = searchParams.get('to') || searchParams.get('endDate') || '';
     const appSNParam = searchParams.get('appSN') || '';
     const forceRefresh = searchParams.get('refresh') === '1' || searchParams.get('force') === 'true';
 
-    // Calculate KST yesterday limit (yyyyMMdd)
+    // Calculate KST limits (yyyyMMdd)
     const nowUtc = new Date();
     const kstOffsetMs = 9 * 60 * 60 * 1000;
     const kstDate = new Date(nowUtc.getTime() + kstOffsetMs);
-    kstDate.setUTCDate(kstDate.getUTCDate() - 1); // Yesterday in KST
 
+    const todayY = kstDate.getUTCFullYear();
+    const todayM = String(kstDate.getUTCMonth() + 1).padStart(2, '0');
+    const todayD = String(kstDate.getUTCDate()).padStart(2, '0');
+    const maxKstToday = `${todayY}${todayM}${todayD}`;
+
+    kstDate.setUTCDate(kstDate.getUTCDate() - 1); // Yesterday in KST
     const yyyy = kstDate.getUTCFullYear();
     const mm = String(kstDate.getUTCMonth() + 1).padStart(2, '0');
     const dd = String(kstDate.getUTCDate()).padStart(2, '0');
@@ -75,9 +80,9 @@ export async function GET(req: NextRequest) {
       startDate = '20260101';
     }
 
-    // Enforce max KST yesterday constraint
-    if (endDate > maxKstYesterday) {
-      endDate = maxKstYesterday;
+    // Enforce max KST constraint (allow up to today if specified)
+    if (endDate > maxKstToday) {
+      endDate = maxKstToday;
     }
 
     // Enforce startDate <= endDate
@@ -134,7 +139,13 @@ export async function GET(req: NextRequest) {
 
     const channelId = process.env.SETTLEMENT_API_CHANNEL_ID || 'guru';
     const channelSecret = process.env.SETTLEMENT_API_CHANNEL_SECRET || '41697d0dad';
-    const apiUrl = process.env.SETTLEMENT_API_URL || 'https://admin.treasurecomics.com/api/internal/v1/revenue';
+    let apiUrl = process.env.SETTLEMENT_API_URL || 'https://admin.treasurecomics.com/api/internal/v1/revenue';
+    if (apiUrl.includes('settlements/daily')) {
+      apiUrl = apiUrl.replace('settlements/daily', 'revenue');
+    }
+    if (apiUrl.startsWith('http://')) {
+      apiUrl = apiUrl.replace('http://', 'https://');
+    }
     const authHeader = `Basic ${Buffer.from(`${channelId}:${channelSecret}`).toString('base64')}`;
 
     const chunks = getDateChunks(minMissingYyyyMmDd, maxMissingYyyyMmDd, 3);

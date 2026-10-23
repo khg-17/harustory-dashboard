@@ -736,14 +736,18 @@ export async function GET(request: NextRequest) {
   const newUserOnly = searchParams.get('newUserOnly') || '';
   const cacheKey = `${type}_${app}_${from}_${to}_${label}_${userSegment}_${steps}_${newUserOnly}`;
 
-  // 1.5 Deterministic Memory Cache Check: Return cached response immediately for identical request parameters
+  // 1.5 Deterministic Memory Cache Check: Return cached response if within 5-minute TTL
   if (responseCache.has(cacheKey)) {
-    const cachedData = responseCache.get(cacheKey)!.data;
-    return NextResponse.json({
-      success: true,
-      mode: 'cached',
-      data: cachedData,
-    });
+    const cachedEntry = responseCache.get(cacheKey)!;
+    if (Date.now() - cachedEntry.timestamp < 5 * 60 * 1000) {
+      return NextResponse.json({
+        success: true,
+        mode: 'cached',
+        data: cachedEntry.data,
+      });
+    } else {
+      responseCache.delete(cacheKey);
+    }
   }
 
   // 2. Circuit Breaker Check: If ClickHouse is currently quota-blocked, DO NOT query DB
